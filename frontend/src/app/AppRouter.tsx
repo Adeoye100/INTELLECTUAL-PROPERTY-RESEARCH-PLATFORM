@@ -1,5 +1,5 @@
 import React from 'react';
-import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { AuthLayout } from './AuthLayout';
 import { MainLayout } from './MainLayout';
 import { LoginScreen } from '../features/auth/LoginScreen';
@@ -11,10 +11,12 @@ import { WatchesScreen } from '../features/watches/WatchesScreen';
 import { DashboardScreen } from '../features/dashboard/DashboardScreen';
 import { AdminScreen } from '../features/billing/AdminScreen';
 
+import { LandingPage } from '../features/landing/pages/LandingPage';
+
 const router = createBrowserRouter([
   {
     path: '/',
-    element: <Navigate to="/dashboard" replace />,
+    element: <LandingPage />,
   },
   {
     path: '/auth',
