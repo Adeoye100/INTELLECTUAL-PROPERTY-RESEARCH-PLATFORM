@@ -1,0 +1,23 @@
+@import "tailwindcss";
+@config "../../tailwind.config.js";
+
+@layer base {
+  body {
+    @apply bg-surface-base text-text-primary antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}
+
+@layer components {
+  .brand-gradient {
+    background: linear-gradient(180deg, theme('colors.forge-navy.950'), theme('colors.forge-teal.600'));
+  }
+
+  .btn-primary {
+    @apply bg-forge-teal-700 text-white font-medium py-2 px-4 rounded transition-colors duration-200;
+  }
+
+  .btn-primary:hover, .btn-primary:active {
+    @apply bg-forge-navy-950;
+  }
+}

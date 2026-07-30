@@ -1,0 +1,21 @@
+import React from 'react';
+import { Outlet } from 'react-router-dom';
+import { Logo } from '../components/Logo';
+
+export const AuthLayout: React.FC = () => {
+  return (
+    <div className="min-h-screen w-full flex items-center justify-center bg-forge-gradient p-6">
+      <div className="w-full max-w-md">
+        <div className="flex justify-center mb-8">
+          <Logo className="scale-125" />
+        </div>
+        <div className="bg-surface-card rounded-lg shadow-2xl p-8 border border-forge-silver-300">
+          <Outlet />
+        </div>
+        <div className="mt-8 text-center text-forge-subtext-onDark text-sm">
+          © 2026 Forge Global Intellectual Property Security. All rights reserved.
+        </div>
+      </div>
+    </div>
+  );
+};
