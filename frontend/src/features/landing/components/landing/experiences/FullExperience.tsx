@@ -29,7 +29,7 @@ export function FullExperience() {
   const cardFacet = cardFacetIndex !== null ? FACETS[cardFacetIndex] : null;
 
   return (
-    <div className="relative bg-gradient-to-b from-forge-navy to-forge-teal text-forge-text-onDark overflow-hidden">
+    <div className="relative min-h-screen bg-forge-teal text-forge-text-onDark overflow-hidden">
       <div className="fixed inset-0 z-0" aria-hidden="true">
         <Suspense fallback={null}>
           <ShieldScene

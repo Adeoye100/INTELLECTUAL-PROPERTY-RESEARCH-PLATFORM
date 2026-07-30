@@ -3,7 +3,8 @@
 
 @layer base {
   body {
-    @apply bg-surface-base text-text-primary antialiased;
+    @apply text-text-primary antialiased;
+    background-color: #0A1428;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
 }
