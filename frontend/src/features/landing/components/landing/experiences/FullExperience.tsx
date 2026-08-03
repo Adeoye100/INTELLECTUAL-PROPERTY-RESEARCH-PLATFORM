@@ -29,7 +29,10 @@ export function FullExperience() {
   const cardFacet = cardFacetIndex !== null ? FACETS[cardFacetIndex] : null;
 
   return (
-    <div className="relative min-h-screen bg-forge-teal text-forge-text-onDark overflow-hidden">
+    <div
+      className="relative min-h-screen text-forge-text-onDark overflow-hidden"
+      style={{ backgroundImage: 'url(/landingpagebg.webp)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundAttachment: 'fixed' }}
+    >
       <div className="fixed inset-0 z-0" aria-hidden="true">
         <Suspense fallback={null}>
           <ShieldScene

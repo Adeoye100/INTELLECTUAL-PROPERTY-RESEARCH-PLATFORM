@@ -8,7 +8,10 @@ import { ShieldStatic } from '../ShieldStatic';
 // Same six-facet content as the animated tiers, in plain document flow.
 export function StaticExperience() {
   return (
-    <div className="relative min-h-screen bg-forge-teal text-forge-text-onDark">
+    <div
+      className="relative min-h-screen text-forge-text-onDark"
+      style={{ backgroundImage: 'url(/landingpagebg.webp)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundAttachment: 'fixed' }}
+    >
       <LandingHeader />
       <main>
         <section className="min-h-[80vh] flex flex-col items-center justify-center text-center px-6 py-28">

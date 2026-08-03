@@ -1,10 +1,9 @@
 import { Link } from 'react-router-dom';
-import { ShieldStatic } from './ShieldStatic';
 export function LandingHeader() {
   return (
     <header className="fixed top-0 inset-x-0 z-30 flex items-center justify-between px-6 md:px-10 py-5">
       <Link to="/" className="flex items-center gap-2.5">
-        <ShieldStatic size={22} animated={false} />
+        <img src="/logo.png" alt="Forge Global logo" className="h-16 w-auto object-contain" />
         <span className="font-semibold tracking-[0.18em] text-forge-text-onDark text-sm uppercase">
           Forge Global
         </span>
