@@ -92,10 +92,10 @@ export interface RiskScore {
 
 export interface OfficeActionRef {
   id: string;
-  portfolioMarkId: string;
+  portfolioMarkId: string | null;   // null until linked
   referenceText: string;
   examinerReasoningSummary: string;
-  linkedPrecedentRef: string;
+  linkedPrecedentRef: string | null;
 }
 
 export interface Subscription {

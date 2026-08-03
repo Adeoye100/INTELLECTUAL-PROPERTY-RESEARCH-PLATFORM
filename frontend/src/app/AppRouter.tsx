@@ -6,6 +6,7 @@ import { LoginScreen } from '../features/auth/LoginScreen';
 import { SignupScreen } from '../features/auth/SignupScreen';
 import { SearchScreen } from '../features/search/SearchScreen';
 import { RiskDetailScreen } from '../features/search/RiskDetailScreen';
+import { OfficeActionResearchScreen } from '../features/office-action/OfficeActionResearchScreen';
 import { PortfolioScreen } from '../features/portfolio/PortfolioScreen';
 import { WatchesScreen } from '../features/watches/WatchesScreen';
 import { DashboardScreen } from '../features/dashboard/DashboardScreen';
@@ -33,6 +34,7 @@ const router = createBrowserRouter([
       { path: 'dashboard', element: <DashboardScreen /> },
       { path: 'search', element: <SearchScreen /> },
       { path: 'search/risk/:id', element: <RiskDetailScreen /> },
+      { path: 'office-actions', element: <OfficeActionResearchScreen /> },
       { path: 'portfolio', element: <PortfolioScreen /> },
       { path: 'watches', element: <WatchesScreen /> },
       { path: 'admin', element: <AdminScreen /> },

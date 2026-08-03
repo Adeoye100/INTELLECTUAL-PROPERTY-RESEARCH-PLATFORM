@@ -101,7 +101,12 @@ export const RiskDetailScreen: React.FC = () => {
                 </div>
               ))}
               <div className="pt-2">
-                <Button variant="outline" size="sm" className="w-full">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full"
+                  onClick={() => navigate('/office-actions')}
+                >
                   <FileText className="w-4 h-4 mr-2" />
                   View Office Action Research (linked precedents)
                 </Button>
