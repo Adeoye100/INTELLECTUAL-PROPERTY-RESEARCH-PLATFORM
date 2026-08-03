@@ -1,11 +1,12 @@
 import React from 'react';
-import { useForm } from 'react-hook-form';
-import { Search as SearchIcon, Filter, AlertTriangle } from 'lucide-react';
+import { useForm, useWatch } from 'react-hook-form';
+import { Search as SearchIcon, Filter } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
 import { Badge } from '../../components/Badge';
+import { SourceStatusIndicator } from '../../components/SourceStatusIndicator';
 import { useQuery } from '@tanstack/react-query';
-import type { SearchResult } from '../../types';
+import type { SearchResponse, SearchResult } from '../../types';
 import { Link } from 'react-router-dom';
 
 interface SearchFilters {
@@ -15,7 +16,7 @@ interface SearchFilters {
 }
 
 export const SearchScreen: React.FC = () => {
-  const { register, handleSubmit, watch } = useForm<SearchFilters>({
+  const { register, handleSubmit, control } = useForm<SearchFilters>({
     defaultValues: {
       query: '',
       jurisdictions: ['US'],
@@ -23,18 +24,20 @@ export const SearchScreen: React.FC = () => {
     },
   });
 
-  const queryText = watch('query');
+  const queryText = useWatch({ control, name: 'query' });
 
-  const { data: results, isLoading, isError } = useQuery<SearchResult[]>({
+  const { data: searchResponse, isLoading, isError } = useQuery<SearchResponse>({
     queryKey: ['search', queryText],
     queryFn: async () => {
-      if (!queryText) return [];
+      if (!queryText) return { results: [], sourceStatuses: [] };
       const response = await fetch(`/api/search?q=${encodeURIComponent(queryText)}`);
       if (!response.ok) throw new Error('Search failed');
       return response.json();
     },
     enabled: queryText.length > 2,
   });
+
+  const results = searchResponse?.results;
 
   const onSubmit = (data: SearchFilters) => {
     console.log('Search filters:', data);
@@ -64,7 +67,7 @@ export const SearchScreen: React.FC = () => {
                   <SearchIcon className="absolute left-3 top-2.5 w-4 h-4 text-forge-silver-500" />
                   <input
                     {...register('query')}
-                    className="w-full pl-9 pr-3 py-2 border border-forge-silver-300 rounded focus:ring-2 focus:ring-forge-teal-700 outline-none"
+                    className="w-full pl-9 pr-3 py-2 border border-forge-silver-300 rounded focus:ring-2 focus:ring-accent outline-none"
                     placeholder="Search mark name..."
                   />
                 </div>
@@ -79,7 +82,7 @@ export const SearchScreen: React.FC = () => {
                         type="checkbox"
                         value={j}
                         {...register('jurisdictions')}
-                        className="rounded text-forge-teal-700 focus:ring-forge-teal-700"
+                        className="rounded text-accent focus:ring-accent"
                       />
                       {j === 'US' ? 'United States (USPTO)' : 
                        j === 'EU' ? 'European Union (EUIPO)' :
@@ -94,7 +97,7 @@ export const SearchScreen: React.FC = () => {
                 <label className="block text-xs font-bold text-text-secondary uppercase mb-1">Nice Classes</label>
                 <input
                   {...register('classes')}
-                  className="w-full px-3 py-2 border border-forge-silver-300 rounded focus:ring-2 focus:ring-forge-teal-700 outline-none"
+                  className="w-full px-3 py-2 border border-forge-silver-300 rounded focus:ring-2 focus:ring-accent outline-none"
                   placeholder="e.g. 9, 35, 42"
                 />
               </div>
@@ -124,20 +127,26 @@ export const SearchScreen: React.FC = () => {
             <div className="p-8 text-center text-risk-high bg-risk-high/10 rounded-lg">
               Search encountered an error. Please try again.
             </div>
-          ) : results?.length === 0 ? (
-            <div className="p-12 text-center bg-surface-card rounded-lg border border-forge-silver-300">
-              No direct matches found. Try broadening your filters.
-            </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center justify-between text-sm text-text-secondary px-2">
-                <span>Showing {results?.length} matches for "{queryText}"</span>
-                <span>Sorted by composite risk score</span>
-              </div>
-              
-              {results?.map((result) => (
-                <SearchResultCard key={result.id} result={result} />
-              ))}
+              <SourceStatusIndicator statuses={searchResponse?.sourceStatuses ?? []} />
+
+              {results?.length === 0 ? (
+                <div className="p-12 text-center bg-surface-card rounded-lg border border-forge-silver-300">
+                  No direct matches found. Try broadening your filters.
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between text-sm text-text-secondary px-2">
+                    <span>Showing {results?.length} matches for "{queryText}"</span>
+                    <span>Sorted by composite risk score</span>
+                  </div>
+
+                  {results?.map((result) => (
+                    <SearchResultCard key={result.id} result={result} />
+                  ))}
+                </>
+              )}
             </div>
           )}
         </div>
@@ -147,10 +156,8 @@ export const SearchScreen: React.FC = () => {
 };
 
 const SearchResultCard: React.FC<{ result: SearchResult }> = ({ result }) => {
-  const isUnavailable = result.status === 'unavailable';
-
   return (
-    <Card className={cn('relative', isUnavailable && 'opacity-75')}>
+    <Card className="relative">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-1">
@@ -165,35 +172,22 @@ const SearchResultCard: React.FC<{ result: SearchResult }> = ({ result }) => {
           </div>
           <div className="flex items-center gap-4 text-xs font-bold text-text-secondary uppercase">
             <span>{result.candidateSource}</span>
-            <span>Ref: {result.candidateRef}</span>
+            <span>Ref: <span className="font-mono">{result.candidateRef}</span></span>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          {isUnavailable ? (
-            <div className="flex items-center text-risk-high text-xs font-bold bg-risk-high/5 px-3 py-1.5 rounded border border-risk-high/20">
-              <AlertTriangle className="w-4 h-4 mr-2" />
-              SOURCE UNAVAILABLE
+          <div className="text-right mr-4 hidden sm:block">
+            <div className="text-[10px] text-text-secondary uppercase font-bold">Similarity</div>
+            <div className="text-lg font-bold text-text-primary">
+              {result.riskScore ? Math.max(result.riskScore.phoneticScore, result.riskScore.visualScore) : 0}%
             </div>
-          ) : (
-            <>
-              <div className="text-right mr-4 hidden sm:block">
-                <div className="text-[10px] text-text-secondary uppercase font-bold">Similarity</div>
-                <div className="text-lg font-bold text-text-primary">
-                  {result.riskScore ? Math.max(result.riskScore.phoneticScore, result.riskScore.visualScore) : 0}%
-                </div>
-              </div>
-              <Link to={`/search/risk/${result.id}`}>
-                <Button variant="outline" size="sm">Review Risk</Button>
-              </Link>
-            </>
-          )}
+          </div>
+          <Link to={`/search/risk/${result.id}`}>
+            <Button variant="outline" size="sm">Review Risk</Button>
+          </Link>
         </div>
       </div>
     </Card>
   );
 };
-
-function cn(...classes: any[]) {
-  return classes.filter(Boolean).join(' ');
-}

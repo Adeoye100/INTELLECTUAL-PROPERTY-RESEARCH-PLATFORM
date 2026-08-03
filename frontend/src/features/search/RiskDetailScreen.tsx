@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, Scale, FileText, AlertCircle, Shield } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
-import type { SearchResult } from '../../types';
+import type { SearchResponse } from '../../types';
 import { cn } from '../../lib/utils';
 import { 
   ResponsiveContainer,
@@ -20,7 +20,7 @@ export const RiskDetailScreen: React.FC = () => {
   const navigate = useNavigate();
 
   // In a real app, we'd fetch by ID. Here we just get all and find the one.
-  const { data: results, isLoading } = useQuery<SearchResult[]>({
+  const { data: searchResponse, isLoading } = useQuery<SearchResponse>({
     queryKey: ['search'], // reuse cache
     queryFn: async () => {
         const response = await fetch(`/api/search?q=FORGE`);
@@ -28,7 +28,7 @@ export const RiskDetailScreen: React.FC = () => {
     }
   });
 
-  const result = results?.find(r => r.id === id);
+  const result = searchResponse?.results.find(r => r.id === id);
 
   if (isLoading) return <div className="p-8 text-center animate-pulse">Analyzing risk vectors...</div>;
   if (!result || !result.riskScore) return <div className="p-8 text-center">Result not found or source unavailable.</div>;
@@ -75,7 +75,7 @@ export const RiskDetailScreen: React.FC = () => {
                   {result.candidateMarkText}
                 </div>
                 <div className="text-xs text-text-secondary mt-1 italic">
-                  Source: {result.candidateSource} | Ref: {result.candidateRef}
+                  Source: {result.candidateSource} | Ref: <span className="font-mono not-italic">{result.candidateRef}</span>
                 </div>
               </div>
             </div>
@@ -166,7 +166,7 @@ export const RiskDetailScreen: React.FC = () => {
                   <p className="text-xs text-forge-subtext-onDark">Monitor status changes</p>
                 </div>
               </div>
-              <Button className="w-full bg-forge-teal-600 hover:bg-forge-teal-700">Initiate Legal Review</Button>
+              <Button className="w-full bg-accent hover:bg-accent-hover">Initiate Legal Review</Button>
             </div>
           </Card>
         </div>

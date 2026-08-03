@@ -96,7 +96,7 @@ export const AdminScreen: React.FC = () => {
                   <div className="text-lg font-bold">$1,200</div>
                 </div>
               </div>
-              <Button className="w-full bg-forge-teal-600 hover:bg-forge-teal-700">Manage Billing</Button>
+              <Button className="w-full bg-accent hover:bg-accent-hover">Manage Billing</Button>
             </div>
           </Card>
 

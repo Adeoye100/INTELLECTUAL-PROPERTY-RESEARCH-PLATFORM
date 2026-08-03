@@ -1,5 +1,7 @@
 export type UserRole = 'admin' | 'attorney' | 'viewer';
 export type RiskLevel = 'low' | 'medium' | 'high';
+export type SourceStatus = 'responded' | 'pending' | 'unavailable';
+export type SourceStatusEntry = { source: string; status: SourceStatus };
 export type WatchAlertChannel = 'email' | 'in-app';
 export type WatchAlertMode = 'real-time' | 'digest';
 
@@ -72,7 +74,11 @@ export interface SearchResult {
   candidateSource: string;
   candidateRef: string;
   riskScore?: RiskScore; // Joined data
-  status?: string; // e.g. "available", "unavailable" (partial source requirement)
+}
+
+export interface SearchResponse {
+  results: SearchResult[];
+  sourceStatuses: SourceStatusEntry[];
 }
 
 export interface RiskScore {

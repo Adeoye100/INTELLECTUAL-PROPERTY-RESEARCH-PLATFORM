@@ -66,7 +66,7 @@ export const SignupScreen: React.FC = () => {
           <label className="block text-sm font-semibold text-text-primary mb-1">Full Name</label>
           <input
             {...register('fullName')}
-            className="w-full px-3 py-2 border border-forge-silver-300 rounded focus:ring-2 focus:ring-forge-teal-700 outline-none transition-all"
+            className="w-full px-3 py-2 border border-forge-silver-300 rounded focus:ring-2 focus:ring-accent outline-none transition-all"
             placeholder="Jane Smith"
           />
           {errors.fullName && <p className="text-risk-high text-xs mt-1">{errors.fullName.message}</p>}
@@ -76,7 +76,7 @@ export const SignupScreen: React.FC = () => {
           <label className="block text-sm font-semibold text-text-primary mb-1">Company</label>
           <input
             {...register('company')}
-            className="w-full px-3 py-2 border border-forge-silver-300 rounded focus:ring-2 focus:ring-forge-teal-700 outline-none transition-all"
+            className="w-full px-3 py-2 border border-forge-silver-300 rounded focus:ring-2 focus:ring-accent outline-none transition-all"
             placeholder="Legal Partners LLC"
           />
           {errors.company && <p className="text-risk-high text-xs mt-1">{errors.company.message}</p>}
@@ -87,7 +87,7 @@ export const SignupScreen: React.FC = () => {
           <input
             {...register('email')}
             type="email"
-            className="w-full px-3 py-2 border border-forge-silver-300 rounded focus:ring-2 focus:ring-forge-teal-700 outline-none transition-all"
+            className="w-full px-3 py-2 border border-forge-silver-300 rounded focus:ring-2 focus:ring-accent outline-none transition-all"
             placeholder="jane@company.com"
           />
           {errors.email && <p className="text-risk-high text-xs mt-1">{errors.email.message}</p>}
@@ -98,7 +98,7 @@ export const SignupScreen: React.FC = () => {
           <input
             {...register('password')}
             type="password"
-            className="w-full px-3 py-2 border border-forge-silver-300 rounded focus:ring-2 focus:ring-forge-teal-700 outline-none transition-all"
+            className="w-full px-3 py-2 border border-forge-silver-300 rounded focus:ring-2 focus:ring-accent outline-none transition-all"
             placeholder="••••••••"
           />
           {errors.password && <p className="text-risk-high text-xs mt-1">{errors.password.message}</p>}
@@ -112,7 +112,7 @@ export const SignupScreen: React.FC = () => {
       <div className="text-center pt-4 border-t border-forge-silver-100">
         <p className="text-sm text-text-secondary">
           Already have an account?{' '}
-          <Link to="/auth/login" className="text-forge-teal-700 font-bold hover:underline">
+          <Link to="/auth/login" className="text-accent font-bold hover:underline">
             Sign In
           </Link>
         </p>

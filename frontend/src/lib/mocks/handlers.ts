@@ -1,5 +1,5 @@
 import { http, HttpResponse, delay } from 'msw';
-import type { SearchResult, OfficeActionRef, PortfolioMark } from '../../types';
+import type { SearchResponse, SearchResult, OfficeActionRef, PortfolioMark } from '../../types';
 
 const mockSearchResults: SearchResult[] = [
   {
@@ -8,7 +8,6 @@ const mockSearchResults: SearchResult[] = [
     candidateMarkText: 'FORGE TEK',
     candidateSource: 'USPTO',
     candidateRef: 'US87654321',
-    status: 'available',
     riskScore: {
       id: 'r1',
       phoneticScore: 85,
@@ -27,7 +26,6 @@ const mockSearchResults: SearchResult[] = [
     candidateMarkText: 'FORTRESS GLOBAL',
     candidateSource: 'EUIPO',
     candidateRef: 'EU12345678',
-    status: 'available',
     riskScore: {
       id: 'r2',
       phoneticScore: 30,
@@ -39,15 +37,17 @@ const mockSearchResults: SearchResult[] = [
       ],
     },
   },
-  {
-    id: '3',
-    searchId: 's1',
-    candidateMarkText: 'VALLEY FORGE',
-    candidateSource: 'WIPO',
-    candidateRef: 'WI99887766',
-    status: 'unavailable', // Demonstrating partial source failure requirement
-  },
 ];
+
+export const mockSearchResponse: SearchResponse = {
+  results: mockSearchResults,
+  sourceStatuses: [
+    { source: 'USPTO', status: 'responded' },
+    { source: 'EUIPO', status: 'responded' },
+    { source: 'UKIPO', status: 'pending' },
+    { source: 'WIPO', status: 'unavailable' },
+  ],
+};
 
 const mockOfficeActionRefs: OfficeActionRef[] = [
   {
@@ -168,10 +168,10 @@ export const handlers = [
     await delay(1200);
     
     if (!q) {
-      return HttpResponse.json([]);
+      return HttpResponse.json<SearchResponse>({ results: [], sourceStatuses: [] });
     }
     
-    return HttpResponse.json(mockSearchResults);
+    return HttpResponse.json(mockSearchResponse);
   }),
 
   http.get('/api/portfolio', async () => {

@@ -6,7 +6,15 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['IBM Plex Mono', 'ui-monospace', 'monospace'],
+      },
       colors: {
+        accent: {
+          DEFAULT: '#146575',
+          hover: '#0F4A57',
+        },
         // Brand — navy-to-teal gradient
         'forge-navy': {
           950: '#0A1428',   // deep navy, gradient start (top)
