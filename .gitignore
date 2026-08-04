@@ -1,2 +1,4 @@
-*./conversation
+* ./conversation
+/home/ad/Documents/IPRP/conversation
 * ./.idea
+.gitignore

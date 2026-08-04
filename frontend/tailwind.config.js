@@ -7,7 +7,9 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['Poppins', 'system-ui', 'sans-serif'],
+        heading: ['Bebas Neue', 'Impact', 'sans-serif'],
+        special: ['ITC Garamond', 'Garamond', 'Georgia', 'serif'],
         mono: ['IBM Plex Mono', 'ui-monospace', 'monospace'],
       },
       colors: {

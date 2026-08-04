@@ -8,7 +8,7 @@ export function HeroSection({ animated = true }: HeroSectionProps) {
       <p className="font-mono text-xs md:text-sm tracking-[0.32em] text-forge-silver-400 uppercase">
         Brand Protection, Forged
       </p>
-      <h1 className="mt-5 max-w-3xl text-4xl md:text-6xl font-semibold text-forge-text-onDark leading-tight">
+      <h1 className="mt-5 max-w-3xl font-heading text-4xl font-normal leading-tight text-forge-text-onDark md:text-6xl">
         Forge Global — Brand Protection and Intellectual Property Security
       </h1>
       <p className="mt-6 max-w-xl text-base md:text-lg text-forge-subtext-onDark">
