@@ -71,8 +71,14 @@ export const RiskDetailScreen: React.FC = () => {
 
               <div className="text-center md:text-right">
                 <div className="text-[10px] text-text-secondary uppercase font-bold mb-1">Candidate Match</div>
-                <div className="text-3xl font-black text-risk-high uppercase font-mono tracking-tighter">
-                  {result.candidateMarkText}
+                <div
+                  className="flex items-center justify-center md:justify-end gap-2 text-risk-high"
+                  aria-label={`Conflicting candidate mark: ${result.candidateMarkText}`}
+                >
+                  <AlertCircle className="w-6 h-6 flex-shrink-0" aria-hidden="true" />
+                  <span className="text-3xl font-black uppercase font-mono tracking-tighter">
+                    {result.candidateMarkText}
+                  </span>
                 </div>
                 <div className="text-xs text-text-secondary mt-1 italic">
                   Source: {result.candidateSource} | Ref: <span className="font-mono not-italic">{result.candidateRef}</span>
@@ -119,7 +125,11 @@ export const RiskDetailScreen: React.FC = () => {
         <div className="lg:col-span-1 space-y-6">
           <Card title="Risk Summary">
             <div className="text-center py-6">
-              <div className="inline-flex items-center justify-center w-24 h-24 rounded-full border-8 border-risk-high text-risk-high mb-4">
+              <div
+                className="inline-flex items-center justify-center w-24 h-24 rounded-full border-8 border-risk-high text-risk-high mb-4"
+                role="img"
+                aria-label="Risk level: HIGH"
+              >
                 <span className="text-2xl font-black">HIGH</span>
               </div>
               <h3 className="text-lg font-bold text-text-primary uppercase tracking-wide">Likelihood of Confusion</h3>

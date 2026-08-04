@@ -7,6 +7,13 @@ import { Badge } from '../../components/Badge';
 import { Link } from 'react-router-dom';
 import type { Alert } from '../../types';
 
+interface Watch {
+  id: string;
+  alertChannel: string;
+  alertMode: string;
+  markText: string;
+}
+
 export const WatchesScreen: React.FC = () => {
   const { data: alerts, isLoading: alertsLoading } = useQuery<(Alert & { matchedMarkText: string })[]>({
     queryKey: ['alerts'],
@@ -16,7 +23,7 @@ export const WatchesScreen: React.FC = () => {
     },
   });
 
-  const { data: watches, isLoading: watchesLoading } = useQuery<any[]>({
+  const { data: watches, isLoading: watchesLoading } = useQuery<Watch[]>({
     queryKey: ['watches'],
     queryFn: async () => {
       const response = await fetch('/api/watches');
@@ -28,12 +35,12 @@ export const WatchesScreen: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <header className="flex items-center justify-between">
+      <header className="flex items-center justify-between md:max-xl:flex-col md:max-xl:items-stretch md:max-xl:gap-4">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Watches & Alerts</h1>
           <p className="text-text-secondary text-sm">Real-time monitoring of global registry filings</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 md:max-xl:flex-wrap">
             <Button variant="outline" size="sm">
                 <Settings className="w-4 h-4 mr-2" />
                 Notification Settings
@@ -45,9 +52,9 @@ export const WatchesScreen: React.FC = () => {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         {/* Active Alerts Feed */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="xl:col-span-2 space-y-4">
           <h2 className="text-sm font-bold text-text-secondary uppercase tracking-wider flex items-center gap-2">
             <Bell className="w-4 h-4" />
             Recent Alerts
@@ -55,8 +62,8 @@ export const WatchesScreen: React.FC = () => {
           
           {alerts?.map((alert) => (
             <Card key={alert.id} className={cn("border-l-4", alert.riskScore?.compositeRating === 'high' ? "border-l-risk-high" : "border-l-risk-medium")}>
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
+              <div className="flex items-start justify-between gap-4 md:max-xl:flex-col">
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <Badge risk={alert.riskScore?.compositeRating}>{alert.riskScore?.compositeRating} Risk</Badge>
                     <span className="text-xs text-text-secondary font-medium">
@@ -71,7 +78,7 @@ export const WatchesScreen: React.FC = () => {
                     Registry: {alert.matchedFilingRef.startsWith('US') ? 'USPTO' : 'Other'}.
                   </p>
                 </div>
-                <Link to={`/search/risk/${alert.id}`}>
+                <Link to={`/search/risk/${alert.id}`} className="md:max-xl:self-end">
                   <Button size="sm" variant="outline">
                     Analyze <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
@@ -89,7 +96,7 @@ export const WatchesScreen: React.FC = () => {
         </div>
 
         {/* Active Watches Sidebar */}
-        <div className="lg:col-span-1 space-y-4">
+        <div className="xl:col-span-1 space-y-4">
           <h2 className="text-sm font-bold text-text-secondary uppercase tracking-wider flex items-center gap-2">
             <Eye className="w-4 h-4" />
             Active Watches
@@ -102,7 +109,10 @@ export const WatchesScreen: React.FC = () => {
                   <Shield className="w-4 h-4 text-forge-teal-700" />
                   <span className="font-bold uppercase font-mono text-sm">{watch.markText}</span>
                 </div>
-                <div className="w-2 h-2 rounded-full bg-risk-low"></div>
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-full bg-risk-low" aria-hidden="true"></div>
+                  <span className="text-[10px] font-bold uppercase text-text-secondary">Active</span>
+                </div>
               </div>
               <div className="text-[10px] text-text-secondary uppercase font-bold space-y-1">
                 <div className="flex justify-between">
@@ -125,6 +135,6 @@ export const WatchesScreen: React.FC = () => {
   );
 };
 
-function cn(...classes: any[]) {
+function cn(...classes: string[]) {
   return classes.filter(Boolean).join(' ');
 }

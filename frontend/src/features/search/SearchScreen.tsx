@@ -50,8 +50,13 @@ export const SearchScreen: React.FC = () => {
           <h1 className="text-2xl font-bold text-text-primary">Trademark Search</h1>
           <p className="text-text-secondary text-sm">Cross-registry phonetic and visual similarity analysis</p>
         </div>
-        <Button variant="outline" size="sm">
-          <Filter className="w-4 h-4 mr-2" />
+        <Button
+          variant="outline"
+          size="sm"
+          disabled
+          title="Saved searches are not available yet"
+        >
+          <Filter className="w-4 h-4 mr-2" aria-hidden="true" />
           Saved Searches
         </Button>
       </header>
@@ -62,12 +67,13 @@ export const SearchScreen: React.FC = () => {
           <Card title="Search Filters" className="sticky top-24">
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-text-secondary uppercase mb-1">Mark Text</label>
+                <label htmlFor="trademark-query" className="block text-xs font-bold text-text-secondary uppercase mb-1">Mark Text</label>
                 <div className="relative">
-                  <SearchIcon className="absolute left-3 top-2.5 w-4 h-4 text-forge-silver-500" />
+                  <SearchIcon className="absolute left-3 top-2.5 w-4 h-4 text-forge-silver-500" aria-hidden="true" />
                   <input
                     {...register('query')}
-                    className="w-full pl-9 pr-3 py-2 border border-forge-silver-300 rounded focus:ring-2 focus:ring-accent outline-none"
+                    id="trademark-query"
+                    className="w-full pl-9 pr-3 py-2 border border-forge-silver-300 rounded outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
                     placeholder="Search mark name..."
                   />
                 </div>
@@ -94,10 +100,11 @@ export const SearchScreen: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-text-secondary uppercase mb-1">Nice Classes</label>
+                <label htmlFor="nice-classes" className="block text-xs font-bold text-text-secondary uppercase mb-1">Nice Classes</label>
                 <input
                   {...register('classes')}
-                  className="w-full px-3 py-2 border border-forge-silver-300 rounded focus:ring-2 focus:ring-accent outline-none"
+                  id="nice-classes"
+                  className="w-full px-3 py-2 border border-forge-silver-300 rounded outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
                   placeholder="e.g. 9, 35, 42"
                 />
               </div>
@@ -183,8 +190,11 @@ const SearchResultCard: React.FC<{ result: SearchResult }> = ({ result }) => {
               {result.riskScore ? Math.max(result.riskScore.phoneticScore, result.riskScore.visualScore) : 0}%
             </div>
           </div>
-          <Link to={`/search/risk/${result.id}`}>
-            <Button variant="outline" size="sm">Review Risk</Button>
+          <Link
+            to={`/search/risk/${result.id}`}
+            className="inline-flex items-center justify-center rounded border border-forge-silver-500 px-3 py-1.5 text-sm font-medium text-text-primary transition-colors hover:bg-forge-silver-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+          >
+            Review Risk
           </Link>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, AlertCircle, Shield, ExternalLink, Calendar } from 'lucide-react';
+import { Plus, AlertCircle, Shield, ExternalLink, Calendar, MoveHorizontal } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
 import { Badge } from '../../components/Badge';
@@ -20,18 +20,18 @@ export const PortfolioScreen: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between">
+      <header className="flex items-center justify-between md:max-xl:flex-col md:max-xl:items-stretch md:max-xl:gap-4">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Protected Portfolio</h1>
           <p className="text-text-secondary text-sm">Managed trademarks and intellectual property assets</p>
         </div>
-        <Button>
+        <Button className="md:max-xl:self-start">
           <Plus className="w-4 h-4 mr-2" />
           Add Mark
         </Button>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <Card className="bg-forge-navy-950 text-white border-none">
           <div className="text-[10px] text-forge-subtext-onDark uppercase font-bold mb-1">Total Assets</div>
           <div className="text-3xl font-black">24</div>
@@ -54,7 +54,14 @@ export const PortfolioScreen: React.FC = () => {
       </div>
 
       <Card>
-        <Table headers={['Mark', 'Jurisdiction', 'Classes', 'Status', 'Renewal Date', 'Actions']}>
+        <div className="mb-3 hidden items-center gap-2 text-xs font-semibold text-text-secondary md:max-xl:flex">
+          <MoveHorizontal className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+          <span>Scroll horizontally to review all portfolio columns.</span>
+        </div>
+        <Table
+          headers={['Mark', 'Jurisdiction', 'Classes', 'Status', 'Renewal Date', 'Actions']}
+          className="md:max-xl:overscroll-x-contain md:max-xl:[&>table]:min-w-[48rem]"
+        >
           {marks?.map((mark) => (
             <TableRow key={mark.id}>
               <TableCell>

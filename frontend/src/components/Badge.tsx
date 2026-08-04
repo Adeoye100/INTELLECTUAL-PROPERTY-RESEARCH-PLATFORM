@@ -19,9 +19,9 @@ export const Badge: React.FC<BadgeProps> = ({ children, risk = 'none', className
   };
 
   const icons = {
-    low: <CheckCircle className="w-3 h-3 mr-1" />,
-    medium: <Info className="w-3 h-3 mr-1" />,
-    high: <AlertCircle className="w-3 h-3 mr-1" />,
+    low: <CheckCircle className="w-3 h-3 mr-1" aria-hidden="true" />,
+    medium: <Info className="w-3 h-3 mr-1" aria-hidden="true" />,
+    high: <AlertCircle className="w-3 h-3 mr-1" aria-hidden="true" />,
     none: null,
   };
 

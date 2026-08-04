@@ -20,9 +20,13 @@ export const MainLayout: React.FC = () => {
       <header className="h-16 bg-forge-gradient flex items-center justify-between px-6 sticky top-0 z-40">
         <Logo />
         <div className="flex items-center gap-4 text-white">
-          <button className="p-2 hover:bg-white/10 rounded-full relative">
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-risk-high rounded-full border border-forge-navy-950"></span>
+          <button
+            className="p-2 hover:bg-white/10 rounded-full relative"
+            aria-label="Notifications — alerts pending"
+          >
+            <Bell className="w-5 h-5" aria-hidden="true" />
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-risk-high rounded-full border border-forge-navy-950" aria-hidden="true"></span>
+            <span className="sr-only">You have pending alerts</span>
           </button>
           <div className="flex items-center gap-2 border-l border-white/20 pl-4">
             <div className="w-8 h-8 rounded-full bg-forge-teal-700 flex items-center justify-center font-bold text-sm">
@@ -56,7 +60,7 @@ export const MainLayout: React.FC = () => {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 bg-surface-base p-8">
+        <main className="min-w-0 flex-1 bg-surface-base p-8">
           <Outlet />
         </main>
       </div>

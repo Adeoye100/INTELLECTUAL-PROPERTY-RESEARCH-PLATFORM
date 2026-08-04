@@ -11,6 +11,7 @@ import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
 import { Badge } from '../../components/Badge';
 import { Link } from 'react-router-dom';
+import type { Alert } from '../../types';
 import { 
   AreaChart, 
   Area, 
@@ -25,7 +26,7 @@ import {
 } from 'recharts';
 
 export const DashboardScreen: React.FC = () => {
-  const { data: alerts } = useQuery<any[]>({
+  const { data: alerts } = useQuery<(Alert & { matchedMarkText: string })[]>({
     queryKey: ['alerts'],
     queryFn: async () => {
       const response = await fetch('/api/alerts');
@@ -66,7 +67,10 @@ export const DashboardScreen: React.FC = () => {
         </Card>
         <Card>
           <div className="text-[10px] text-text-secondary uppercase font-bold mb-1">Pending Alerts</div>
-          <div className="text-3xl font-black text-risk-high">{alerts?.length || 0}</div>
+          <div className="text-3xl font-black text-risk-high flex items-center gap-2">
+            <AlertCircle className="w-6 h-6 flex-shrink-0" aria-hidden="true" />
+            {alerts?.length || 0}
+          </div>
           <div className="text-xs text-text-secondary mt-2 flex items-center gap-1">
             <Clock className="w-3 h-3" /> 2 requiring urgent review
           </div>

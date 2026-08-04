@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Search as SearchIcon, FileText, Link } from 'lucide-react';
@@ -19,15 +19,15 @@ export const OfficeActionResearchScreen: React.FC = () => {
   const [selectedOfficeAction, setSelectedOfficeAction] = useState<OfficeActionRef | null>(null);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
 
-  const { register, handleSubmit, watch } = useForm<SearchFilters>({
+  const { register, handleSubmit, control } = useForm<SearchFilters>({
     defaultValues: {
       markText: '',
       niceClass: '',
     },
   });
 
-  const markText = watch('markText');
-  const niceClass = watch('niceClass');
+  const markText = useWatch({ control, name: 'markText' });
+  const niceClass = useWatch({ control, name: 'niceClass' });
 
   // Search office actions
   const { data: officeActions, isLoading, isError } = useQuery<OfficeActionRef[]>({

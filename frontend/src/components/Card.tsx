@@ -13,7 +13,7 @@ export const Card: React.FC<CardProps> = ({ children, className, title, footer }
     <div className={cn('bg-surface-card border border-forge-silver-300 rounded-lg shadow-sm overflow-hidden', className)}>
       {title && (
         <div className="px-6 py-4 border-b border-forge-silver-300">
-          <h3 className="text-lg font-semibold text-text-primary">{title}</h3>
+          <h2 className="text-lg font-semibold text-text-primary">{title}</h2>
         </div>
       )}
       <div className="px-6 py-4">{children}</div>
