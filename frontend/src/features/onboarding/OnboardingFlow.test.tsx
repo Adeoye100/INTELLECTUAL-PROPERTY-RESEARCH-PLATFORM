@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mockSearchResponse } from '../../lib/mocks/handlers';
+import { mockDashboardSummary, mockSearchResponse } from '../../lib/mocks/handlers';
 import { DashboardScreen } from '../dashboard/DashboardScreen';
 import { SearchScreen } from '../search/SearchScreen';
 import { useAuthStore } from '../auth/authStore';
@@ -32,6 +32,7 @@ describe('FE-06 onboarding flow', () => {
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes('/api/search')) return new Response(JSON.stringify(mockSearchResponse), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      if (url.includes('/api/dashboard/summary')) return new Response(JSON.stringify(mockDashboardSummary), { status: 200, headers: { 'Content-Type': 'application/json' } });
       return new Response(JSON.stringify([]), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }));
   });
@@ -52,9 +53,9 @@ describe('FE-06 onboarding flow', () => {
     expect(screen.getByRole('heading', { name: 'Complete one useful action' })).toBeVisible();
 
     await user.click(screen.getByRole('link', { name: /run your first search/i }));
-    fireEvent.change(screen.getByRole('textbox', { name: 'Mark Text' }), { target: { value: 'FORGE' } });
-    await screen.findByText('WIPO: Unavailable');
-    await user.click(screen.getByRole('button', { name: 'Apply Filters' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Mark' }), { target: { value: 'FORGE' } });
+    await user.click(screen.getByRole('button', { name: 'Search trademarks' }));
+    await screen.findByText(/WIPO: Unavailable/);
 
     expect(await screen.findByText(/first search completed on this browser/i)).toBeVisible();
     expect(useOnboardingStore.getState().progressByUser['new-user']).toMatchObject({

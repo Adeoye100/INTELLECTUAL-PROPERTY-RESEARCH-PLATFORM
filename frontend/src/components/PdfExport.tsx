@@ -11,6 +11,10 @@ export type PdfReportRequest =
         query: string;
         jurisdictions: string[];
         niceClasses: string;
+        status?: string;
+        owner?: string;
+        filedFrom?: string;
+        filedTo?: string;
         resultIds: string[];
       };
     }

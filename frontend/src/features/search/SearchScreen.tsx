@@ -1,79 +1,149 @@
-import React from 'react';
-import { useForm, useWatch } from 'react-hook-form';
-import { Search as SearchIcon, Filter } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { AlertTriangle, FilterX, MoveHorizontal, Search as SearchIcon } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
-import { Badge } from '../../components/Badge';
-import { SourceStatusIndicator } from '../../components/SourceStatusIndicator';
-import { useQuery } from '@tanstack/react-query';
-import type { SearchResponse, SearchResult } from '../../types';
-import { Link, useSearchParams } from 'react-router-dom';
 import { PdfExport } from '../../components/PdfExport';
+import { SourceStatusIndicator } from '../../components/SourceStatusIndicator';
+import type { SearchResponse, RiskDetailRouteState } from '../../types';
 import { useAuthStore } from '../auth/authStore';
 import { useOnboardingStore } from '../onboarding/onboardingStore';
+import {
+  buildSearchRequestUrl,
+  defaultSearchFilters,
+  hasSearchFilterParams,
+  normalizeSearchFilters,
+  rankSearchResults,
+  searchFilterStorageKey,
+  searchFiltersFromParams,
+  searchFiltersSchema,
+  searchFiltersToParams,
+  type SearchFilters,
+} from './searchFilters';
 
-interface SearchFilters {
-  query: string;
-  jurisdictions: string[];
-  classes: string;
-}
+const jurisdictions = [
+  ['US', 'United States (USPTO)'],
+  ['EU', 'European Union (EUIPO)'],
+  ['GB', 'United Kingdom (UKIPO)'],
+  ['CA', 'Canada (CIPO)'],
+  ['AU', 'Australia (IP Australia)'],
+] as const;
+
+const loadInitialFilters = (params: URLSearchParams, userId: string | undefined) => {
+  if (hasSearchFilterParams(params)) {
+    const filters = searchFiltersFromParams(params);
+    return { filters, submitted: searchFiltersSchema.safeParse(filters).success };
+  }
+
+  if (userId) {
+    try {
+      const stored = localStorage.getItem(searchFilterStorageKey(userId));
+      if (stored) {
+        const parsed = searchFiltersSchema.safeParse(JSON.parse(stored));
+        if (parsed.success) return { filters: parsed.data, submitted: true };
+      }
+    } catch {
+      // Invalid client storage falls back to visible defaults.
+    }
+  }
+  return { filters: defaultSearchFilters, submitted: false };
+};
+
+const fetchSearch = async (filters: SearchFilters): Promise<SearchResponse> => {
+  const response = await fetch(buildSearchRequestUrl(filters));
+  if (!response.ok) throw new Error('Search failed');
+  return response.json() as Promise<SearchResponse>;
+};
 
 export const SearchScreen: React.FC = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const user = useAuthStore((state) => state.user);
   const completePath = useOnboardingStore((state) => state.completePath);
-  const [onboardingComplete, setOnboardingComplete] = React.useState(false);
-  const { register, handleSubmit, control } = useForm<SearchFilters>({
-    defaultValues: {
-      query: '',
-      jurisdictions: ['US'],
-      classes: '',
-    },
+  const queryClient = useQueryClient();
+  const [initialState] = useState(() => loadInitialFilters(searchParams, user?.id));
+  const [submittedFilters, setSubmittedFilters] = useState<SearchFilters | null>(
+    initialState.submitted ? normalizeSearchFilters(initialState.filters) : null,
+  );
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [onboardingComplete, setOnboardingComplete] = useState(false);
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<SearchFilters>({
+    resolver: zodResolver(searchFiltersSchema),
+    defaultValues: initialState.filters,
   });
 
-  const queryText = useWatch({ control, name: 'query' });
-  const jurisdictions = useWatch({ control, name: 'jurisdictions' });
-  const niceClasses = useWatch({ control, name: 'classes' });
-
-  const { data: searchResponse, isLoading, isError, refetch } = useQuery<SearchResponse>({
-    queryKey: ['search', queryText],
-    queryFn: async () => {
-      if (!queryText) return { results: [], sourceStatuses: [] };
-      const response = await fetch(`/api/search?q=${encodeURIComponent(queryText)}`);
-      if (!response.ok) throw new Error('Search failed');
-      return response.json();
-    },
-    enabled: queryText.length > 2,
+  const searchQuery = useQuery<SearchResponse>({
+    queryKey: ['search', submittedFilters],
+    queryFn: () => fetchSearch(submittedFilters!),
+    enabled: submittedFilters !== null,
+    retry: false,
+    placeholderData: (previousData) => previousData,
   });
 
-  const results = searchResponse?.results;
+  const rankedResults = useMemo(
+    () => rankSearchResults(searchQuery.data?.results ?? []),
+    [searchQuery.data?.results],
+  );
+  const sourceStatuses = searchQuery.data?.sourceStatuses ?? [];
+  const hasIncompleteSources = sourceStatuses.some(({ status }) => status !== 'complete');
+  const allSourcesUnavailable = sourceStatuses.length > 0 && sourceStatuses.every(({ status }) => status === 'unavailable');
 
-  const onSubmit = async (data: SearchFilters) => {
-    console.log('Search filters:', data);
-    if (data.query.trim().length < 3) return;
-    const outcome = await refetch();
-    if (!outcome.error && user && searchParams.get('onboarding') === 'search') {
-      completePath(user.id, 'search');
-      setOnboardingComplete(true);
+  const onSubmit = async (values: SearchFilters) => {
+    const normalized = normalizeSearchFilters(values);
+    const nextParams = searchFiltersToParams(normalized);
+    const onboarding = searchParams.get('onboarding');
+    if (onboarding) nextParams.set('onboarding', onboarding);
+    setSearchParams(nextParams, { replace: true });
+    if (user) localStorage.setItem(searchFilterStorageKey(user.id), JSON.stringify(normalized));
+    setSubmittedFilters(normalized);
+
+    try {
+      await queryClient.fetchQuery({
+        queryKey: ['search', normalized],
+        queryFn: () => fetchSearch(normalized),
+      });
+      if (user && onboarding === 'search') {
+        completePath(user.id, 'search');
+        setOnboardingComplete(true);
+      }
+    } catch {
+      // The query error state renders the retry action.
     }
+  };
+
+  const clearFilters = () => {
+    reset(defaultSearchFilters);
+    setSubmittedFilters(null);
+    setSelectedIds(new Set());
+    const nextParams = new URLSearchParams();
+    const onboarding = searchParams.get('onboarding');
+    if (onboarding) nextParams.set('onboarding', onboarding);
+    setSearchParams(nextParams, { replace: true });
+    if (user) localStorage.removeItem(searchFilterStorageKey(user.id));
+  };
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Trademark Search</h1>
-          <p className="text-text-secondary text-sm">Cross-registry phonetic and visual similarity analysis</p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled
-          title="Saved searches are not available yet"
-        >
-          <Filter className="w-4 h-4 mr-2" aria-hidden="true" />
-          Saved Searches
-        </Button>
+      <header>
+        <h1 className="text-2xl font-bold text-text-primary">Trademark Search</h1>
+        <p className="text-sm text-text-secondary">Cross-registry search with explicit filters and ranked confusion risk.</p>
       </header>
 
       {onboardingComplete && (
@@ -83,159 +153,98 @@ export const SearchScreen: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Filters Sidebar */}
-        <div className="lg:col-span-1 space-y-4">
-          <Card title="Search Filters" className="sticky top-24">
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
+        <aside className="space-y-4 lg:col-span-1" aria-label="Trademark search filters">
+          <Card title="Search filters" className="lg:sticky lg:top-24">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
               <div>
-                <label htmlFor="trademark-query" className="block text-xs font-bold text-text-secondary uppercase mb-1">Mark Text</label>
-                <div className="relative">
-                  <SearchIcon className="absolute left-3 top-2.5 w-4 h-4 text-forge-silver-500" aria-hidden="true" />
-                  <input
-                    {...register('query')}
-                    id="trademark-query"
-                    className="w-full pl-9 pr-3 py-2 border border-forge-silver-300 rounded outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
-                    placeholder="Search mark name..."
-                  />
-                </div>
+                <label htmlFor="search-mark" className="mb-1 block text-xs font-bold uppercase text-text-secondary">Mark</label>
+                <div className="relative"><SearchIcon className="absolute left-3 top-2.5 h-4 w-4 text-forge-silver-500" aria-hidden="true" /><input {...register('mark')} id="search-mark" aria-invalid={Boolean(errors.mark)} aria-describedby={errors.mark ? 'search-mark-error' : undefined} className="w-full rounded border border-forge-silver-300 py-2 pl-9 pr-3 outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2" /></div>
+                {errors.mark && <p id="search-mark-error" className="mt-1 text-xs text-risk-high">{errors.mark.message}</p>}
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-text-secondary uppercase mb-1">Jurisdiction</label>
+              <fieldset>
+                <legend className="mb-1 text-xs font-bold uppercase text-text-secondary">Jurisdiction</legend>
                 <div className="space-y-2">
-                  {['US', 'EU', 'GB', 'CA', 'AU'].map((j) => (
-                    <label key={j} className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
-                      <input
-                        type="checkbox"
-                        value={j}
-                        {...register('jurisdictions')}
-                        className="rounded text-accent focus:ring-accent"
-                      />
-                      {j === 'US' ? 'United States (USPTO)' : 
-                       j === 'EU' ? 'European Union (EUIPO)' :
-                       j === 'GB' ? 'United Kingdom (UKIPO)' :
-                       j === 'CA' ? 'Canada (CIPO)' : 'Australia (IP Australia)'}
-                    </label>
-                  ))}
+                  {jurisdictions.map(([value, label]) => <label key={value} className="flex cursor-pointer items-center gap-2 text-sm text-text-primary"><input type="checkbox" value={value} {...register('jurisdictions')} className="rounded text-accent focus:ring-accent" />{label}</label>)}
                 </div>
-              </div>
+                {errors.jurisdictions && <p className="mt-1 text-xs text-risk-high">{errors.jurisdictions.message}</p>}
+              </fieldset>
 
-              <div>
-                <label htmlFor="nice-classes" className="block text-xs font-bold text-text-secondary uppercase mb-1">Nice Classes</label>
-                <input
-                  {...register('classes')}
-                  id="nice-classes"
-                  className="w-full px-3 py-2 border border-forge-silver-300 rounded outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
-                  placeholder="e.g. 9, 35, 42"
-                />
-              </div>
+              <div><label htmlFor="search-class" className="mb-1 block text-xs font-bold uppercase text-text-secondary">Nice class</label><input {...register('niceClass')} id="search-class" placeholder="9, 35, 42" aria-invalid={Boolean(errors.niceClass)} aria-describedby={errors.niceClass ? 'search-class-error' : undefined} className="w-full rounded border border-forge-silver-300 px-3 py-2 outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2" />{errors.niceClass && <p id="search-class-error" className="mt-1 text-xs text-risk-high">{errors.niceClass.message}</p>}</div>
+              <div><label htmlFor="search-status" className="mb-1 block text-xs font-bold uppercase text-text-secondary">Status</label><select {...register('status')} id="search-status" className="w-full rounded border border-forge-silver-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"><option value="">Any status</option><option value="pending">Pending</option><option value="registered">Registered</option><option value="abandoned">Abandoned</option></select></div>
+              <div><label htmlFor="search-owner" className="mb-1 block text-xs font-bold uppercase text-text-secondary">Owner</label><input {...register('owner')} id="search-owner" className="w-full rounded border border-forge-silver-300 px-3 py-2 outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2" /></div>
 
-              <Button type="submit" className="w-full">Apply Filters</Button>
+              <fieldset className="space-y-3">
+                <legend className="text-xs font-bold uppercase text-text-secondary">Filing-date range</legend>
+                <div><label htmlFor="search-filed-from" className="mb-1 block text-xs font-semibold text-text-secondary">From</label><input {...register('filedFrom')} id="search-filed-from" type="date" className="w-full rounded border border-forge-silver-300 px-3 py-2 outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2" /></div>
+                <div><label htmlFor="search-filed-to" className="mb-1 block text-xs font-semibold text-text-secondary">To</label><input {...register('filedTo')} id="search-filed-to" type="date" aria-invalid={Boolean(errors.filedTo)} aria-describedby={errors.filedTo ? 'search-date-error' : undefined} className="w-full rounded border border-forge-silver-300 px-3 py-2 outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2" />{errors.filedTo && <p id="search-date-error" className="mt-1 text-xs text-risk-high">{errors.filedTo.message}</p>}</div>
+              </fieldset>
+
+              <div className="flex flex-col gap-2"><Button type="submit" className="w-full" disabled={isSubmitting}>{isSubmitting ? 'Searching…' : 'Search trademarks'}</Button><Button type="button" variant="ghost" className="w-full" onClick={clearFilters}><FilterX className="mr-2 h-4 w-4" aria-hidden="true" />Clear filters</Button></div>
             </form>
           </Card>
-        </div>
+        </aside>
 
-        {/* Results Main Area */}
-        <div className="lg:col-span-3 space-y-4">
-          {!queryText || queryText.length <= 2 ? (
-            <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed border-forge-silver-300 rounded-lg bg-surface-card">
-              <SearchIcon className="w-12 h-12 text-forge-silver-300 mb-4" />
-              <h3 className="text-lg font-semibold text-text-primary">Ready to Search</h3>
-              <p className="text-text-secondary max-w-xs">
-                Enter at least 3 characters to begin analyzing trademarks across international registries.
-              </p>
-            </div>
-          ) : isLoading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-32 bg-forge-silver-100 animate-pulse rounded-lg"></div>
-              ))}
-            </div>
-          ) : isError ? (
-            <div className="p-8 text-center text-risk-high bg-risk-high/10 rounded-lg">
-              Search encountered an error. Please try again.
-            </div>
+        <main className="min-w-0 space-y-4 lg:col-span-3" aria-label="Trademark search results">
+          {!submittedFilters ? (
+            <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-forge-silver-300 bg-surface-card py-24 text-center"><SearchIcon className="mb-4 h-12 w-12 text-forge-silver-300" aria-hidden="true" /><h2 className="text-lg font-semibold text-text-primary">Ready to search</h2><p className="max-w-sm text-text-secondary">Set the visible filters and submit to query the connected registries.</p></div>
+          ) : searchQuery.isLoading ? (
+            <div className="space-y-3" role="status" aria-label="Loading trademark results"><div className="h-12 animate-pulse rounded bg-forge-silver-100" /><div className="h-64 animate-pulse rounded bg-forge-silver-100" /><span className="sr-only">Loading trademark results…</span></div>
+          ) : searchQuery.isError ? (
+            <div className="rounded-lg border border-risk-high/30 bg-risk-high/10 p-8 text-center" role="alert"><AlertTriangle className="mx-auto mb-3 h-8 w-8 text-risk-high" aria-hidden="true" /><h2 className="font-bold text-text-primary">Search could not be completed</h2><p className="mt-1 text-sm text-text-secondary">Your filters are preserved. Retry when the registry connection is available.</p><Button className="mt-4" onClick={() => void searchQuery.refetch()}>Retry search</Button></div>
           ) : (
             <div className="space-y-4">
-              <SourceStatusIndicator statuses={searchResponse?.sourceStatuses ?? []} />
-
-              {results?.length === 0 ? (
-                <div className="p-12 text-center bg-surface-card rounded-lg border border-forge-silver-300">
-                  No direct matches found. Try broadening your filters.
-                </div>
+              <SourceStatusIndicator statuses={sourceStatuses} />
+              {allSourcesUnavailable && rankedResults.length === 0 ? (
+                <div className="rounded-lg border border-risk-high/30 bg-risk-high/10 p-8 text-center" role="alert"><h2 className="font-bold text-text-primary">All registry sources are unavailable</h2><p className="mt-1 text-sm text-text-secondary">No reliable result set can be shown yet. Your filters remain saved.</p><Button className="mt-4" onClick={() => void searchQuery.refetch()}>Retry sources</Button></div>
+              ) : rankedResults.length === 0 ? (
+                <div className="rounded-lg border border-forge-silver-300 bg-surface-card p-12 text-center"><h2 className="font-bold text-text-primary">No results found</h2><p className="mt-1 text-sm text-text-secondary">No current matches satisfy every submitted filter.</p>{hasIncompleteSources && <Button className="mt-4" onClick={() => void searchQuery.refetch()}>Check pending sources</Button>}</div>
               ) : (
                 <>
-                  <div className="flex flex-wrap items-start justify-between gap-3 px-2 text-sm text-text-secondary">
-                    <div>
-                      <span>Showing {results?.length} matches for "{queryText}"</span>
-                      <span className="ml-3">Sorted by composite risk score</span>
-                    </div>
-                    <PdfExport
-                      request={{
-                        reportType: 'search-results',
-                        context: {
-                          screen: 'search-results',
-                          query: queryText,
-                          jurisdictions,
-                          niceClasses,
-                          resultIds: results?.map((result) => result.id) ?? [],
-                        },
-                      }}
-                      disabled={!results?.length}
-                      label="Export results PDF"
-                    />
+                  <div className="flex flex-wrap items-start justify-between gap-3 px-1 text-sm text-text-secondary"><div><p>Showing {rankedResults.length} ranked matches.</p>{searchQuery.isFetching && <p role="status">Checking for additional source results without clearing this table…</p>}{selectedIds.size > 0 && <p>{selectedIds.size} result{selectedIds.size === 1 ? '' : 's'} selected.</p>}</div><div className="flex flex-wrap gap-2">{hasIncompleteSources && <Button variant="outline" size="sm" onClick={() => void searchQuery.refetch()} disabled={searchQuery.isFetching}>{searchQuery.isFetching ? 'Refreshing sources…' : 'Refresh sources'}</Button>}<PdfExport request={{ reportType: 'search-results', context: { screen: 'search-results', query: submittedFilters.mark, jurisdictions: submittedFilters.jurisdictions, niceClasses: submittedFilters.niceClass, status: submittedFilters.status, owner: submittedFilters.owner, filedFrom: submittedFilters.filedFrom, filedTo: submittedFilters.filedTo, resultIds: rankedResults.map((result) => result.id) } }} label="Export results PDF" /></div></div>
+                  <div className="hidden items-center gap-2 text-xs font-semibold text-text-secondary md:max-xl:flex"><MoveHorizontal className="h-4 w-4" aria-hidden="true" />Scroll horizontally to review every legal-data column.</div>
+                  <div className="overflow-x-auto overscroll-x-contain rounded-lg border border-forge-silver-300">
+                    <table className="min-w-[72rem] w-full border-collapse text-left">
+                      <caption className="sr-only">Trademark results ranked by explicit risk level and similarity score</caption>
+                      <thead className="bg-surface-base"><tr className="border-b border-forge-silver-300"><th scope="col" className="px-3 py-3 text-xs font-bold uppercase text-text-secondary">Select</th><th scope="col" className="px-3 py-3 text-xs font-bold uppercase text-text-secondary">Rank</th>{['Mark', 'Owner', 'Class', 'Jurisdiction', 'Filing date', 'Source', 'Risk', 'Action'].map((heading) => <th key={heading} scope="col" className="px-3 py-3 text-xs font-bold uppercase text-text-secondary">{heading}</th>)}</tr></thead>
+                      <tbody className="divide-y divide-forge-silver-100">
+                        {rankedResults.map((result, index) => {
+                          const routeState: RiskDetailRouteState = {
+                            result,
+                            proposedMark: {
+                              markText: submittedFilters.mark,
+                              jurisdiction: submittedFilters.jurisdictions[0] ?? 'US',
+                              niceClasses: submittedFilters.niceClass
+                                ? submittedFilters.niceClass.split(',').map((c) => parseInt(c.trim(), 10)).filter(Boolean)
+                                : [],
+                            },
+                            searchQuery: submittedFilters.mark,
+                          };
+                          return (
+                            <tr key={result.id} className="bg-white hover:bg-surface-base">
+                              <td className="px-3 py-3"><input type="checkbox" checked={selectedIds.has(result.id)} onChange={() => toggleSelection(result.id)} aria-label={`Select ${result.candidateMarkText}`} className="rounded text-accent focus:ring-accent" /></td>
+                              <td className="px-3 py-3 font-bold text-text-primary">{index + 1}</td>
+                              <th scope="row" className="px-3 py-3 font-mono text-sm font-bold uppercase text-text-primary">{result.candidateMarkText}</th>
+                              <td className="px-3 py-3 text-sm text-text-primary">{result.owner ?? '—'}</td>
+                              <td className="px-3 py-3 text-sm text-text-primary">{result.niceClasses?.join(', ') ?? '—'}</td>
+                              <td className="px-3 py-3 text-sm text-text-primary">{result.jurisdiction ?? '—'}</td>
+                              <td className="px-3 py-3 text-sm text-text-primary">{result.filingDate ?? '—'}</td>
+                              <td className="px-3 py-3 text-sm text-text-primary"><span className="block">{result.candidateSource}</span><span className="font-mono text-xs text-text-secondary">{result.candidateRef}</span></td>
+                              <td className="px-3 py-3"><Badge risk={result.riskScore?.compositeRating}>{result.riskScore ? `${result.riskScore.compositeRating} risk` : 'Not scored'}</Badge></td>
+                              <td className="px-3 py-3"><Link to={`/search/risk/${result.id}`} state={routeState} className="inline-flex rounded border border-forge-silver-500 px-3 py-1.5 text-sm font-medium text-text-primary hover:bg-forge-silver-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2" aria-label={`Review risk for ${result.candidateMarkText}`}>Review risk</Link></td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
-
-                  {results?.map((result) => (
-                    <SearchResultCard key={result.id} result={result} />
-                  ))}
                 </>
               )}
             </div>
           )}
-        </div>
+        </main>
       </div>
     </div>
-  );
-};
-
-const SearchResultCard: React.FC<{ result: SearchResult }> = ({ result }) => {
-  return (
-    <Card className="relative">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-1">
-            <h3 className="text-xl font-black tracking-tight text-text-primary uppercase font-mono">
-              {result.candidateMarkText}
-            </h3>
-            {result.riskScore && (
-              <Badge risk={result.riskScore.compositeRating}>
-                {result.riskScore.compositeRating} RISK
-              </Badge>
-            )}
-          </div>
-          <div className="flex items-center gap-4 text-xs font-bold text-text-secondary uppercase">
-            <span>{result.candidateSource}</span>
-            <span>Ref: <span className="font-mono">{result.candidateRef}</span></span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="text-right mr-4 hidden sm:block">
-            <div className="text-[10px] text-text-secondary uppercase font-bold">Similarity</div>
-            <div className="text-lg font-bold text-text-primary">
-              {result.riskScore ? Math.max(result.riskScore.phoneticScore, result.riskScore.visualScore) : 0}%
-            </div>
-          </div>
-          <Link
-            to={`/search/risk/${result.id}`}
-            className="inline-flex items-center justify-center rounded border border-forge-silver-500 px-3 py-1.5 text-sm font-medium text-text-primary transition-colors hover:bg-forge-silver-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
-          >
-            Review Risk
-          </Link>
-        </div>
-      </div>
-    </Card>
   );
 };

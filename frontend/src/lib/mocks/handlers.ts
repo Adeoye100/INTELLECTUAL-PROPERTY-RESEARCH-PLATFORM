@@ -1,5 +1,5 @@
 import { http, HttpResponse, delay } from 'msw';
-import type { SearchResponse, SearchResult, OfficeActionRef, PortfolioMark } from '../../types';
+import type { DashboardSummary, SearchResponse, SearchResult, OfficeActionRef, PortfolioMark, Matter, MatterSaveRequest, MatterSaveResult } from '../../types';
 
 const mockSearchResults: SearchResult[] = [
   {
@@ -8,15 +8,44 @@ const mockSearchResults: SearchResult[] = [
     candidateMarkText: 'FORGE TEK',
     candidateSource: 'USPTO',
     candidateRef: 'US87654321',
+    owner: 'Forge Technologies Inc.',
+    niceClasses: [9, 42],
+    jurisdiction: 'US',
+    filingDate: '2025-02-14',
+    status: 'Pending',
     riskScore: {
       id: 'r1',
       phoneticScore: 85,
       visualScore: 40,
+      conceptualScore: 72,
       classOverlap: true,
       compositeRating: 'high',
+      methodology: {
+        version: 'v2.1.0',
+        description: 'Weighted composite of phonetic (Soundex/Double Metaphone), visual (Levenshtein edit distance), conceptual (word-vector cosine), and Nice class overlap.',
+        sourceAttribution: ['USPTO TESS', 'EUIPO TMview'],
+      },
       matchedMarkRefs: [
-        { type: 'Phonetic', evidence: 'Highly similar sound to "FORGE"', score: 85 },
-        { type: 'Class', evidence: 'Direct overlap in Class 9', score: 100 },
+        {
+          type: 'Phonetic',
+          evidence: 'Double Metaphone encoding identical: FRKTK — "FORGE" and "FORGETEK" share the dominant FORGE phoneme with near-identical stress pattern.',
+          score: 85,
+        },
+        {
+          type: 'Visual',
+          evidence: 'Levenshtein edit distance of 4 on 10-character base. Shared uppercase FORGE prefix dominates visual impression.',
+          score: 70,
+        },
+        {
+          type: 'Conceptual',
+          evidence: 'Word-vector cosine similarity 0.72 — both marks evoke industrial craftsmanship and technology concepts.',
+          score: 72,
+        },
+        {
+          type: 'Class',
+          evidence: 'Direct overlap in Nice Class 9 (electronics/software). Applicant also filed in Class 42 which further overlaps your registrations.',
+          score: 100,
+        },
       ],
     },
   },
@@ -26,15 +55,62 @@ const mockSearchResults: SearchResult[] = [
     candidateMarkText: 'FORTRESS GLOBAL',
     candidateSource: 'EUIPO',
     candidateRef: 'EU12345678',
+    owner: 'Fortress Global GmbH',
+    niceClasses: [35],
+    jurisdiction: 'EU',
+    filingDate: '2024-09-03',
+    status: 'Registered',
     riskScore: {
       id: 'r2',
       phoneticScore: 30,
       visualScore: 60,
+      // null = conceptual scoring unsupported for EUIPO source in this methodology version
+      conceptualScore: null,
       classOverlap: false,
       compositeRating: 'medium',
+      methodology: {
+        version: 'v2.1.0',
+        description: 'Weighted composite of phonetic (Soundex/Double Metaphone), visual (Levenshtein edit distance), conceptual (word-vector cosine), and Nice class overlap.',
+        sourceAttribution: ['EUIPO TMview'],
+      },
       matchedMarkRefs: [
-        { type: 'Visual', evidence: 'Similar word structure', score: 60 },
+        {
+          type: 'Visual',
+          evidence: 'Shared word structure: [ADJECTIVE] GLOBAL mirrors [MARK] GLOBAL. Visual impression elevated by identical secondary element "GLOBAL".',
+          score: 60,
+        },
+        {
+          type: 'Phonetic',
+          evidence: '"FORTRESS" and "FORGE" share the initial FOR- phoneme and 4-character overlap but diverge strongly at the third syllable. Modest risk.',
+          score: 30,
+        },
       ],
+    },
+  },
+  {
+    id: '3',
+    searchId: 's1',
+    candidateMarkText: 'THE FORGE HOUSE',
+    candidateSource: 'UKIPO',
+    candidateRef: 'GB00998877',
+    owner: 'Forge House Limited',
+    niceClasses: [35, 41],
+    jurisdiction: 'GB',
+    filingDate: '2023-05-18',
+    status: 'Abandoned',
+    riskScore: {
+      id: 'r3',
+      phoneticScore: 25,
+      visualScore: 35,
+      conceptualScore: 20,
+      classOverlap: false,
+      compositeRating: 'low',
+      methodology: {
+        version: 'v2.1.0',
+        description: 'Mock low-risk aggregate used for ranked-result testing.',
+        sourceAttribution: ['UKIPO'],
+      },
+      matchedMarkRefs: [{ type: 'Visual', evidence: 'Shared FORGE term only', score: 35 }],
     },
   },
 ];
@@ -42,11 +118,37 @@ const mockSearchResults: SearchResult[] = [
 export const mockSearchResponse: SearchResponse = {
   results: mockSearchResults,
   sourceStatuses: [
-    { source: 'USPTO', status: 'responded' },
-    { source: 'EUIPO', status: 'responded' },
-    { source: 'UKIPO', status: 'pending' },
-    { source: 'WIPO', status: 'unavailable' },
+    { source: 'USPTO', status: 'complete', resultCount: 1 },
+    { source: 'EUIPO', status: 'pending', resultCount: 1 },
+    { source: 'UKIPO', status: 'delayed', resultCount: 1 },
+    { source: 'WIPO', status: 'unavailable', resultCount: 0 },
   ],
+  partial: true,
+  requestId: 'mock-search-request',
+};
+
+export const mockDashboardSummary: DashboardSummary = {
+  activeWatches: 12,
+  portfolioHealthPercent: 94,
+  portfolioMarkCount: 24,
+  recentAlerts: [
+    { id: 'a-high', matchedMarkText: 'FORGE LABS', protectedMarkText: 'FORGE GLOBAL', candidateRef: 'US99887766', jurisdiction: 'US', riskLevel: 'high', detectedAt: '2026-08-04', resolved: false },
+    { id: 'a-medium', matchedMarkText: 'FORTRESS GLOBAL', protectedMarkText: 'FORGE GLOBAL', candidateRef: 'EU12345678', jurisdiction: 'EU', riskLevel: 'medium', detectedAt: '2026-08-03', resolved: false },
+    { id: 'a-resolved', matchedMarkText: 'FORGE HOUSE', protectedMarkText: 'FORGE GLOBAL', candidateRef: 'GB00998877', jurisdiction: 'GB', riskLevel: 'high', detectedAt: '2026-08-01', resolved: true },
+  ],
+  recentSearches: [
+    { id: 's1', mark: 'FORGE', jurisdictions: ['US', 'EU'], resultCount: 18, highRiskCount: 3, searchedAt: '2026-08-04' },
+    { id: 's2', mark: 'INNOVATE PRO', jurisdictions: ['US'], resultCount: 7, highRiskCount: 0, searchedAt: '2026-08-02' },
+  ],
+  searchActivity: [
+    { label: 'Mon', count: 4 }, { label: 'Tue', count: 7 }, { label: 'Wed', count: 5 },
+    { label: 'Thu', count: 12 }, { label: 'Fri', count: 9 }, { label: 'Sat', count: 2 }, { label: 'Sun', count: 3 },
+  ],
+  riskDistribution: [
+    { risk: 'high', count: 4 }, { risk: 'medium', count: 8 }, { risk: 'low', count: 12 },
+  ],
+  partial: false,
+  unavailableSections: [],
 };
 
 const mockOfficeActionRefs: OfficeActionRef[] = [
@@ -147,8 +249,39 @@ const mockPortfolioMarks: PortfolioMark[] = [
   },
 ];
 
-// MOCK-ONLY FE-06/auth scenario counters. These deterministic first-failure
-// cases exist for frontend retry testing and must not ship as backend logic.
+// ---------------------------------------------------------------------------
+// MOCK-ONLY: Matter fixtures — FE-12
+// These fixtures exist only for frontend development while the backend
+// /api/matters endpoint has not been implemented. They must not be used as
+// production data or presented as server-persisted state.
+// ---------------------------------------------------------------------------
+const mockMatters: Matter[] = [
+  {
+    id: 'matter-mock-1',
+    name: 'Q3 Clearance — FORGE GLOBAL',
+    clientRef: 'FG-2026-Q3',
+    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1_000).toISOString(),
+    savedResultIds: [],
+  },
+  {
+    id: 'matter-mock-2',
+    name: 'Portfolio Audit 2026',
+    clientRef: 'FG-2026-AUDIT',
+    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1_000).toISOString(),
+    savedResultIds: ['1'],
+  },
+  {
+    id: 'matter-mock-3',
+    name: 'EU Expansion Clearance',
+    clientRef: 'FG-2026-EU',
+    createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1_000).toISOString(),
+    savedResultIds: [],
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Auth scenario counters — FE-06/auth. MOCK-ONLY.
+// ---------------------------------------------------------------------------
 const mockAttemptCounts = new Map<string, number>();
 const failFirstMockAttempt = (key: string) => {
   const attempts = mockAttemptCounts.get(key) ?? 0;
@@ -188,7 +321,6 @@ export const handlers = [
     });
   }),
 
-  // MOCK authentication lifecycle endpoints. Replace with tenant-aware APIs.
   http.post('/api/auth/logout', async () => {
     await delay(150);
     return new HttpResponse(null, { status: 204 });
@@ -277,15 +409,82 @@ export const handlers = [
 
   http.get('/api/search', async ({ request }) => {
     const url = new URL(request.url);
-    const q = url.searchParams.get('q');
-    
-    await delay(1200);
-    
-    if (!q) {
-      return HttpResponse.json<SearchResponse>({ results: [], sourceStatuses: [] });
-    }
-    
-    return HttpResponse.json(mockSearchResponse);
+    const mark = url.searchParams.get('mark')?.toLowerCase() ?? '';
+    const requestedJurisdictions = url.searchParams.getAll('jurisdiction');
+    const requestedClasses = (url.searchParams.get('class') ?? '').split(',').filter(Boolean).map(Number);
+    const status = url.searchParams.get('status')?.toLowerCase() ?? '';
+    const owner = url.searchParams.get('owner')?.toLowerCase() ?? '';
+    const filedFrom = url.searchParams.get('filedFrom') ?? '';
+    const filedTo = url.searchParams.get('filedTo') ?? '';
+
+    await delay(700);
+    if (mark === 'error') return HttpResponse.json({ message: 'Mock search failure' }, { status: 503 });
+    if (mark === 'outage') return HttpResponse.json<SearchResponse>({
+      results: [],
+      sourceStatuses: ['USPTO', 'EUIPO', 'UKIPO', 'WIPO'].map((source) => ({ source, status: 'unavailable' as const, resultCount: 0 })),
+      partial: true,
+      requestId: 'mock-outage',
+    });
+
+    const filtered = mockSearchResults.filter((result) => {
+      if (mark && !result.candidateMarkText.toLowerCase().includes(mark)) return false;
+      if (requestedJurisdictions.length && !requestedJurisdictions.includes(result.jurisdiction)) return false;
+      if (requestedClasses.length && !requestedClasses.some((niceClass) => result.niceClasses.includes(niceClass))) return false;
+      if (status && result.status.toLowerCase() !== status) return false;
+      if (owner && !result.owner.toLowerCase().includes(owner)) return false;
+      if (filedFrom && result.filingDate < filedFrom) return false;
+      if (filedTo && result.filingDate > filedTo) return false;
+      return true;
+    });
+
+    const requestKey = url.searchParams.toString();
+    const firstArrival = failFirstMockAttempt(`search:${requestKey}`);
+    const arrivedResults = firstArrival ? filtered.filter(({ candidateSource }) => candidateSource === 'USPTO') : filtered;
+    const sourceStatuses = firstArrival
+      ? [
+          { source: 'USPTO', status: 'complete' as const, resultCount: arrivedResults.length },
+          { source: 'EUIPO', status: 'pending' as const },
+          { source: 'UKIPO', status: 'delayed' as const },
+          { source: 'WIPO', status: 'unavailable' as const, resultCount: 0 },
+        ]
+      : [
+          { source: 'USPTO', status: 'complete' as const, resultCount: filtered.filter((result) => result.candidateSource === 'USPTO').length },
+          { source: 'EUIPO', status: 'complete' as const, resultCount: filtered.filter((result) => result.candidateSource === 'EUIPO').length },
+          { source: 'UKIPO', status: 'complete' as const, resultCount: filtered.filter((result) => result.candidateSource === 'UKIPO').length },
+          { source: 'WIPO', status: 'unavailable' as const, resultCount: 0 },
+        ];
+
+    return HttpResponse.json<SearchResponse>({
+      results: arrivedResults,
+      sourceStatuses,
+      partial: sourceStatuses.some(({ status: sourceStatus }) => sourceStatus !== 'complete'),
+      requestId: `mock-${Date.now()}`,
+    });
+  }),
+
+  // MOCK dashboard lifecycle scenarios. Append ?scenario=empty|partial|error
+  // while exercising frontend states; replace with an authenticated aggregate API.
+  http.get('/api/dashboard/summary', async ({ request }) => {
+    const scenario = new URL(request.url).searchParams.get('scenario');
+    await delay(500);
+    if (scenario === 'error') return HttpResponse.json({ message: 'Mock dashboard failure' }, { status: 503 });
+    if (scenario === 'empty') return HttpResponse.json<DashboardSummary>({
+      activeWatches: 0,
+      portfolioHealthPercent: 0,
+      portfolioMarkCount: 0,
+      recentAlerts: [],
+      recentSearches: [],
+      searchActivity: [],
+      riskDistribution: [],
+      partial: false,
+      unavailableSections: [],
+    });
+    if (scenario === 'partial') return HttpResponse.json<DashboardSummary>({
+      ...mockDashboardSummary,
+      partial: true,
+      unavailableSections: ['EUIPO alerts', 'portfolio renewal aggregate'],
+    });
+    return HttpResponse.json(mockDashboardSummary);
   }),
 
   http.get('/api/portfolio', async () => {
@@ -344,6 +543,7 @@ export const handlers = [
           id: 'r3',
           phoneticScore: 92,
           visualScore: 35,
+          conceptualScore: null,
           classOverlap: true,
           compositeRating: 'high',
           matchedMarkRefs: [
@@ -359,27 +559,25 @@ export const handlers = [
     const url = new URL(request.url);
     const markText = url.searchParams.get('markText') || '';
     const niceClass = url.searchParams.get('niceClass') || '';
-    
+
     await delay(800);
-    
+
     let filteredResults = mockOfficeActionRefs;
-    
-    // Filter by mark text if provided
+
     if (markText) {
-      filteredResults = filteredResults.filter(oa => 
+      filteredResults = filteredResults.filter(oa =>
         oa.referenceText.toLowerCase().includes(markText.toLowerCase()) ||
         oa.examinerReasoningSummary.toLowerCase().includes(markText.toLowerCase())
       );
     }
-    
-    // Filter by Nice class if provided
+
     if (niceClass) {
-      filteredResults = filteredResults.filter(oa => 
+      filteredResults = filteredResults.filter(oa =>
         oa.referenceText.includes(`Class ${niceClass}`) ||
         oa.examinerReasoningSummary.includes(`Class ${niceClass}`)
       );
     }
-    
+
     return HttpResponse.json(filteredResults);
   }),
 
@@ -388,11 +586,9 @@ export const handlers = [
       officeActionId: string;
       portfolioMarkId: string;
     };
-    
+
     await delay(500);
-    
-    // In a real implementation, this would update the database
-    // For now, we just return success with the request data for confirmation
+
     return HttpResponse.json({
       success: true,
       message: 'Office action successfully linked to portfolio mark',
@@ -401,14 +597,53 @@ export const handlers = [
     });
   }),
 
-  http.get('/api/portfolio', async () => {
-    await delay(500);
-    return HttpResponse.json(mockPortfolioMarks);
+  // ---------------------------------------------------------------------------
+  // MOCK-ONLY: Matter endpoints — FE-12
+  // Replace with real API calls once the backend /api/matters endpoint ships.
+  // These handlers return mocked: true to make the mock-only state explicit.
+  // ---------------------------------------------------------------------------
+
+  http.get('/api/matters', async () => {
+    await delay(400);
+    return HttpResponse.json<Matter[]>(mockMatters);
   }),
 
-  // TEMPORARY FE-17 FALLBACK: remove this handler as soon as the authenticated,
-  // server-generated PDF endpoint is available. This mock returns a download
-  // fixture; it does not perform real PDF generation or authorization.
+  http.post('/api/matters', async ({ request }) => {
+    const body = await request.json() as { name: string; clientRef?: string };
+    if (!body.name?.trim()) {
+      return HttpResponse.json({ message: 'name is required' }, { status: 422 });
+    }
+    await delay(350);
+    const newMatter: Matter = {
+      id: `matter-mock-${Date.now()}`,
+      name: body.name.trim(),
+      clientRef: body.clientRef?.trim() ?? '',
+      createdAt: new Date().toISOString(),
+      savedResultIds: [],
+    };
+    mockMatters.push(newMatter);
+    return HttpResponse.json<Matter & { mocked: true }>({ ...newMatter, mocked: true }, { status: 201 });
+  }),
+
+  http.post('/api/matters/:matterId/risk-results', async ({ params, request }) => {
+    const matterId = String(params.matterId);
+    const body = await request.json() as MatterSaveRequest;
+
+    await delay(500);
+
+    const matter = mockMatters.find((m) => m.id === matterId);
+    if (!matter) {
+      return HttpResponse.json({ message: `Matter ${matterId} not found` }, { status: 404 });
+    }
+    if (!matter.savedResultIds.includes(body.resultId)) {
+      matter.savedResultIds = [...matter.savedResultIds, body.resultId];
+    }
+
+    const result: MatterSaveResult = { matter, created: false, mocked: true };
+    return HttpResponse.json(result, { status: 200 });
+  }),
+
+  // TEMPORARY FE-17 FALLBACK: remove once authenticated server-generated PDF endpoint is available.
   http.post('/api/reports/pdf', async ({ request }) => {
     const body = await request.json() as {
       reportType?: 'search-results' | 'risk-detail' | 'portfolio-summary';

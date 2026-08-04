@@ -1,205 +1,125 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { 
-  AlertCircle, 
-  TrendingUp, 
-  Search, 
-  ArrowRight,
-  Clock
-} from 'lucide-react';
+import { AlertCircle, ArrowRight, BriefcaseBusiness, Eye, RefreshCw, Search } from 'lucide-react';
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Link } from 'react-router-dom';
+import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
-import { Badge } from '../../components/Badge';
-import { Link } from 'react-router-dom';
-import type { Alert } from '../../types';
+import type { DashboardSummary } from '../../types';
 import { useAuthStore } from '../auth/authStore';
-import { useOnboardingStore } from '../onboarding/onboardingStore';
 import { OnboardingChecklist } from '../onboarding/OnboardingChecklist';
-import { 
-  AreaChart, 
-  Area, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell
-} from 'recharts';
+import { useOnboardingStore } from '../onboarding/onboardingStore';
+
+const fetchDashboard = async (): Promise<DashboardSummary> => {
+  const response = await fetch('/api/dashboard/summary');
+  if (!response.ok) throw new Error('Dashboard request failed');
+  return response.json() as Promise<DashboardSummary>;
+};
 
 export const DashboardScreen: React.FC = () => {
   const user = useAuthStore((state) => state.user);
   const clientProgress = useOnboardingStore((state) => user ? state.progressByUser[user.id] : undefined);
   const showOnboarding = user?.onboardingRequired === true && !clientProgress?.completedPath;
-  const { data: alerts } = useQuery<(Alert & { matchedMarkText: string })[]>({
-    queryKey: ['alerts'],
-    queryFn: async () => {
-      const response = await fetch('/api/alerts');
-      return response.json();
-    },
+  const dashboard = useQuery<DashboardSummary>({
+    queryKey: ['dashboard', 'summary'],
+    queryFn: fetchDashboard,
     enabled: !showOnboarding,
+    retry: false,
   });
 
-  const chartData = [
-    { name: 'Mon', count: 4 },
-    { name: 'Tue', count: 7 },
-    { name: 'Wed', count: 5 },
-    { name: 'Thu', count: 12 },
-    { name: 'Fri', count: 9 },
-    { name: 'Sat', count: 2 },
-    { name: 'Sun', count: 3 },
-  ];
+  if (showOnboarding) return <OnboardingChecklist />;
 
-  const riskData = [
-    { name: 'High Risk', value: 4, color: '#B3261E' },
-    { name: 'Medium Risk', value: 8, color: '#B8860B' },
-    { name: 'Low Risk', value: 12, color: '#1E8A5B' },
-  ];
+  if (dashboard.isLoading) {
+    return (
+      <div className="space-y-6" role="status" aria-label="Loading dashboard">
+        <header><h1 className="text-2xl font-bold text-text-primary">Console Overview</h1><p className="text-sm text-text-secondary">Loading firm activity…</p></header>
+        <div className="h-36 animate-pulse rounded-lg bg-forge-silver-100" />
+        <div className="grid grid-cols-4 gap-6"><div className="h-28 animate-pulse rounded-lg bg-forge-silver-100" /><div className="h-28 animate-pulse rounded-lg bg-forge-silver-100" /><div className="h-28 animate-pulse rounded-lg bg-forge-silver-100" /><div className="h-28 animate-pulse rounded-lg bg-forge-silver-100" /></div>
+      </div>
+    );
+  }
 
-  if (showOnboarding) {
-    return <OnboardingChecklist />;
+  if (dashboard.isError) {
+    return (
+      <section className="mx-auto max-w-2xl rounded-lg border border-risk-high/30 bg-risk-high/10 p-8 text-center" role="alert">
+        <AlertCircle className="mx-auto mb-3 h-10 w-10 text-risk-high" aria-hidden="true" />
+        <h1 className="text-2xl font-bold text-text-primary">Dashboard unavailable</h1>
+        <p className="mt-2 text-text-secondary">Firm activity could not be loaded. No cached legal data is being presented as current.</p>
+        <Button className="mt-5" onClick={() => void dashboard.refetch()}><RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />Retry dashboard</Button>
+      </section>
+    );
+  }
+
+  const summary = dashboard.data!;
+  const urgentAlerts = summary.recentAlerts
+    .filter((alert) => !alert.resolved && alert.riskLevel === 'high')
+    .sort((left, right) => right.detectedAt.localeCompare(left.detectedAt));
+  const isEmpty = summary.activeWatches === 0
+    && summary.portfolioMarkCount === 0
+    && summary.recentAlerts.length === 0
+    && summary.recentSearches.length === 0;
+
+  if (isEmpty) {
+    return (
+      <div className="space-y-6">
+        <header><h1 className="text-2xl font-bold text-text-primary">Console Overview</h1><p className="text-sm text-text-secondary">Welcome, {user?.fullName ?? 'researcher'}.</p></header>
+        {summary.partial && <PartialDataNotice unavailableSections={summary.unavailableSections} onRetry={() => void dashboard.refetch()} />}
+        <section className="rounded-lg border-2 border-dashed border-forge-silver-300 bg-surface-card p-12 text-center"><BriefcaseBusiness className="mx-auto mb-3 h-10 w-10 text-forge-silver-500" aria-hidden="true" /><h2 className="text-xl font-bold text-text-primary">No firm activity yet</h2><p className="mx-auto mt-2 max-w-lg text-text-secondary">Run a trademark search, add a portfolio mark, or configure a watch to populate this dashboard with authoritative activity.</p><div className="mt-5 flex justify-center gap-3"><Link to="/search" className="rounded bg-accent px-4 py-2 font-medium text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2">Start a search</Link><Link to="/portfolio" className="rounded border border-forge-silver-500 px-4 py-2 font-medium text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2">Open portfolio</Link></div></section>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-bold text-text-primary">Console Overview</h1>
-        <p className="text-text-secondary text-sm">Welcome back, {user?.fullName ?? 'researcher'}. Here is your brand security posture.</p>
-      </header>
+    <div className="space-y-6">
+      <header><h1 className="text-2xl font-bold text-text-primary">Console Overview</h1><p className="text-sm text-text-secondary">Welcome back, {user?.fullName ?? 'researcher'}. Current firm activity and risk follow.</p></header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="bg-forge-navy-950 text-white border-none">
-          <div className="text-[10px] text-forge-subtext-onDark uppercase font-bold mb-1">Portfolio Health</div>
-          <div className="text-3xl font-black">94%</div>
-          <div className="text-xs text-risk-low mt-2 flex items-center gap-1 font-bold">
-            <TrendingUp className="w-3 h-3" /> +2% from last month
-          </div>
-        </Card>
-        <Card>
-          <div className="text-[10px] text-text-secondary uppercase font-bold mb-1">Pending Alerts</div>
-          <div className="text-3xl font-black text-risk-high flex items-center gap-2">
-            <AlertCircle className="w-6 h-6 flex-shrink-0" aria-hidden="true" />
-            {alerts?.length || 0}
-          </div>
-          <div className="text-xs text-text-secondary mt-2 flex items-center gap-1">
-            <Clock className="w-3 h-3" /> 2 requiring urgent review
-          </div>
-        </Card>
-        <Card>
-          <div className="text-[10px] text-text-secondary uppercase font-bold mb-1">Active Watches</div>
-          <div className="text-3xl font-black text-forge-teal-700">12</div>
-          <div className="text-xs text-text-secondary mt-2">Monitoring 18 assets</div>
-        </Card>
-        <Card>
-          <div className="text-[10px] text-text-secondary uppercase font-bold mb-1">Next Renewal</div>
-          <div className="text-3xl font-black text-text-primary font-mono">OCT 14</div>
-          <div className="text-xs text-risk-medium mt-2 font-bold flex items-center gap-1">
-            <AlertCircle className="w-3 h-3" /> FORGE GLOBAL (US)
-          </div>
-        </Card>
-      </div>
+      {summary.partial && <PartialDataNotice unavailableSections={summary.unavailableSections} onRetry={() => void dashboard.refetch()} />}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Activity Chart */}
-        <Card title="Infringement Detection Activity" className="lg:col-span-2">
-          <div className="h-80 w-full mt-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#146575" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#146575" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E7EAEE" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#5B6470'}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#5B6470'}} />
-                <Tooltip />
-                <Area type="monotone" dataKey="count" stroke="#146575" fillOpacity={1} fill="url(#colorCount)" strokeWidth={3} />
-              </AreaChart>
-            </ResponsiveContainer>
+      {urgentAlerts.length > 0 && (
+        <section className="rounded-lg border-2 border-risk-high bg-white p-5" aria-labelledby="urgent-alerts-heading">
+          <div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wider text-risk-high">Requires attention</p><h2 id="urgent-alerts-heading" className="text-xl font-bold text-text-primary">Unresolved High-risk alerts</h2></div><Badge risk="high">{urgentAlerts.length} unresolved</Badge></div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[46rem] text-left"><caption className="sr-only">Unresolved High-risk trademark alerts</caption><thead><tr className="border-b border-forge-silver-300 bg-surface-base">{['Matched mark', 'Protected mark', 'Jurisdiction', 'Detected', 'Reference', 'Action'].map((heading) => <th key={heading} scope="col" className="px-3 py-2 text-xs font-bold uppercase text-text-secondary">{heading}</th>)}</tr></thead><tbody>{urgentAlerts.map((alert) => <tr key={alert.id} className="border-b border-forge-silver-100 last:border-0"><th scope="row" className="px-3 py-3 font-mono text-sm font-bold uppercase text-text-primary">{alert.matchedMarkText}</th><td className="px-3 py-3 text-sm text-text-primary">{alert.protectedMarkText}</td><td className="px-3 py-3 text-sm text-text-primary">{alert.jurisdiction}</td><td className="px-3 py-3 text-sm text-text-primary">{alert.detectedAt}</td><td className="px-3 py-3 font-mono text-xs text-text-secondary">{alert.candidateRef}</td><td className="px-3 py-3"><Link to={`/search/risk/${alert.id}`} className="font-bold text-risk-high underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">Review now</Link></td></tr>)}</tbody></table></div>
+        </section>
+      )}
+
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4" aria-label="Firm summary metrics">
+        <MetricCard label="Active watches" value={String(summary.activeWatches)} icon={<Eye className="h-5 w-5" aria-hidden="true" />} detail="Currently monitoring new filings" />
+        <MetricCard label="Portfolio health" value={`${summary.portfolioHealthPercent}%`} icon={<BriefcaseBusiness className="h-5 w-5" aria-hidden="true" />} detail={`${summary.portfolioMarkCount} portfolio marks assessed`} />
+        <MetricCard label="Recent alerts" value={String(summary.recentAlerts.length)} icon={<AlertCircle className="h-5 w-5" aria-hidden="true" />} detail={`${urgentAlerts.length} unresolved High risk`} />
+        <MetricCard label="Recent searches" value={String(summary.recentSearches.length)} icon={<Search className="h-5 w-5" aria-hidden="true" />} detail="Most recent completed searches" />
+      </section>
+
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <Card title="Search activity" className="xl:col-span-2">
+          <p className="text-sm text-text-secondary">Completed searches per day; exact searches remain in the table below.</p>
+          <div className="mt-3 h-64" role="img" aria-label={`Search activity: ${summary.searchActivity.map((point) => `${point.label} ${point.count}`).join(', ')}`}>
+            <ResponsiveContainer width="100%" height="100%"><AreaChart data={summary.searchActivity}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E7EAEE" /><XAxis dataKey="label" axisLine={false} tickLine={false} /><YAxis allowDecimals={false} axisLine={false} tickLine={false} /><Tooltip /><Area type="monotone" dataKey="count" stroke="#146575" fill="#146575" fillOpacity={0.12} strokeWidth={3} /></AreaChart></ResponsiveContainer>
           </div>
+        </Card>
+        <Card title="Risk distribution">
+          <p className="mb-4 text-sm text-text-secondary">Aggregate portfolio ratings.</p>
+          <ul className="space-y-4">{summary.riskDistribution.map((item) => <li key={item.risk} className="flex items-center justify-between"><Badge risk={item.risk}>{item.risk} risk</Badge><span className="font-bold text-text-primary">{item.count} marks</span></li>)}</ul>
+        </Card>
+      </section>
+
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <Card title="Recent alerts" footer={<Link to="/watches" className="flex items-center gap-1 text-sm font-bold text-forge-teal-700 hover:underline">View all alerts <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>}>
+          {summary.recentAlerts.length === 0 ? <p className="py-8 text-center text-sm text-text-secondary">No recent alerts.</p> : <div className="overflow-x-auto"><table className="w-full min-w-[34rem] text-left"><caption className="sr-only">Recent trademark alerts</caption><thead><tr className="border-b border-forge-silver-300"><th scope="col" className="px-3 py-2 text-xs font-bold uppercase text-text-secondary">Risk</th><th scope="col" className="px-3 py-2 text-xs font-bold uppercase text-text-secondary">Matched mark</th><th scope="col" className="px-3 py-2 text-xs font-bold uppercase text-text-secondary">Protected mark</th><th scope="col" className="px-3 py-2 text-xs font-bold uppercase text-text-secondary">Detected</th></tr></thead><tbody>{summary.recentAlerts.slice(0, 5).map((alert) => <tr key={alert.id} className="border-b border-forge-silver-100 last:border-0"><td className="px-3 py-3"><Badge risk={alert.riskLevel}>{alert.riskLevel}</Badge></td><th scope="row" className="px-3 py-3 font-mono text-sm font-bold uppercase text-text-primary">{alert.matchedMarkText}</th><td className="px-3 py-3 text-sm text-text-primary">{alert.protectedMarkText}</td><td className="px-3 py-3 text-sm text-text-primary">{alert.detectedAt}</td></tr>)}</tbody></table></div>}
         </Card>
 
-        {/* Risk Distribution */}
-        <Card title="Portfolio Risk Profile">
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={riskData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {riskData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="space-y-2 mt-4">
-            {riskData.map((item) => (
-              <div key={item.name} className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
-                  <span className="text-text-secondary">{item.name}</span>
-                </div>
-                <span className="font-bold text-text-primary">{item.value} Marks</span>
-              </div>
-            ))}
-          </div>
+        <Card title="Recent searches" footer={<Link to="/search" className="flex items-center gap-1 text-sm font-bold text-forge-teal-700 hover:underline">New search <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>}>
+          {summary.recentSearches.length === 0 ? <p className="py-8 text-center text-sm text-text-secondary">No recent searches.</p> : <div className="overflow-x-auto"><table className="w-full min-w-[34rem] text-left"><caption className="sr-only">Recent trademark searches</caption><thead><tr className="border-b border-forge-silver-300"><th scope="col" className="px-3 py-2 text-xs font-bold uppercase text-text-secondary">Mark</th><th scope="col" className="px-3 py-2 text-xs font-bold uppercase text-text-secondary">Jurisdiction</th><th scope="col" className="px-3 py-2 text-xs font-bold uppercase text-text-secondary">Results</th><th scope="col" className="px-3 py-2 text-xs font-bold uppercase text-text-secondary">High risk</th><th scope="col" className="px-3 py-2 text-xs font-bold uppercase text-text-secondary">Searched</th></tr></thead><tbody>{summary.recentSearches.slice(0, 5).map((search) => <tr key={search.id} className="border-b border-forge-silver-100 last:border-0"><th scope="row" className="px-3 py-3 font-mono text-sm font-bold uppercase text-text-primary">{search.mark}</th><td className="px-3 py-3 text-sm text-text-primary">{search.jurisdictions.join(', ')}</td><td className="px-3 py-3 text-sm text-text-primary">{search.resultCount}</td><td className="px-3 py-3 text-sm text-text-primary">{search.highRiskCount}</td><td className="px-3 py-3 text-sm text-text-primary">{search.searchedAt}</td></tr>)}</tbody></table></div>}
         </Card>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card title="Recent Alerts" footer={<Link to="/watches" className="text-forge-teal-700 font-bold flex items-center gap-1 text-sm hover:underline">View all alerts <ArrowRight className="w-4 h-4" /></Link>}>
-           <div className="space-y-4">
-              {alerts?.slice(0, 3).map((alert) => (
-                <div key={alert.id} className="flex items-center justify-between py-2 border-b border-forge-silver-100 last:border-0">
-                  <div className="flex items-center gap-3">
-                    <Badge risk={alert.riskScore?.compositeRating} className="w-16 justify-center">{alert.riskScore?.compositeRating}</Badge>
-                    <div>
-                      <div className="text-sm font-bold text-text-primary uppercase font-mono">{alert.matchedMarkText}</div>
-                      <div className="text-[10px] text-text-secondary uppercase font-bold">Conflict with FORGE GLOBAL</div>
-                    </div>
-                  </div>
-                  <Link to={`/search/risk/${alert.id}`}>
-                    <Button variant="ghost" size="sm">Review</Button>
-                  </Link>
-                </div>
-              ))}
-           </div>
-        </Card>
-
-        <Card title="Recommended Actions">
-           <div className="space-y-4">
-              <div className="p-4 rounded bg-risk-high/5 border border-risk-high/20 flex items-start gap-4">
-                 <AlertCircle className="w-5 h-5 text-risk-high mt-1" />
-                 <div>
-                    <h4 className="font-bold text-text-primary">Renewal Deadline Approaching</h4>
-                    <p className="text-sm text-text-secondary">Trademark "FORGE GLOBAL" (US) requires renewal by Oct 14, 2026. Failure to file will result in abandonment.</p>
-                    <Button className="mt-2" size="sm">File Renewal</Button>
-                 </div>
-              </div>
-              <div className="p-4 rounded bg-forge-teal-700/5 border border-forge-teal-700/20 flex items-start gap-4">
-                 <Search className="w-5 h-5 text-forge-teal-700 mt-1" />
-                 <div>
-                    <h4 className="font-bold text-text-primary">Perform Monthly Sweep</h4>
-                    <p className="text-sm text-text-secondary">Run your scheduled portfolio-wide search to detect new similar filings.</p>
-                    <Button variant="outline" className="mt-2" size="sm">Run Sweep</Button>
-                 </div>
-              </div>
-           </div>
-        </Card>
-      </div>
+      </section>
     </div>
   );
 };
+
+function MetricCard({ label, value, detail, icon }: { label: string; value: string; detail: string; icon: React.ReactNode }) {
+  return <Card><div className="flex items-center justify-between"><p className="text-xs font-bold uppercase text-text-secondary">{label}</p><span className="text-forge-teal-700">{icon}</span></div><p className="mt-1 text-3xl font-black text-text-primary">{value}</p><p className="mt-2 text-xs text-text-secondary">{detail}</p></Card>;
+}
+
+function PartialDataNotice({ unavailableSections, onRetry }: { unavailableSections: string[]; onRetry: () => void }) {
+  return <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-risk-medium bg-risk-medium/10 p-4" role="status"><div><p className="font-bold text-text-primary">Dashboard data is partial</p><p className="text-sm text-text-secondary">Unavailable: {unavailableSections.length ? unavailableSections.join(', ') : 'one or more aggregates'}.</p></div><Button variant="outline" size="sm" onClick={onRetry}><RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />Retry missing data</Button></div>;
+}
