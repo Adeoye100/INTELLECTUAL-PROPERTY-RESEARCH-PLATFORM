@@ -7,12 +7,15 @@ export interface AuthenticatedUser {
   email: string;
   fullName: string;
   role: UserRole;
+  emailVerified?: boolean;
+  onboardingRequired?: boolean;
 }
 
 interface AuthState {
   token: string | null;
   user: AuthenticatedUser | null;
-  setSession: (token: string, user: AuthenticatedUser) => void;
+  expiresAt: number | null;
+  setSession: (token: string, user: AuthenticatedUser, expiresAt?: number) => void;
   clearSession: () => void;
 }
 
@@ -21,14 +24,17 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       token: null,
       user: null,
-      setSession: (token, user) => set({ token, user }),
-      clearSession: () => set({ token: null, user: null }),
+      expiresAt: null,
+      setSession: (token, user, expiresAt = Date.now() + 60 * 60 * 1_000) => set({ token, user, expiresAt }),
+      clearSession: () => set({ token: null, user: null, expiresAt: null }),
     }),
     {
       name: 'forge-auth-session',
       storage: createJSONStorage(() => localStorage),
-      partialize: ({ token, user }) => ({ token, user }),
+      partialize: ({ token, user, expiresAt }) => ({ token, user, expiresAt }),
     },
   ),
 );
 
+export const isSessionExpired = (expiresAt: number | null) =>
+  expiresAt !== null && expiresAt <= Date.now();

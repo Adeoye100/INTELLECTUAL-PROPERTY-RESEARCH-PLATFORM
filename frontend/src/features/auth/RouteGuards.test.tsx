@@ -3,7 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it } from 'vitest';
 import { MainLayout } from '../../app/MainLayout';
 import type { UserRole } from '../../types';
-import { RequireAdmin } from './RouteGuards';
+import { RequireAdmin, RequireAuthentication, RequireRole, RoleHomeRedirect } from './RouteGuards';
 import { useAuthStore } from './authStore';
 
 const setRole = (role: UserRole) => {
@@ -26,7 +26,7 @@ describe('role access', () => {
     render(
       <MemoryRouter initialEntries={['/admin']}>
         <Routes>
-          <Route path="/dashboard" element={<div>Dashboard destination</div>} />
+          <Route path="/permission-denied" element={<div>Permission denied destination</div>} />
           <Route
             path="/admin"
             element={(
@@ -39,7 +39,7 @@ describe('role access', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText('Dashboard destination')).toBeVisible();
+    expect(screen.getByText('Permission denied destination')).toBeVisible();
     expect(screen.queryByText('Administration content')).not.toBeInTheDocument();
   });
 
@@ -74,5 +74,52 @@ describe('role access', () => {
     const administrationLink = screen.queryByRole('link', { name: 'Administration' });
     if (expected) expect(administrationLink).toBeVisible();
     else expect(administrationLink).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['admin', 'Admin home'],
+    ['attorney', 'Attorney home'],
+    ['viewer', 'Viewer home'],
+  ] as const)('routes %s to its role-aware home', (role, destination) => {
+    setRole(role);
+    render(
+      <MemoryRouter initialEntries={['/app']}>
+        <Routes>
+          <Route path="/app" element={<RoleHomeRedirect />} />
+          <Route path="/admin" element={<div>Admin home</div>} />
+          <Route path="/dashboard" element={<div>Attorney home</div>} />
+          <Route path="/portfolio" element={<div>Viewer home</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(destination)).toBeVisible();
+  });
+
+  it('blocks Viewer users from Attorney-only routes', () => {
+    setRole('viewer');
+    render(
+      <MemoryRouter initialEntries={['/office-actions']}>
+        <Routes>
+          <Route path="/permission-denied" element={<div>Permission denied destination</div>} />
+          <Route path="/office-actions" element={<RequireRole allowedRoles={['admin', 'attorney']}><div>Office Actions</div></RequireRole>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Permission denied destination')).toBeVisible();
+  });
+
+  it('rejects an expired persisted session from a protected route', () => {
+    useAuthStore.getState().setSession('expired-token', {
+      id: 'u1', email: 'attorney@example.com', fullName: 'Attorney User', role: 'attorney',
+    }, Date.now() - 1);
+    render(
+      <MemoryRouter initialEntries={['/search']}>
+        <Routes>
+          <Route path="/auth/login" element={<div>Sign-in destination</div>} />
+          <Route path="/search" element={<RequireAuthentication><div>Protected search</div></RequireAuthentication>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Sign-in destination')).toBeVisible();
   });
 });

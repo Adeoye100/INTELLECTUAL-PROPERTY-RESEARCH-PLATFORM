@@ -147,24 +147,132 @@ const mockPortfolioMarks: PortfolioMark[] = [
   },
 ];
 
+// MOCK-ONLY FE-06/auth scenario counters. These deterministic first-failure
+// cases exist for frontend retry testing and must not ship as backend logic.
+const mockAttemptCounts = new Map<string, number>();
+const failFirstMockAttempt = (key: string) => {
+  const attempts = mockAttemptCounts.get(key) ?? 0;
+  mockAttemptCounts.set(key, attempts + 1);
+  return attempts === 0;
+};
+
+const mockAuthError = (status: number, code: string, message: string) =>
+  HttpResponse.json({ code, message, mocked: true }, { status });
+
 export const handlers = [
   http.post('/api/auth/login', async ({ request }) => {
     const body = await request.json() as { email?: string };
-    const role = body.email?.toLowerCase().startsWith('admin')
+    const email = body.email?.toLowerCase() ?? '';
+    if (email.startsWith('retry') && failFirstMockAttempt(`login:${email}`)) return HttpResponse.error();
+    if (email.startsWith('network')) return HttpResponse.error();
+    if (email.startsWith('unverified')) return mockAuthError(403, 'EMAIL_NOT_VERIFIED', 'Email verification is required.');
+    if (email.startsWith('denied')) return mockAuthError(403, 'PERMISSION_DENIED', 'This account cannot access the requested firm.');
+
+    const role = email.startsWith('admin')
       ? 'admin'
-      : body.email?.toLowerCase().startsWith('viewer')
+      : email.startsWith('viewer')
         ? 'viewer'
         : 'attorney';
     await delay(800);
     return HttpResponse.json({
       token: 'mock-token',
+      expiresAt: email.startsWith('short-session') ? Date.now() + 500 : Date.now() + 60 * 60 * 1_000,
       user: {
         id: 'u1',
         email: body.email ?? 'attorney@forgeglobal.com',
         role,
         fullName: role === 'admin' ? 'Jane Smith' : role === 'viewer' ? 'Robert Ross' : 'John Doe',
+        emailVerified: true,
+        onboardingRequired: email.includes('new'),
       },
     });
+  }),
+
+  // MOCK authentication lifecycle endpoints. Replace with tenant-aware APIs.
+  http.post('/api/auth/logout', async () => {
+    await delay(150);
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.post('/api/auth/signup', async ({ request }) => {
+    const body = await request.json() as { email?: string };
+    const email = body.email?.toLowerCase() ?? '';
+    if (email.startsWith('existing')) return mockAuthError(409, 'DUPLICATE_ACCOUNT', 'An account already exists.');
+    if (email.startsWith('network')) return HttpResponse.error();
+    await delay(400);
+    return HttpResponse.json({ accepted: true, verificationRequired: true, mocked: true }, { status: 202 });
+  }),
+
+  http.get('/api/auth/invitations/:token', async ({ params }) => {
+    const token = String(params.token);
+    if (token === 'network-retry' && failFirstMockAttempt('invite:network-retry')) return HttpResponse.error();
+    if (token === 'network') return HttpResponse.error();
+    if (token === 'expired') return mockAuthError(410, 'EXPIRED_LINK', 'The invitation has expired.');
+    if (token === 'seat-limit') return mockAuthError(409, 'SEAT_LIMIT', 'No licensed seats remain.');
+    if (token === 'duplicate') return mockAuthError(409, 'DUPLICATE_ACCOUNT', 'This email already has an account.');
+    if (token === 'forbidden') return mockAuthError(403, 'PERMISSION_DENIED', 'This invitation is not available to the current user.');
+    await delay(250);
+    return HttpResponse.json({
+      email: `${token}@invite.example`,
+      firmName: 'Forge Legal Partners',
+      role: token.startsWith('viewer') ? 'viewer' : token.startsWith('admin') ? 'admin' : 'attorney',
+      mocked: true,
+    });
+  }),
+
+  http.post('/api/auth/invitations/:token/accept', async ({ params, request }) => {
+    const token = String(params.token);
+    const body = await request.json() as { fullName?: string };
+    if (token === 'expired') return mockAuthError(410, 'EXPIRED_LINK', 'The invitation expired before acceptance.');
+    if (token === 'seat-limit') return mockAuthError(409, 'SEAT_LIMIT', 'No licensed seats remain.');
+    const role = token.startsWith('viewer') ? 'viewer' : token.startsWith('admin') ? 'admin' : 'attorney';
+    await delay(350);
+    return HttpResponse.json({
+      token: 'mock-invitation-session',
+      expiresAt: Date.now() + 60 * 60 * 1_000,
+      user: {
+        id: `invited-${token}`,
+        email: `${token}@invite.example`,
+        fullName: body.fullName ?? 'Invited User',
+        role,
+        emailVerified: true,
+        onboardingRequired: true,
+      },
+      mocked: true,
+    });
+  }),
+
+  http.post('/api/auth/password-reset', async ({ request }) => {
+    const body = await request.json() as { email?: string };
+    if (body.email?.startsWith('network')) return HttpResponse.error();
+    await delay(300);
+    return HttpResponse.json({ accepted: true, mocked: true }, { status: 202 });
+  }),
+
+  http.get('/api/auth/password-reset/:token', async ({ params }) => {
+    const token = String(params.token);
+    if (token === 'expired') return mockAuthError(410, 'EXPIRED_LINK', 'The reset link has expired.');
+    if (token === 'network') return HttpResponse.error();
+    return HttpResponse.json({ valid: true, mocked: true });
+  }),
+
+  http.post('/api/auth/password-reset/:token', async ({ params }) => {
+    if (String(params.token) === 'expired') return mockAuthError(410, 'EXPIRED_LINK', 'The reset link has expired.');
+    await delay(300);
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.get('/api/auth/verify-email/:token', async ({ params }) => {
+    const token = String(params.token);
+    if (token === 'expired') return mockAuthError(410, 'EXPIRED_LINK', 'The verification link has expired.');
+    if (token === 'network') return HttpResponse.error();
+    await delay(250);
+    return HttpResponse.json({ verified: true, mocked: true });
+  }),
+
+  http.post('/api/auth/verify-email/resend', async () => {
+    await delay(250);
+    return HttpResponse.json({ accepted: true, mocked: true }, { status: 202 });
   }),
 
   http.get('/api/search', async ({ request }) => {
@@ -183,6 +291,28 @@ export const handlers = [
   http.get('/api/portfolio', async () => {
     await delay(500);
     return HttpResponse.json(mockPortfolioMarks);
+  }),
+
+  http.post('/api/portfolio', async ({ request }) => {
+    const body = await request.json() as {
+      markText: string;
+      jurisdiction: string;
+      niceClasses: number[];
+      renewalDate: string;
+    };
+    await delay(400);
+    return HttpResponse.json<PortfolioMark>({
+      id: `mock-${Date.now()}`,
+      firmId: 'f1',
+      ownerUserId: 'u1',
+      markText: body.markText,
+      jurisdiction: body.jurisdiction,
+      niceClasses: body.niceClasses,
+      status: 'Draft',
+      filingDate: new Date().toISOString().slice(0, 10),
+      renewalDate: body.renewalDate,
+      sourceRegistry: 'Manual entry (mock)',
+    }, { status: 201 });
   }),
 
   http.get('/api/watches', async () => {

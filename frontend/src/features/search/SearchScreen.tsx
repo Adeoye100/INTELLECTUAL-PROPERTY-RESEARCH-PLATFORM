@@ -7,8 +7,10 @@ import { Badge } from '../../components/Badge';
 import { SourceStatusIndicator } from '../../components/SourceStatusIndicator';
 import { useQuery } from '@tanstack/react-query';
 import type { SearchResponse, SearchResult } from '../../types';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { PdfExport } from '../../components/PdfExport';
+import { useAuthStore } from '../auth/authStore';
+import { useOnboardingStore } from '../onboarding/onboardingStore';
 
 interface SearchFilters {
   query: string;
@@ -17,6 +19,10 @@ interface SearchFilters {
 }
 
 export const SearchScreen: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const user = useAuthStore((state) => state.user);
+  const completePath = useOnboardingStore((state) => state.completePath);
+  const [onboardingComplete, setOnboardingComplete] = React.useState(false);
   const { register, handleSubmit, control } = useForm<SearchFilters>({
     defaultValues: {
       query: '',
@@ -29,7 +35,7 @@ export const SearchScreen: React.FC = () => {
   const jurisdictions = useWatch({ control, name: 'jurisdictions' });
   const niceClasses = useWatch({ control, name: 'classes' });
 
-  const { data: searchResponse, isLoading, isError } = useQuery<SearchResponse>({
+  const { data: searchResponse, isLoading, isError, refetch } = useQuery<SearchResponse>({
     queryKey: ['search', queryText],
     queryFn: async () => {
       if (!queryText) return { results: [], sourceStatuses: [] };
@@ -42,8 +48,14 @@ export const SearchScreen: React.FC = () => {
 
   const results = searchResponse?.results;
 
-  const onSubmit = (data: SearchFilters) => {
+  const onSubmit = async (data: SearchFilters) => {
     console.log('Search filters:', data);
+    if (data.query.trim().length < 3) return;
+    const outcome = await refetch();
+    if (!outcome.error && user && searchParams.get('onboarding') === 'search') {
+      completePath(user.id, 'search');
+      setOnboardingComplete(true);
+    }
   };
 
   return (
@@ -63,6 +75,13 @@ export const SearchScreen: React.FC = () => {
           Saved Searches
         </Button>
       </header>
+
+      {onboardingComplete && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-forge-teal-700 bg-forge-teal-700/10 p-4" role="status">
+          <p className="font-bold text-text-primary">First search completed on this browser.</p>
+          <Link to="/dashboard" className="font-bold text-forge-teal-700 underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">Continue to dashboard</Link>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Filters Sidebar */}

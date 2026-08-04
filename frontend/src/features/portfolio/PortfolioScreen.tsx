@@ -1,5 +1,9 @@
 import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Plus, AlertCircle, Shield, ExternalLink, Calendar, MoveHorizontal } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
@@ -7,8 +11,33 @@ import { Badge } from '../../components/Badge';
 import { Table, TableRow, TableCell } from '../../components/Table';
 import type { PortfolioMark } from '../../types';
 import { PdfExport } from '../../components/PdfExport';
+import { Modal } from '../../components/Modal';
+import { useAuthStore } from '../auth/authStore';
+import { useOnboardingStore } from '../onboarding/onboardingStore';
+
+const portfolioMarkSchema = z.object({
+  markText: z.string().trim().min(2, 'Enter the trademark name.'),
+  jurisdiction: z.string().min(2, 'Choose a jurisdiction.'),
+  niceClasses: z.string().trim().regex(/^\d+(\s*,\s*\d+)*$/, 'Enter one or more numeric classes separated by commas.'),
+  renewalDate: z.string().min(1, 'Choose the next renewal date.'),
+});
+
+type PortfolioMarkValues = z.infer<typeof portfolioMarkSchema>;
 
 export const PortfolioScreen: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const queryClient = useQueryClient();
+  const user = useAuthStore((state) => state.user);
+  const completePath = useOnboardingStore((state) => state.completePath);
+  const [isAddOpen, setIsAddOpen] = React.useState(() => searchParams.get('onboarding') === 'add' && user?.role !== 'viewer');
+  const [addError, setAddError] = React.useState<string | null>(null);
+  const [onboardingComplete, setOnboardingComplete] = React.useState(false);
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<PortfolioMarkValues>({ resolver: zodResolver(portfolioMarkSchema) });
   const { data: marks, isLoading } = useQuery<PortfolioMark[]>({
     queryKey: ['portfolio'],
     queryFn: async () => {
@@ -16,6 +45,31 @@ export const PortfolioScreen: React.FC = () => {
       return response.json();
     },
   });
+
+  const addMark = async (values: PortfolioMarkValues) => {
+    setAddError(null);
+    try {
+      const response = await fetch('/api/portfolio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...values,
+          niceClasses: values.niceClasses.split(',').map((value) => Number(value.trim())),
+        }),
+      });
+      if (!response.ok) throw new Error('Portfolio creation failed');
+      const created = await response.json() as PortfolioMark;
+      queryClient.setQueryData<PortfolioMark[]>(['portfolio'], (current = []) => [...current, created]);
+      if (user && searchParams.get('onboarding') === 'add') {
+        completePath(user.id, 'portfolio');
+        setOnboardingComplete(true);
+      }
+      reset();
+      setIsAddOpen(false);
+    } catch {
+      setAddError('The mark could not be added. Check your connection and retry.');
+    }
+  };
 
   if (isLoading) return <div className="p-8 text-center">Loading portfolio...</div>;
 
@@ -39,12 +93,21 @@ export const PortfolioScreen: React.FC = () => {
             disabled={!marks?.length}
             label="Export portfolio PDF"
           />
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Mark
-          </Button>
+          {user?.role !== 'viewer' && (
+            <Button onClick={() => setIsAddOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" aria-hidden="true" />
+              Add mark
+            </Button>
+          )}
         </div>
       </header>
+
+      {onboardingComplete && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-forge-teal-700 bg-forge-teal-700/10 p-4" role="status">
+          <p className="font-bold text-text-primary">First portfolio mark added on this browser.</p>
+          <Link to="/dashboard" className="font-bold text-forge-teal-700 underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">Continue to dashboard</Link>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <Card className="bg-forge-navy-950 text-white border-none">
@@ -115,6 +178,26 @@ export const PortfolioScreen: React.FC = () => {
           )}
         </Table>
       </Card>
+
+      <Modal
+        isOpen={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+        title="Add a portfolio mark"
+        footer={(
+          <>
+            <Button type="button" variant="ghost" onClick={() => setIsAddOpen(false)}>Cancel</Button>
+            <Button type="submit" form="add-portfolio-mark" disabled={isSubmitting}>{isSubmitting ? 'Adding…' : addError ? 'Retry adding mark' : 'Add mark'}</Button>
+          </>
+        )}
+      >
+        <form id="add-portfolio-mark" onSubmit={handleSubmit(addMark)} className="space-y-4" noValidate>
+          <div><label htmlFor="portfolio-mark-text" className="mb-1 block text-sm font-bold text-text-primary">Trademark name</label><input {...register('markText')} id="portfolio-mark-text" autoFocus aria-invalid={Boolean(errors.markText)} aria-describedby={errors.markText ? 'portfolio-mark-error' : undefined} className="w-full rounded border border-forge-silver-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2" />{errors.markText && <p id="portfolio-mark-error" className="mt-1 text-xs text-risk-high">{errors.markText.message}</p>}</div>
+          <div><label htmlFor="portfolio-jurisdiction" className="mb-1 block text-sm font-bold text-text-primary">Jurisdiction</label><select {...register('jurisdiction')} id="portfolio-jurisdiction" defaultValue="" aria-invalid={Boolean(errors.jurisdiction)} aria-describedby={errors.jurisdiction ? 'portfolio-jurisdiction-error' : undefined} className="w-full rounded border border-forge-silver-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"><option value="" disabled>Choose jurisdiction</option><option value="US">United States</option><option value="EU">European Union</option><option value="GB">United Kingdom</option></select>{errors.jurisdiction && <p id="portfolio-jurisdiction-error" className="mt-1 text-xs text-risk-high">{errors.jurisdiction.message}</p>}</div>
+          <div><label htmlFor="portfolio-classes" className="mb-1 block text-sm font-bold text-text-primary">Nice classes</label><input {...register('niceClasses')} id="portfolio-classes" placeholder="9, 35, 42" aria-invalid={Boolean(errors.niceClasses)} aria-describedby={errors.niceClasses ? 'portfolio-classes-error' : undefined} className="w-full rounded border border-forge-silver-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2" />{errors.niceClasses && <p id="portfolio-classes-error" className="mt-1 text-xs text-risk-high">{errors.niceClasses.message}</p>}</div>
+          <div><label htmlFor="portfolio-renewal" className="mb-1 block text-sm font-bold text-text-primary">Next renewal date</label><input {...register('renewalDate')} id="portfolio-renewal" type="date" aria-invalid={Boolean(errors.renewalDate)} aria-describedby={errors.renewalDate ? 'portfolio-renewal-error' : undefined} className="w-full rounded border border-forge-silver-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2" />{errors.renewalDate && <p id="portfolio-renewal-error" className="mt-1 text-xs text-risk-high">{errors.renewalDate.message}</p>}</div>
+          {addError && <p className="rounded bg-risk-high/10 p-3 text-sm text-risk-high" role="alert">{addError}</p>}
+        </form>
+      </Modal>
     </div>
   );
 };

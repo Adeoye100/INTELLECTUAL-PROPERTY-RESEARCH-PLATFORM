@@ -14,6 +14,11 @@ import { AdminScreen } from '../features/billing/AdminScreen';
 
 import { LandingPage } from '../features/landing/pages/LandingPage';
 import { RequireAdmin, RequireAuthentication } from '../features/auth/RouteGuards';
+import { RequireRole, RoleHomeRedirect } from '../features/auth/RouteGuards';
+import { InviteAcceptanceScreen } from '../features/auth/InviteAcceptanceScreen';
+import { PasswordResetRequestScreen, PasswordUpdateScreen } from '../features/auth/PasswordResetScreens';
+import { EmailVerificationScreen } from '../features/auth/EmailVerificationScreen';
+import { PermissionDeniedScreen } from '../features/auth/PermissionDeniedScreen';
 
 const router = createBrowserRouter([
   {
@@ -26,6 +31,11 @@ const router = createBrowserRouter([
     children: [
       { path: 'login', element: <LoginScreen /> },
       { path: 'signup', element: <SignupScreen /> },
+      { path: 'invite/:token', element: <InviteAcceptanceScreen /> },
+      { path: 'forgot-password', element: <PasswordResetRequestScreen /> },
+      { path: 'reset-password/:token', element: <PasswordUpdateScreen /> },
+      { path: 'verify-email', element: <EmailVerificationScreen /> },
+      { path: 'verify-email/:token', element: <EmailVerificationScreen /> },
     ],
   },
   {
@@ -37,11 +47,20 @@ const router = createBrowserRouter([
     ),
     children: [
       { path: 'dashboard', element: <DashboardScreen /> },
+      { path: 'app', element: <RoleHomeRedirect /> },
       { path: 'search', element: <SearchScreen /> },
       { path: 'search/risk/:id', element: <RiskDetailScreen /> },
-      { path: 'office-actions', element: <OfficeActionResearchScreen /> },
+      {
+        path: 'office-actions',
+        element: (
+          <RequireRole allowedRoles={['admin', 'attorney']}>
+            <OfficeActionResearchScreen />
+          </RequireRole>
+        ),
+      },
       { path: 'portfolio', element: <PortfolioScreen /> },
       { path: 'watches', element: <WatchesScreen /> },
+      { path: 'permission-denied', element: <PermissionDeniedScreen /> },
       {
         path: 'admin',
         element: (

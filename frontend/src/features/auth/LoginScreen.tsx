@@ -1,105 +1,144 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Button } from '../../components/Button';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Button } from '../../components/Button';
+import { AuthApiError, authErrorMessage, authRequest } from './authApi';
+import { roleHomePath } from './roleRouting';
 import { useAuthStore, type AuthenticatedUser } from './authStore';
 
 const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  email: z.string().trim().email('Enter a valid email address.'),
+  password: z.string().min(8, 'Password must be at least 8 characters.'),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
+
+interface LoginResponse {
+  token: string;
+  expiresAt: number;
+  user: AuthenticatedUser;
+}
+
+interface LoginLocationState {
+  from?: string;
+  reason?: 'authentication-required' | 'session-expired' | 'signed-out' | 'password-updated';
+}
+
+const notices: Record<NonNullable<LoginLocationState['reason']>, string> = {
+  'authentication-required': 'Sign in to continue to that page.',
+  'session-expired': 'Your session expired. Sign in again to continue.',
+  'signed-out': 'You have signed out successfully.',
+  'password-updated': 'Your password was updated. Sign in with your new password.',
+};
 
 export const LoginScreen: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const setSession = useAuthStore((state) => state.setSession);
-  const [submitError, setSubmitError] = React.useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<AuthApiError['code'] | null>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+  const locationState = location.state as LoginLocationState | null;
   const {
     register,
     handleSubmit,
+    getValues,
     formState: { errors, isSubmitting },
-  } = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
-  });
+  } = useForm<LoginFormValues>({ resolver: zodResolver(loginSchema) });
+
+  useEffect(() => {
+    if (submitError) errorRef.current?.focus();
+  }, [submitError]);
 
   const onSubmit = async (data: LoginFormValues) => {
     setSubmitError(null);
+    setErrorCode(null);
 
     try {
-      const response = await fetch('/api/auth/login', {
+      const session = await authRequest<LoginResponse>('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
+      setSession(session.token, session.user, session.expiresAt);
 
-      if (!response.ok) throw new Error('Sign in failed');
-
-      const session = (await response.json()) as {
-        token: string;
-        user: AuthenticatedUser;
-      };
-      setSession(session.token, session.user);
-
-      const destination = (location.state as { from?: string } | null)?.from;
-      navigate(destination ?? '/dashboard', { replace: true });
-    } catch {
-      setSubmitError('Unable to sign in. Check your details and try again.');
+      const destination = session.user.onboardingRequired
+        ? '/dashboard'
+        : locationState?.from ?? roleHomePath(session.user.role);
+      navigate(destination, { replace: true });
+    } catch (error) {
+      setSubmitError(authErrorMessage(error));
+      setErrorCode(error instanceof AuthApiError ? error.code : 'UNKNOWN_ERROR');
     }
   };
 
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h1 className="text-2xl font-bold text-text-primary">Sign In</h1>
-        <p className="text-text-secondary mt-1">Access your brand protection console</p>
+        <h1 className="text-2xl font-bold text-text-primary">Sign in</h1>
+        <p className="mt-1 text-text-secondary">Access your brand protection console</p>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      {locationState?.reason && (
+        <p className="rounded border border-forge-teal-700/30 bg-forge-teal-700/10 p-3 text-sm text-text-primary" role="status">
+          {notices[locationState.reason]}
+        </p>
+      )}
+
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <div>
-          <label htmlFor="login-email" className="block text-sm font-semibold text-text-primary mb-1">Email Address</label>
+          <label htmlFor="login-email" className="mb-1 block text-sm font-semibold text-text-primary">Email address</label>
           <input
             {...register('email')}
             id="login-email"
             type="email"
-            className="w-full px-3 py-2 border border-forge-silver-300 rounded focus:ring-2 focus:ring-accent outline-none transition-all"
-            placeholder="attorney@company.com"
+            autoComplete="email"
+            aria-invalid={Boolean(errors.email)}
+            aria-describedby={errors.email ? 'login-email-error' : undefined}
+            className="w-full rounded border border-forge-silver-300 px-3 py-2 outline-none transition-all focus:ring-2 focus:ring-accent focus:ring-offset-2"
           />
-          {errors.email && <p className="text-risk-high text-xs mt-1">{errors.email.message}</p>}
+          {errors.email && <p id="login-email-error" className="mt-1 text-xs text-risk-high">{errors.email.message}</p>}
         </div>
 
         <div>
-          <label htmlFor="login-password" className="block text-sm font-semibold text-text-primary mb-1">Password</label>
+          <div className="mb-1 flex items-center justify-between gap-3">
+            <label htmlFor="login-password" className="text-sm font-semibold text-text-primary">Password</label>
+            <Link to="/auth/forgot-password" className="text-xs font-bold text-accent hover:underline">Forgot password?</Link>
+          </div>
           <input
             {...register('password')}
             id="login-password"
             type="password"
-            className="w-full px-3 py-2 border border-forge-silver-300 rounded focus:ring-2 focus:ring-accent outline-none transition-all"
-            placeholder="••••••••"
+            autoComplete="current-password"
+            aria-invalid={Boolean(errors.password)}
+            aria-describedby={errors.password ? 'login-password-error' : undefined}
+            className="w-full rounded border border-forge-silver-300 px-3 py-2 outline-none transition-all focus:ring-2 focus:ring-accent focus:ring-offset-2"
           />
-          {errors.password && <p className="text-risk-high text-xs mt-1">{errors.password.message}</p>}
+          {errors.password && <p id="login-password-error" className="mt-1 text-xs text-risk-high">{errors.password.message}</p>}
         </div>
 
         {submitError && (
-          <p className="rounded bg-risk-high/10 p-3 text-sm text-risk-high" role="alert">
-            {submitError}
-          </p>
+          <div ref={errorRef} tabIndex={-1} className="rounded bg-risk-high/10 p-3 text-sm text-risk-high focus:outline-none" role="alert">
+            <p>{submitError}</p>
+            {errorCode === 'EMAIL_NOT_VERIFIED' && (
+              <Link to={`/auth/verify-email?email=${encodeURIComponent(getValues('email'))}`} className="mt-2 inline-block font-bold underline">
+                Resend verification email
+              </Link>
+            )}
+          </div>
         )}
 
         <Button type="submit" className="w-full" disabled={isSubmitting}>
-          {isSubmitting ? 'Signing in...' : 'Sign In'}
+          {isSubmitting ? 'Signing in…' : errorCode === 'NETWORK_ERROR' ? 'Retry sign in' : 'Sign in'}
         </Button>
       </form>
 
-      <div className="text-center pt-4 border-t border-forge-silver-100">
+      <div className="border-t border-forge-silver-100 pt-4 text-center">
         <p className="text-sm text-text-secondary">
-          Don't have an account?{' '}
-          <Link to="/auth/signup" className="text-accent font-bold hover:underline">
-            Request Access
-          </Link>
+          Don&apos;t have an account?{' '}
+          <Link to="/auth/signup" className="font-bold text-accent hover:underline">Request access</Link>
         </p>
       </div>
     </div>

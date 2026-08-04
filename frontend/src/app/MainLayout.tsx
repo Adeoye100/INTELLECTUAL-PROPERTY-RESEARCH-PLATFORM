@@ -13,6 +13,8 @@ import {
 import { cn } from '../lib/utils';
 import { Button } from '../components/Button';
 import { useAuthStore } from '../features/auth/authStore';
+import { authRequest } from '../features/auth/authApi';
+import { SessionExpiryMonitor } from '../features/auth/SessionExpiryMonitor';
 
 export const MainLayout: React.FC = () => {
   const navigate = useNavigate();
@@ -26,13 +28,20 @@ export const MainLayout: React.FC = () => {
     .toUpperCase() ?? 'FG';
   const roleLabel = user?.role ? `${user.role[0].toUpperCase()}${user.role.slice(1)}` : '';
 
-  const signOut = () => {
-    clearSession();
-    navigate('/auth/login', { replace: true });
+  const signOut = async () => {
+    try {
+      await authRequest<void>('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // Local logout must still succeed when server revocation is unavailable.
+    } finally {
+      clearSession();
+      navigate('/auth/login', { replace: true, state: { reason: 'signed-out' } });
+    }
   };
 
   return (
     <div className="flex flex-col min-h-screen">
+      <SessionExpiryMonitor />
       {/* Header */}
       <header className="h-16 bg-forge-gradient flex items-center justify-between px-6 sticky top-0 z-40">
         <Logo />

@@ -1,121 +1,126 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Button } from '../../components/Button';
-import { Link, useNavigate } from 'react-router-dom';
 import { Check } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Button } from '../../components/Button';
+import { AuthApiError, authErrorMessage, authRequest } from './authApi';
 
 const signupSchema = z.object({
-  fullName: z.string().min(2, 'Full name is required'),
-  email: z.string().email('Invalid email address'),
-  company: z.string().min(2, 'Company name is required'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  fullName: z.string().trim().min(2, 'Enter your full name.'),
+  email: z.string().trim().email('Enter a valid email address.'),
+  company: z.string().trim().min(2, 'Enter your company or firm name.'),
+  password: z.string().min(8, 'Password must be at least 8 characters.'),
 });
 
 type SignupFormValues = z.infer<typeof signupSchema>;
 
 export const SignupScreen: React.FC = () => {
-  const navigate = useNavigate();
-  const [isSuccess, setIsSuccess] = React.useState(false);
-
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<AuthApiError['code'] | null>(null);
+  const statusRef = useRef<HTMLDivElement>(null);
   const {
     register,
     handleSubmit,
+    getValues,
     formState: { errors, isSubmitting },
-  } = useForm<SignupFormValues>({
-    resolver: zodResolver(signupSchema),
-  });
+  } = useForm<SignupFormValues>({ resolver: zodResolver(signupSchema) });
+
+  useEffect(() => {
+    if (submitError || isSuccess) statusRef.current?.focus();
+  }, [isSuccess, submitError]);
 
   const onSubmit = async (data: SignupFormValues) => {
-    console.log('Signup data:', data);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setIsSuccess(true);
+    setSubmitError(null);
+    setErrorCode(null);
+    try {
+      await authRequest('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      setIsSuccess(true);
+    } catch (error) {
+      setSubmitError(authErrorMessage(error));
+      setErrorCode(error instanceof AuthApiError ? error.code : 'UNKNOWN_ERROR');
+    }
   };
 
   if (isSuccess) {
     return (
-      <div className="text-center space-y-6">
+      <div ref={statusRef} tabIndex={-1} className="space-y-6 text-center focus:outline-none" role="status">
         <div className="flex justify-center">
-          <div className="w-16 h-16 bg-risk-low rounded-full flex items-center justify-center text-white">
-            <Check size={32} strokeWidth={3} />
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-risk-low text-white">
+            <Check size={32} strokeWidth={3} aria-hidden="true" />
           </div>
         </div>
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold text-text-primary">Request Submitted</h1>
-          <p className="text-text-secondary">
-            Your request for access has been received. Our team will review your application and contact you within 24 hours.
-          </p>
+          <h1 className="text-2xl font-bold text-text-primary">Verify your email</h1>
+          <p className="text-text-secondary">We sent a verification link to {getValues('email')}. Open it before signing in.</p>
         </div>
-        <Button className="w-full" onClick={() => navigate('/auth/login')}>
-          Return to Sign In
-        </Button>
+        <Link to={`/auth/verify-email?email=${encodeURIComponent(getValues('email'))}`} className="inline-flex w-full justify-center rounded bg-accent px-4 py-2 font-medium text-white hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2">
+          View verification options
+        </Link>
       </div>
     );
   }
 
+  const fields: Array<{ name: keyof SignupFormValues; label: string; type: string; autoComplete: string }> = [
+    { name: 'fullName', label: 'Full name', type: 'text', autoComplete: 'name' },
+    { name: 'company', label: 'Company or firm', type: 'text', autoComplete: 'organization' },
+    { name: 'email', label: 'Email address', type: 'email', autoComplete: 'email' },
+    { name: 'password', label: 'Password', type: 'password', autoComplete: 'new-password' },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h1 className="text-2xl font-bold text-text-primary">Request Access</h1>
-        <p className="text-text-secondary mt-1">Join the Forge Global brand protection network</p>
+        <h1 className="text-2xl font-bold text-text-primary">Request access</h1>
+        <p className="mt-1 text-text-secondary">Create your Forge Global account</p>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div>
-          <label className="block text-sm font-semibold text-text-primary mb-1">Full Name</label>
-          <input
-            {...register('fullName')}
-            className="w-full px-3 py-2 border border-forge-silver-300 rounded focus:ring-2 focus:ring-accent outline-none transition-all"
-            placeholder="Jane Smith"
-          />
-          {errors.fullName && <p className="text-risk-high text-xs mt-1">{errors.fullName.message}</p>}
-        </div>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        {fields.map((field) => {
+          const error = errors[field.name];
+          const id = `signup-${field.name}`;
+          return (
+            <div key={field.name}>
+              <label htmlFor={id} className="mb-1 block text-sm font-semibold text-text-primary">{field.label}</label>
+              <input
+                {...register(field.name)}
+                id={id}
+                type={field.type}
+                autoComplete={field.autoComplete}
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? `${id}-error` : undefined}
+                className="w-full rounded border border-forge-silver-300 px-3 py-2 outline-none transition-all focus:ring-2 focus:ring-accent focus:ring-offset-2"
+              />
+              {error && <p id={`${id}-error`} className="mt-1 text-xs text-risk-high">{error.message}</p>}
+            </div>
+          );
+        })}
 
-        <div>
-          <label className="block text-sm font-semibold text-text-primary mb-1">Company</label>
-          <input
-            {...register('company')}
-            className="w-full px-3 py-2 border border-forge-silver-300 rounded focus:ring-2 focus:ring-accent outline-none transition-all"
-            placeholder="Legal Partners LLC"
-          />
-          {errors.company && <p className="text-risk-high text-xs mt-1">{errors.company.message}</p>}
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold text-text-primary mb-1">Email Address</label>
-          <input
-            {...register('email')}
-            type="email"
-            className="w-full px-3 py-2 border border-forge-silver-300 rounded focus:ring-2 focus:ring-accent outline-none transition-all"
-            placeholder="jane@company.com"
-          />
-          {errors.email && <p className="text-risk-high text-xs mt-1">{errors.email.message}</p>}
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold text-text-primary mb-1">Password</label>
-          <input
-            {...register('password')}
-            type="password"
-            className="w-full px-3 py-2 border border-forge-silver-300 rounded focus:ring-2 focus:ring-accent outline-none transition-all"
-            placeholder="••••••••"
-          />
-          {errors.password && <p className="text-risk-high text-xs mt-1">{errors.password.message}</p>}
-        </div>
+        {submitError && (
+          <div ref={statusRef} tabIndex={-1} className="rounded bg-risk-high/10 p-3 text-sm text-risk-high focus:outline-none" role="alert">
+            <p>{submitError}</p>
+            {errorCode === 'DUPLICATE_ACCOUNT' && (
+              <div className="mt-2 flex gap-3">
+                <Link to="/auth/login" className="font-bold underline">Sign in</Link>
+                <Link to="/auth/forgot-password" className="font-bold underline">Reset password</Link>
+              </div>
+            )}
+          </div>
+        )}
 
         <Button type="submit" className="w-full" disabled={isSubmitting}>
-          {isSubmitting ? 'Submitting...' : 'Request Access'}
+          {isSubmitting ? 'Submitting…' : errorCode === 'NETWORK_ERROR' ? 'Retry request' : 'Request access'}
         </Button>
       </form>
 
-      <div className="text-center pt-4 border-t border-forge-silver-100">
-        <p className="text-sm text-text-secondary">
-          Already have an account?{' '}
-          <Link to="/auth/login" className="text-accent font-bold hover:underline">
-            Sign In
-          </Link>
-        </p>
+      <div className="border-t border-forge-silver-100 pt-4 text-center">
+        <p className="text-sm text-text-secondary">Already have an account? <Link to="/auth/login" className="font-bold text-accent hover:underline">Sign in</Link></p>
       </div>
     </div>
   );

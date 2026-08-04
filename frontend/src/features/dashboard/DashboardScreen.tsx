@@ -12,6 +12,9 @@ import { Card } from '../../components/Card';
 import { Badge } from '../../components/Badge';
 import { Link } from 'react-router-dom';
 import type { Alert } from '../../types';
+import { useAuthStore } from '../auth/authStore';
+import { useOnboardingStore } from '../onboarding/onboardingStore';
+import { OnboardingChecklist } from '../onboarding/OnboardingChecklist';
 import { 
   AreaChart, 
   Area, 
@@ -26,12 +29,16 @@ import {
 } from 'recharts';
 
 export const DashboardScreen: React.FC = () => {
+  const user = useAuthStore((state) => state.user);
+  const clientProgress = useOnboardingStore((state) => user ? state.progressByUser[user.id] : undefined);
+  const showOnboarding = user?.onboardingRequired === true && !clientProgress?.completedPath;
   const { data: alerts } = useQuery<(Alert & { matchedMarkText: string })[]>({
     queryKey: ['alerts'],
     queryFn: async () => {
       const response = await fetch('/api/alerts');
       return response.json();
     },
+    enabled: !showOnboarding,
   });
 
   const chartData = [
@@ -50,11 +57,15 @@ export const DashboardScreen: React.FC = () => {
     { name: 'Low Risk', value: 12, color: '#1E8A5B' },
   ];
 
+  if (showOnboarding) {
+    return <OnboardingChecklist />;
+  }
+
   return (
     <div className="space-y-8">
       <header>
         <h1 className="text-2xl font-bold text-text-primary">Console Overview</h1>
-        <p className="text-text-secondary text-sm">Welcome back, John. Here is your brand security posture.</p>
+        <p className="text-text-secondary text-sm">Welcome back, {user?.fullName ?? 'researcher'}. Here is your brand security posture.</p>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
