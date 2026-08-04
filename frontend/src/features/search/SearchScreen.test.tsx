@@ -102,6 +102,9 @@ describe('SearchScreen accessibility', () => {
     });
 
     await user.tab();
+    expect(screen.getByRole('button', { name: 'Export results PDF' })).toHaveFocus();
+
+    await user.tab();
     expect(reviewLinks[0]).toHaveFocus();
     await user.keyboard('{Enter}');
     expect(await screen.findByText('Risk detail destination')).toBeVisible();

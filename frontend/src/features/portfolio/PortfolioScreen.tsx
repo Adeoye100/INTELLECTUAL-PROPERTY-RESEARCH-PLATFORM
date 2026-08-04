@@ -6,6 +6,7 @@ import { Card } from '../../components/Card';
 import { Badge } from '../../components/Badge';
 import { Table, TableRow, TableCell } from '../../components/Table';
 import type { PortfolioMark } from '../../types';
+import { PdfExport } from '../../components/PdfExport';
 
 export const PortfolioScreen: React.FC = () => {
   const { data: marks, isLoading } = useQuery<PortfolioMark[]>({
@@ -25,10 +26,24 @@ export const PortfolioScreen: React.FC = () => {
           <h1 className="text-2xl font-bold text-text-primary">Protected Portfolio</h1>
           <p className="text-text-secondary text-sm">Managed trademarks and intellectual property assets</p>
         </div>
-        <Button className="md:max-xl:self-start">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Mark
-        </Button>
+        <div className="flex flex-wrap items-start gap-3 md:max-xl:self-start">
+          <PdfExport
+            request={{
+              reportType: 'portfolio-summary',
+              context: {
+                screen: 'portfolio',
+                markIds: marks?.map((mark) => mark.id) ?? [],
+                firmId: marks?.[0]?.firmId,
+              },
+            }}
+            disabled={!marks?.length}
+            label="Export portfolio PDF"
+          />
+          <Button>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Mark
+          </Button>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">

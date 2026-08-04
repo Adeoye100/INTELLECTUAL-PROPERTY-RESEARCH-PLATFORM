@@ -1,0 +1,264 @@
+Use these prompts one at a time and in order. This keeps each task focused, testable, and easier to review. Prompt 1 intentionally recreates FE-16/17 because those changes passed locally but were never pushed to GitHub.
+
+Prompt 1 — Re-execute FE-16 and FE-17
+
+Work on this repository:
+
+https://github.com/Adeoye100/INTELLECTUAL-PROPERTY-RESEARCH-PLATFORM
+
+Continue from the latest main branch and implement the previously completed-but-unpushed FE-16 and FE-17 work.
+
+Before editing:
+
+Read all project documentation and any AGENTS.md.
+Inspect git status, current branch, routes, authentication, admin, search, risk-detail, portfolio, and MSW code.
+Preserve all existing work. Do not reset, overwrite, or discard unrelated changes.
+Verify whether each requirement already exists before recreating it.
+
+Implement FE-16:
+
+Persist the authenticated user and role.
+Expose Administration navigation only to Admin users.
+Protect /admin against Attorney and Viewer access.
+Add role badges to the seat table.
+Support user invitations, role assignment, and seat removal.
+Show seat-limit states.
+Display plan, renewal date, payment/subscription state, seat usage, search usage, and watch usage.
+Turn usage metrics into a clear renewal recommendation.
+Keep API-level authorization explicitly documented as still required.
+
+Implement FE-17:
+
+Create a reusable accessible PDF export component.
+Add export triggers to search results, risk detail, and portfolio.
+Support loading, disabled, success/download, retry, and failure states.
+Send the correct report type and screen context.
+Use an MSW handler only while the real PDF endpoint is unavailable.
+Clearly mark real PDF generation and authorization as backend-blocked.
+
+Add or update tests for role access, keyboard navigation, and export behavior.
+
+Run:
+
+pnpm lint
+pnpm test
+pnpm build
+git diff --check
+
+Do not push or open a PR. Finish with:
+
+Files changed
+Requirements completed
+Remaining backend dependencies
+Test results
+Recommended commit message
+Prompt 2 — Authentication and onboarding
+
+Continue the frontend implementation in:
+
+https://github.com/Adeoye100/INTELLECTUAL-PROPERTY-RESEARCH-PLATFORM
+
+Handle the incomplete authentication states and missing FE-06 onboarding flow. Inspect the existing implementation first and preserve completed behavior.
+
+Implement:
+
+Protected authenticated routes.
+Logout and session-expiry handling.
+Invite-acceptance route and interface.
+Password-reset request and password-update screens.
+Email-verification state.
+Expired-link, duplicate-account, seat-limit, permission-denied, network-error, and retry states.
+Role-aware routing for Admin, Attorney, and Viewer.
+A first-run onboarding checklist shown before an empty dashboard.
+Checklist steps that guide the user toward either:
+completing their first trademark search, or
+adding their first portfolio mark.
+Persist onboarding progress without confusing it with server-confirmed data.
+Allow completed users to skip onboarding on future sessions.
+
+Use accessible forms, semantic validation, keyboard focus management, visible labels, and helpful error messages. Add MSW scenarios for frontend testing, but label them as mocks.
+
+Add tests for successful onboarding, incomplete onboarding, expired invitation, network retry, role routing, and keyboard use.
+
+Run lint, tests, build, and git diff --check. Do not push. Report completed acceptance criteria, mocked dependencies, files changed, and a recommended commit message.
+
+Prompt 3 — Dashboard, search filters, and result table
+
+Continue the frontend checklist in:
+
+https://github.com/Adeoye100/INTELLECTUAL-PROPERTY-RESEARCH-PLATFORM
+
+Complete the partial dashboard, FE-08 search, and FE-09 results implementation.
+
+Dashboard acceptance criteria:
+
+Show active watches, recent alerts, portfolio health, and recent searches.
+Keep unresolved High-risk alerts above the fold on the main desktop viewport.
+Use charts only for meaningful aggregates; keep exact legal data in accessible tables.
+Include loading, empty, error, partial-data, and retry states.
+
+Search acceptance criteria:
+
+Keep these filters visible: mark, jurisdiction, class, status, owner, and filing-date range.
+Validate date ranges.
+Ensure submitted filters actually control the API/MSW request and React Query cache key.
+Preserve filters through refresh or navigation where appropriate.
+Do not implement decorative filters that have no effect.
+
+Results acceptance criteria:
+
+Replace or supplement card-only results with an accessible ranked table.
+Include mark, owner, class, jurisdiction, filing date, source, and explicit risk label.
+Pair risk colours with text and icons.
+Show source states: complete, pending, delayed, and unavailable.
+Support partial result arrival without losing filters, selection, or scroll position.
+Provide loading, no-results, source-outage, and retry states.
+Ensure the table works at agreed desktop and tablet widths.
+
+Add focused tests for request parameters, date validation, ranking, source states, keyboard navigation, and filter persistence.
+
+Run lint, tests, build, and git diff --check. Do not push. Report any backend contract assumptions separately.
+
+Prompt 4 — Risk analysis, matters, and decision actions
+
+Continue the project at:
+
+https://github.com/Adeoye100/INTELLECTUAL-PROPERTY-RESEARCH-PLATFORM
+
+Complete the partial FE-11 risk-detail and FE-12 decision-action work without breaking the existing Office Actions interface.
+
+Required corrections:
+
+Remove the hard-coded proposed mark and hard-coded “HIGH” result.
+Derive the proposed mark, matched record, score, and risk level from route state or API response.
+Handle direct page refresh when route state is unavailable.
+Present proposed and matched marks side by side.
+Show phonetic, visual/edit-distance, conceptual, and class-overlap evidence.
+If conceptual scoring is unsupported, label it unavailable instead of fabricating evidence.
+Show scoring methodology/version and source attribution.
+Pair all risk colours with explicit labels and icons.
+
+Implement permission-aware actions:
+
+Save to matter
+Research related Office Actions
+Discard result
+Export risk report
+
+Build the minimum matter-selection/creation UI required for “Save to matter.” Use a typed frontend adapter and MSW fixture while the matter backend is unavailable. Do not claim server persistence when only mock state exists.
+
+Add confirmation and recovery states for destructive or failed actions. Test role permissions, derived risk content, direct refresh, action success/failure, and keyboard interaction.
+
+Run lint, tests, build, and git diff --check. Do not push. Clearly separate UI-complete work from backend-blocked work in the final report.
+
+Prompt 5 — Portfolio, watches, and alerts
+
+Continue the frontend work in:
+
+https://github.com/Adeoye100/INTELLECTUAL-PROPERTY-RESEARCH-PLATFORM
+
+Complete FE-14 portfolio and FE-15 watches/alerts.
+
+Portfolio requirements:
+
+Provide table and detail views.
+Add functional filters.
+Display per-mark renewal dates and warnings.
+Show status history.
+Show attachments with accessible states for empty, loading, unavailable, and failed downloads.
+Support import from search.
+Add one-click conversion of a portfolio mark into a watch.
+Preserve selected mark context during navigation.
+
+Watch requirements:
+
+Configure channel, mode, and active status.
+Show success, validation, permission, and request-failure states.
+Do not expose SMS as implemented if it remains outside scope.
+
+Alert requirements:
+
+Add clearly visible unread styling.
+Sort alerts newest first using actual timestamps.
+Add read/unread, severity, source, and date filters.
+Display severity, supporting evidence, source, and timestamp.
+Navigate directly from an alert to the relevant risk-detail record.
+Pair risk colours with text and icons.
+
+Use typed domain models and React Query consistently. MSW may simulate unavailable backend operations, but mock status must remain explicit.
+
+Add tests for renewal warnings, watch creation, unread state, sorting, filtering, and alert navigation. Run all frontend quality gates and report completed versus blocked acceptance criteria. Do not push.
+
+Prompt 6 — Replace mock-only architecture with live API readiness
+
+Continue FE-21 integration work in:
+
+https://github.com/Adeoye100/INTELLECTUAL-PROPERTY-RESEARCH-PLATFORM
+
+First inspect the backend directory and documentation. Do not invent live endpoints or declare integration complete if the backend still contains no application implementation.
+
+Implement the safest frontend integration foundation:
+
+Create a centralized typed API client.
+Validate required environment variables.
+Use the documented /api/v1 base path.
+Add consistent authentication headers, JSON parsing, error normalization, timeout handling, and 401/session-expiry behavior.
+Move feature-specific fetch logic into API modules.
+Make MSW opt-in through an explicit development environment flag such as VITE_API_MODE=mock.
+Ensure staging and production default to live endpoints and cannot silently enable MSW.
+Preserve existing mock fixtures for isolated frontend development.
+Document every required endpoint, request shape, response shape, role rule, and unresolved contract.
+Integrate only endpoints that genuinely exist and can be verified.
+
+For PDF exports, support authenticated blob downloads, server filenames, content-type validation, loading, failure, and retry behavior. Keep actual generation, storage, authorization, retention, and audit logging marked backend-owned.
+
+Add tests proving mock/live mode selection and normalized API failures. Run lint, tests, build, and git diff --check.
+
+Finish with two separate lists:
+
+Verified live integrations
+Blocked integrations requiring backend contracts
+
+Do not push or fabricate successful staging integration.
+
+Prompt 7 — FE-20/22 hardening and final frontend audit
+
+Perform the final frontend hardening and checklist audit for:
+
+https://github.com/Adeoye100/INTELLECTUAL-PROPERTY-RESEARCH-PLATFORM
+
+Review all documentation and current code before changing anything.
+
+Complete the frontend quality gate:
+
+Add route-level error boundaries.
+Verify loading, empty, error, denied, offline, retry, and partial-source states.
+Run keyboard-only checks on all critical journeys.
+Check WCAG 2.1 AA contrast, labels, focus visibility, semantic landmarks, announcements, and reduced motion.
+Verify desktop and agreed tablet responsiveness.
+Lazy-load heavy routes and the Three.js landing experience where appropriate.
+Reduce the production bundle warning without degrading the landing design.
+Avoid unnecessary rerenders and unstable React effects.
+Confirm risk evidence appears wherever a risk rating is displayed.
+Add missing component/integration tests.
+Configure or verify CI for lint, tests, TypeScript/build, and failure reporting.
+Update the execution checklist using evidence from the code and tests, not assumptions.
+
+Run:
+
+pnpm lint
+pnpm test
+pnpm build
+git diff --check
+
+Do not mark FE-21, live PDF generation, or the Phase 3 exit gate complete while the backend remains mock-only.
+
+Finish with a table containing:
+
+Ticket
+Previous status
+Verified status
+Evidence
+Remaining blocker
+
+Do not push. Provide a recommended commit breakdown instead of one oversized commit.

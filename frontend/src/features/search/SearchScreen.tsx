@@ -8,6 +8,7 @@ import { SourceStatusIndicator } from '../../components/SourceStatusIndicator';
 import { useQuery } from '@tanstack/react-query';
 import type { SearchResponse, SearchResult } from '../../types';
 import { Link } from 'react-router-dom';
+import { PdfExport } from '../../components/PdfExport';
 
 interface SearchFilters {
   query: string;
@@ -25,6 +26,8 @@ export const SearchScreen: React.FC = () => {
   });
 
   const queryText = useWatch({ control, name: 'query' });
+  const jurisdictions = useWatch({ control, name: 'jurisdictions' });
+  const niceClasses = useWatch({ control, name: 'classes' });
 
   const { data: searchResponse, isLoading, isError } = useQuery<SearchResponse>({
     queryKey: ['search', queryText],
@@ -144,9 +147,25 @@ export const SearchScreen: React.FC = () => {
                 </div>
               ) : (
                 <>
-                  <div className="flex items-center justify-between text-sm text-text-secondary px-2">
-                    <span>Showing {results?.length} matches for "{queryText}"</span>
-                    <span>Sorted by composite risk score</span>
+                  <div className="flex flex-wrap items-start justify-between gap-3 px-2 text-sm text-text-secondary">
+                    <div>
+                      <span>Showing {results?.length} matches for "{queryText}"</span>
+                      <span className="ml-3">Sorted by composite risk score</span>
+                    </div>
+                    <PdfExport
+                      request={{
+                        reportType: 'search-results',
+                        context: {
+                          screen: 'search-results',
+                          query: queryText,
+                          jurisdictions,
+                          niceClasses,
+                          resultIds: results?.map((result) => result.id) ?? [],
+                        },
+                      }}
+                      disabled={!results?.length}
+                      label="Export results PDF"
+                    />
                   </div>
 
                   {results?.map((result) => (

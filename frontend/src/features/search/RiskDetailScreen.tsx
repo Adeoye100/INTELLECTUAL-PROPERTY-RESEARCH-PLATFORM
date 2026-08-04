@@ -6,6 +6,7 @@ import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
 import type { SearchResponse } from '../../types';
 import { cn } from '../../lib/utils';
+import { PdfExport } from '../../components/PdfExport';
 import { 
   ResponsiveContainer,
   RadarChart,
@@ -41,14 +42,29 @@ export const RiskDetailScreen: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-          <ChevronLeft className="w-5 h-5" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Confusion Risk Analysis</h1>
-          <p className="text-text-secondary text-sm">Detailed comparison and evidence breakdown</p>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={() => navigate(-1)} aria-label="Back to search results">
+            <ChevronLeft className="w-5 h-5" aria-hidden="true" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-text-primary">Confusion Risk Analysis</h1>
+            <p className="text-text-secondary text-sm">Detailed comparison and evidence breakdown</p>
+          </div>
         </div>
+        <PdfExport
+          request={{
+            reportType: 'risk-detail',
+            context: {
+              screen: 'risk-detail',
+              resultId: result.id,
+              searchId: result.searchId,
+              candidateMarkText: result.candidateMarkText,
+              candidateRef: result.candidateRef,
+            },
+          }}
+          label="Export risk report"
+        />
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

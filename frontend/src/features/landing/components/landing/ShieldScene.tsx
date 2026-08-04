@@ -19,7 +19,10 @@ interface ShieldSceneProps {
 export function ShieldScene({ progressRef, onHover, onSelect }: ShieldSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const handlersRef = useRef({ onHover, onSelect });
-  handlersRef.current = { onHover, onSelect };
+
+  useEffect(() => {
+    handlersRef.current = { onHover, onSelect };
+  }, [onHover, onSelect]);
 
   useEffect(() => {
     const container = containerRef.current;

@@ -148,15 +148,21 @@ const mockPortfolioMarks: PortfolioMark[] = [
 ];
 
 export const handlers = [
-  http.post('/api/auth/login', async () => {
+  http.post('/api/auth/login', async ({ request }) => {
+    const body = await request.json() as { email?: string };
+    const role = body.email?.toLowerCase().startsWith('admin')
+      ? 'admin'
+      : body.email?.toLowerCase().startsWith('viewer')
+        ? 'viewer'
+        : 'attorney';
     await delay(800);
     return HttpResponse.json({
       token: 'mock-token',
       user: {
         id: 'u1',
-        email: 'attorney@forgeglobal.com',
-        role: 'attorney',
-        fullName: 'John Doe',
+        email: body.email ?? 'attorney@forgeglobal.com',
+        role,
+        fullName: role === 'admin' ? 'Jane Smith' : role === 'viewer' ? 'Robert Ross' : 'John Doe',
       },
     });
   }),
@@ -268,5 +274,32 @@ export const handlers = [
   http.get('/api/portfolio', async () => {
     await delay(500);
     return HttpResponse.json(mockPortfolioMarks);
+  }),
+
+  // TEMPORARY FE-17 FALLBACK: remove this handler as soon as the authenticated,
+  // server-generated PDF endpoint is available. This mock returns a download
+  // fixture; it does not perform real PDF generation or authorization.
+  http.post('/api/reports/pdf', async ({ request }) => {
+    const body = await request.json() as {
+      reportType?: 'search-results' | 'risk-detail' | 'portfolio-summary';
+      context?: { screen?: string };
+    };
+    const expectedScreens = {
+      'search-results': 'search-results',
+      'risk-detail': 'risk-detail',
+      'portfolio-summary': 'portfolio',
+    } as const;
+
+    if (!body.reportType || !body.context || expectedScreens[body.reportType] !== body.context.screen) {
+      return HttpResponse.json({ message: 'Invalid report type or screen context' }, { status: 400 });
+    }
+
+    await delay(600);
+    const fileName = `forge-${body.reportType}-${new Date().toISOString().slice(0, 10)}.pdf`;
+    return HttpResponse.json({
+      fileName,
+      downloadUrl: 'data:application/pdf;base64,JVBERi0xLjQKJUVPRgo=',
+      mocked: true,
+    });
   }),
 ];

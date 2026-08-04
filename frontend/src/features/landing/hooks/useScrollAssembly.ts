@@ -17,8 +17,6 @@ sectionRefs: RefObject<HTMLElement | null>[])
 : ScrollAssembly {
   const progressRef = useRef<number[]>(new Array(sectionRefs.length).fill(0));
   const [activeFacetIndex, setActiveFacetIndex] = useState(-1);
-  const refsRef = useRef(sectionRefs);
-  refsRef.current = sectionRefs;
 
   useEffect(() => {
     let frame = 0;
@@ -28,9 +26,7 @@ sectionRefs: RefObject<HTMLElement | null>[])
       const vh = window.innerHeight;
       const startLine = vh * 0.85;
       const endLine = vh * 0.2;
-      const refs = refsRef.current;
-
-const next = refs.map((ref: RefObject<HTMLElement | null>) => {
+      const next = sectionRefs.map((ref: RefObject<HTMLElement | null>) => {
         const el = ref.current;
         if (!el) return 0;
         const rect = el.getBoundingClientRect();
@@ -62,9 +58,7 @@ const next = refs.map((ref: RefObject<HTMLElement | null>) => {
       window.removeEventListener('resize', onScroll);
       cancelAnimationFrame(frame);
     };
-    // sectionRefs array identity is expected to be stable (created via useRef).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sectionRefs.length]);
+  }, [sectionRefs]);
 
   return { progressRef, activeFacetIndex };
 }

@@ -1,0 +1,193 @@
+
+Identified remaining tasks and sequenced next review audits
+
+One honest caveat before these two: both are pass tickets — they sweep across screens that include FE-06, FE-13, and FE-17, which haven't reported back yet. Running these now means re-running them once those three land. That's your call to make, not mine — if the agent's idle and those three are still in flight, there's no harm starting the audit half now and doing a second, cheaper pass later just on the new screens. I've written both to survive that split.
+
+# TASK: FE-18 — Accessibility pass (WCAG 2.1 AA)
+
+## Context
+This is an AUDIT + FIX pass across the existing app, not a new screen. Sweep every
+screen currently in frontend/src/features/. If FE-06, FE-13, or FE-17 land later,
+this ticket will need a short follow-up pass on those specific additions only —
+note that in your report rather than treating today's pass as final.
+
+## Requirement (UI Brief §5 — explicit, non-negotiable)
+1. Color is NEVER the only signal for risk level. Every risk-low/medium/high
+   instance must pair color with an icon or text label. Check Badge.tsx and
+   every place risk-low/medium/high classes are used — grep for them.
+2. Full keyboard navigation for search and results review specifically
+   (this was called out as the priority surface, not "everywhere eventually").
+
+## Scope
+1. Audit first, fix second. Start by grepping for risk-low/medium/high usage
+   across all .tsx files and listing every instance found, BEFORE changing
+   anything.
+2. For each instance failing the color-only rule: add an icon (use whatever
+   icon approach is already in the codebase — check package.json for an
+   existing icon library before adding a new dependency) or a visible text
+   label alongside the color.
+3. Keyboard nav audit on SearchScreen and its results view specifically:
+   - Every interactive element (filter inputs, result rows, risk badges if
+     clickable, pagination if present) must be reachable via Tab
+   - Focus state must be visually distinguishable (check if Tailwind's default
+     focus ring is being suppressed anywhere — search for `outline-none` or
+     `focus:outline-none` without a replacement focus style, that's a common
+     silent break)
+   - Enter/Space must activate whatever a click would activate
+4. Run an automated pass too if a tool is available (axe-core via a quick
+   vitest + @axe-core/react check is fine if not already set up) — don't rely
+   on manual reasoning alone, confirm with tooling.
+
+## Explicitly out of scope
+- Full WCAG AA audit of every criterion — this ticket is scoped specifically
+  to the two requirements above, not a general accessibility overhaul
+- Any screen under features/landing/ (marketing page, separate concern,
+  not part of the contracted deliverable)
+
+## Acceptance criteria
+- Zero risk-level instances found relying on color alone
+- Tab order through SearchScreen + results is complete and logical
+- Focus states are visible on every interactive element touched
+- npm run test and npm run lint pass clean
+
+## Report back
+- Full list of risk-color instances found and how each was fixed
+- Any interactive element that COULDN'T be made keyboard-accessible without a
+  larger structural change, and why
+- Which screens still need a follow-up pass once FE-06/13/17 land
+
+# TASK: FE-19 — Responsive pass
+
+## Context
+Audit + fix pass, same caveat as FE-18 — screens not yet built will need a
+follow-up. Sweep frontend/src/features/ excluding landing/.
+
+## Requirement (UI Brief §6 — read this carefully, it's a boundary not a wishlist)
+- Desktop/laptop is the primary, assumed target for the entire legal-research
+  workflow. Do not degrade or simplify desktop layouts to accommodate smaller
+  screens.
+- Tablet is a SECONDARY target for exactly two screens: Portfolio and
+  Watches/Alerts review. Nowhere else.
+- Mobile is explicitly OUT OF SCOPE for this phase. Do not build mobile
+  layouts. If you find yourself adding a hamburger menu or a bottom nav bar,
+  stop — that's scope the client didn't buy in this phase, and per the
+  implementation plan's own risk register, anything beyond the six signed
+  deliverables needs a change order, not a well-intentioned freebie.
+
+## Scope
+1. Audit current breakpoint behavior on every screen at ~768px (tablet) and
+   ~1280px+ (desktop). Note which screens already degrade gracefully and
+   which visibly break (overlapping elements, cut-off tables, unreachable
+   controls).
+2. Fix PortfolioScreen and WatchesScreen specifically for tablet width —
+   dense tables in particular need a real strategy at 768px (horizontal
+   scroll with a clear affordance, or column priority/collapse — pick
+   whichever the existing Table component already supports before inventing
+   a new pattern).
+3. For every OTHER screen (Search, Dashboard, RiskDetail, Billing, Auth):
+   confirm they render acceptably at typical laptop widths (1280–1920px) —
+   no fix needed below tablet width, that's explicitly out of scope.
+4. Do not touch anything under features/landing/ — it already has its own
+   device-tiered experience system (FullExperience/StaticExperience/
+   LiteExperience) and is a separate concern from this ticket.
+
+## Explicitly out of scope
+- Mobile layouts, hamburger nav, bottom nav — do not build these
+- Any screen other than Portfolio and Watches needing sub-tablet fixes
+
+## Acceptance criteria
+- Portfolio and Watches usable at 768px width with no broken/overlapping UI
+- No regression introduced at desktop widths on any screen
+- No mobile-specific code added anywhere
+- npm run test and npm run lint pass clean
+
+## Report back
+- Which screens were already fine vs. needed fixing, and why
+- The specific strategy used for dense tables at tablet width
+- Confirmation nothing mobile-specific was added
+
+That closes out every named frontend gap once reports land — FE-06, FE-13, FE-17, FE-18, FE-19, on top of what's already standing. Twenty-two frontend tickets, and after this batch there won't be a single one left unaccounted for by guesswork. Which is worth naming plainly: the backend track is still at zero tickets, and it's been sitting there since we started this session. The wall only stands when every section has someone on it — Nehemiah's chapter three doesn't have a hero who built two-thirds of it alone. When frontend reports come back, BE-01 is where we go next, no more deferring it.
+
+next
+Pivoted to research trademark registry access requirements directly
+
+Before I write another agent prompt, I need to stop you here — because BE-01 doesn't fit the pattern we've been using, and pretending it does would waste your agent's time.
+
+Everything above was code an agent can execute inside a repo. BE-01 is a licensing decision, not a coding task. No prompt I write turns an AI agent into someone who can go get USPTO or EUIPO to grant you API access — that requires an actual account, actual terms acceptance, possibly an actual payment, on your end. Handing that to a local coding agent would just produce confident-sounding nonsense.
+
+What I can do right now is the research that makes your decision fast instead of open-ended. Let me pull current, real terms for the registries most likely to fit a build like this.
+Evaluated trademark data sources and charted licensing pathway forward
+
+Here's what the actual terrain looks like — not the same for all three registries, and the gap matters:
+Registry	Access	Verdict
+USPTO (TSDR)	Official, free, self-service API key via a developer.uspto.gov account	✅ Usable now, zero cost, zero waiting
+EUIPO	No official public API for third-party commercial use — current options are unofficial scraper services (e.g. Apify actors) reselling access at per-result pricing	⚠️ Not a licensed source. Legally murkier than it looks.
+WIPO Global Brand Database	One API endpoint exists, explicitly restricted to "collaborating IP Offices" — you don't qualify. Public UI is CAPTCHA-walled and ToS-prohibits automation	❌ Not accessible, official or otherwise
+
+That EUIPO row deserves a straight warning, not a shrug: your own TRD (§3.4) requires you to record source/attribution per record specifically because licensing terms may restrict redistribution. A scraper reselling EUIPO data at $0.01/result has no license to redistribute in the first place — you'd be building your platform's data-integrity requirement on top of a source that fails it structurally. That's not a corner worth cutting to hit a jurisdiction count.
+
+So the honest answer for BE-01: USPTO TSDR is your one confirmed, licensed, cost-free source today. Nothing stops you from registering the API key this afternoon. EUIPO and WIPO aren't a Phase-1 decision you're stuck on — they're simply not available yet on defensible terms, which PRD §8 already anticipated: "jurisdictional coverage at launch is bounded by which licenses are actually in place." That's not a failure to solve, it's the answer.
+
+One thing this isn't, though — my call to make quietly. Narrowing launch scope to US-only changes what you deliver against a signed agreement. That's a conversation with Taiwo, not a decision an agent prompt papers over. Luke 14 is blunt about this same instinct — count the cost before you build the tower, not after the foundation's poured. Confirm US-only-at-launch with the client, get it in writing as the Phase 1 exit criteria the plan already calls for, then BE-01 is genuinely closed.
+
+Once that's confirmed, say the word and I'll write BE-03 — Auth service, JWT + RBAC — as the first real backend prompt. That's where the wall's other side actually starts.
+
+is this free?
+Reconciled free access with approval requirements and identified backup options
+EU Open Data Portal
+en.wikipedia.org
+European Data Portal
+en.wikipedia.org
+Developers’ corner | Open Data Portal
+data.europa.eu
+WIPO FOR OFFICIAL USE ONLY EUIPO’s Web APIs:
+www.wipo.int
+European Union Intellectual Property Office open data in a single API request
+api.store
+data.europa.eu
+data.europa.eu
+interoperable-europe.ec.europa.eu
+interoperable-europe.ec.europa.eu
+data.europa.eu
+data.europa.eu
+API Portal homepage | API Portal
+
+dev.euipo.europa.eu
+API Products | API Portal
+
+dev.euipo.europa.eu
+Getting started | API Portal
+
+dev.euipo.europa.eu
+
+Reconciled free access with approval requirements and identified backup options.
+Done
+
+Correction — I was wrong last message, and I'd rather say that plainly than let it stand.
+
+EUIPO does have an official API, not just third-party scrapers. dev.euipo.europa.eu is EUIPO's own developer portal, with a "Trademark search 1.1.0" product built for exactly this use case.
+
+On cost: every page in their onboarding flow — account signup, app registration, API subscription — describes an approval gate, never a payment gate. No pricing tier, no paywall, no "contact sales" anywhere in their docs. That's the normal shape of an EU public-agency API: funded by the EU budget, free to registered users, rate-limited rather than metered by cost. I can't hand you a line that says "$0" in writing, because they don't publish one — but the complete absence of pricing language across their whole getting-started flow is itself the signal.
+
+What "getting it" actually takes:
+
+    Register an EUIPO account
+    Register an "app" → get a Client ID + Secret
+    Subscribe to the Trademark Search product, accept their Conditions of Use
+    Wait for approval — sandbox: up to a week. Production: longer, unspecified
+
+That last line is the one that matters for your timeline. Phase 1 is two weeks. If EUIPO production approval drags past that, it can't be your Week-1 unblock — it becomes a parallel application you file now and receive later, while USPTO (self-service, same-day key) is what actually satisfies BE-01's Phase 1 exit criteria on schedule.
+
+So, revised, honest picture for the client conversation:
+
+    USPTO — free, official, same-day. Your Week-1 answer.
+    EUIPO — free (near-certainly), official, real API — but apply for it now in parallel, don't wait on it to unblock Phase 1
+    WIPO — still genuinely closed to you; that part of my earlier answer holds
+
+Apply to both today. Build against USPTO. Bring EUIPO in the moment approval lands, without it ever having blocked anything. Say the word when you're ready and I'll write BE-03.
+You are out of free messages until 3:40 PM
+
+
+Claude is AI and can make mistakes. Please double-check cited sources.
+
+

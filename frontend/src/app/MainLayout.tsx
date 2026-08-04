@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Logo } from '../components/Logo';
 import { 
   Search, 
@@ -12,8 +12,25 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from '../components/Button';
+import { useAuthStore } from '../features/auth/authStore';
 
 export const MainLayout: React.FC = () => {
+  const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
+  const clearSession = useAuthStore((state) => state.clearSession);
+  const initials = user?.fullName
+    .split(' ')
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase() ?? 'FG';
+  const roleLabel = user?.role ? `${user.role[0].toUpperCase()}${user.role.slice(1)}` : '';
+
+  const signOut = () => {
+    clearSession();
+    navigate('/auth/login', { replace: true });
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
       {/* Header */}
@@ -30,11 +47,11 @@ export const MainLayout: React.FC = () => {
           </button>
           <div className="flex items-center gap-2 border-l border-white/20 pl-4">
             <div className="w-8 h-8 rounded-full bg-forge-teal-700 flex items-center justify-center font-bold text-sm">
-              JD
+              {initials}
             </div>
             <div className="hidden md:block">
-              <p className="text-xs font-bold leading-none">John Doe</p>
-              <p className="text-[10px] text-forge-subtext-onDark">Senior Attorney</p>
+              <p className="text-xs font-bold leading-none">{user?.fullName}</p>
+              <p className="text-[10px] text-forge-subtext-onDark">{roleLabel}</p>
             </div>
           </div>
         </div>
@@ -48,11 +65,18 @@ export const MainLayout: React.FC = () => {
             <NavItem to="/search" icon={<Search size={20} />} label="Trademark Search" />
             <NavItem to="/portfolio" icon={<Briefcase size={20} />} label="Portfolio" />
             <NavItem to="/watches" icon={<Eye size={20} />} label="Watch Lists" />
-            <NavItem to="/admin" icon={<Settings size={20} />} label="Administration" />
+            {user?.role === 'admin' && (
+              <NavItem to="/admin" icon={<Settings size={20} />} label="Administration" />
+            )}
           </nav>
           
           <div className="p-4 border-t border-white/10">
-            <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" size="sm">
+            <Button
+              variant="ghost"
+              className="w-full justify-start text-white hover:bg-white/10"
+              size="sm"
+              onClick={signOut}
+            >
               <LogOut size={18} className="mr-2" />
               Sign Out
             </Button>

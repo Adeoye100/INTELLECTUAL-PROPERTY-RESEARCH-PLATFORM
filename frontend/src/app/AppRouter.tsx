@@ -13,6 +13,7 @@ import { DashboardScreen } from '../features/dashboard/DashboardScreen';
 import { AdminScreen } from '../features/billing/AdminScreen';
 
 import { LandingPage } from '../features/landing/pages/LandingPage';
+import { RequireAdmin, RequireAuthentication } from '../features/auth/RouteGuards';
 
 const router = createBrowserRouter([
   {
@@ -29,7 +30,11 @@ const router = createBrowserRouter([
   },
   {
     path: '/',
-    element: <MainLayout />,
+    element: (
+      <RequireAuthentication>
+        <MainLayout />
+      </RequireAuthentication>
+    ),
     children: [
       { path: 'dashboard', element: <DashboardScreen /> },
       { path: 'search', element: <SearchScreen /> },
@@ -37,7 +42,14 @@ const router = createBrowserRouter([
       { path: 'office-actions', element: <OfficeActionResearchScreen /> },
       { path: 'portfolio', element: <PortfolioScreen /> },
       { path: 'watches', element: <WatchesScreen /> },
-      { path: 'admin', element: <AdminScreen /> },
+      {
+        path: 'admin',
+        element: (
+          <RequireAdmin>
+            <AdminScreen />
+          </RequireAdmin>
+        ),
+      },
     ],
   },
 ]);

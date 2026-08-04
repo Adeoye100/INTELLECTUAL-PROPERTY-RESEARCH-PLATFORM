@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useRef, useState } from 'react';
+import { type RefObject, useEffect, useState } from 'react';
 
 export interface FacetReveal {
   revealed: boolean[];
@@ -10,12 +10,10 @@ export interface FacetReveal {
 // section is meaningfully in view.
 export function useFacetReveal(sectionRefs: RefObject<HTMLElement | null>[]): FacetReveal {
   const [revealed, setRevealed] = useState<boolean[]>(() => sectionRefs.map(() => false));
-  const refsRef = useRef(sectionRefs);
-  refsRef.current = sectionRefs;
 
   useEffect(() => {
     const observers: IntersectionObserver[] = [];
-    refsRef.current.forEach((ref: RefObject<HTMLElement | null>, i: number) => {
+    sectionRefs.forEach((ref: RefObject<HTMLElement | null>, i: number) => {
       const el = ref.current;
       if (!el) return;
       const observer = new IntersectionObserver(
@@ -36,8 +34,7 @@ export function useFacetReveal(sectionRefs: RefObject<HTMLElement | null>[]): Fa
       observers.push(observer);
     });
     return () => observers.forEach((o) => o.disconnect());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sectionRefs.length]);
+  }, [sectionRefs]);
 
   let activeFacetIndex = -1;
   revealed.forEach((r, i) => {

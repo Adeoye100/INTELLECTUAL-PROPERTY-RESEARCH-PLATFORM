@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { usePrefersReducedMotion } from './usePrefersReducedMotion';
 
 export type ExperienceTier = 'full' | 'lite' | 'static';
@@ -17,7 +17,7 @@ function detectLowPower(): boolean {
   const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false;
   const smallViewport = window.matchMedia?.('(max-width: 767px)').matches ?? false;
 
-  let hasWebGL = true;
+  let hasWebGL: boolean;
   try {
     const canvas = document.createElement('canvas');
     hasWebGL = !!(
@@ -41,11 +41,7 @@ function detectLowPower(): boolean {
 // - 'full': capable desktop — the Three.js / React Three Fiber scene.
 export function useDeviceCapability(): ExperienceTier {
   const prefersReducedMotion = usePrefersReducedMotion();
-  const [lowPower, setLowPower] = useState<boolean>(false);
-
-  useEffect(() => {
-    setLowPower(detectLowPower());
-  }, []);
+  const [lowPower] = useState(detectLowPower);
 
   if (prefersReducedMotion) return 'static';
   if (lowPower) return 'lite';
