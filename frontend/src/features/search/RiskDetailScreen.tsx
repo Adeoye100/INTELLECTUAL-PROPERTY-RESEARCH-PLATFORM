@@ -226,10 +226,9 @@ export const RiskDetailScreen: React.FC = () => {
 
   // API fallback: only fires when route state is absent (direct refresh, bookmark).
   const { data: searchResponse, isLoading: isFetching } = useQuery<SearchResponse>({
-    queryKey: ['search', routeState?.searchQuery ?? '__direct__'],
+    queryKey: ['search-result', id],
     queryFn: async () => {
-      const q = routeState?.searchQuery ?? id ?? '';
-      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+      const res = await fetch(`/api/search?resultId=${encodeURIComponent(id ?? '')}`);
       if (!res.ok) throw new Error('Could not reload search results.');
       return res.json() as Promise<SearchResponse>;
     },

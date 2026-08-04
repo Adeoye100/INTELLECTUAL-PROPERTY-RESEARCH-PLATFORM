@@ -1,19 +1,25 @@
-import React from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import React, { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Link, useSearchParams } from 'react-router-dom';
-import { Plus, AlertCircle, Shield, ExternalLink, Calendar, MoveHorizontal } from 'lucide-react';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { Calendar, Eye, FilterX, MoveHorizontal, Plus, Shield } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
 import { Badge } from '../../components/Badge';
-import { Table, TableRow, TableCell } from '../../components/Table';
-import type { PortfolioMark } from '../../types';
+import type { PortfolioDetailRouteState, PortfolioMark, WatchSummary } from '../../types';
 import { PdfExport } from '../../components/PdfExport';
 import { Modal } from '../../components/Modal';
 import { useAuthStore } from '../auth/authStore';
 import { useOnboardingStore } from '../onboarding/onboardingStore';
+import {
+  filterPortfolioMarks,
+  getRenewalWarning,
+  portfolioFiltersFromParams,
+  portfolioFiltersToParams,
+  type PortfolioFilters,
+} from './portfolioDomain';
 
 const portfolioMarkSchema = z.object({
   markText: z.string().trim().min(2, 'Enter the trademark name.'),
@@ -24,26 +30,65 @@ const portfolioMarkSchema = z.object({
 
 type PortfolioMarkValues = z.infer<typeof portfolioMarkSchema>;
 
+const fetchPortfolio = async (): Promise<PortfolioMark[]> => {
+  const response = await fetch('/api/portfolio');
+  if (!response.ok) throw new Error('Portfolio request failed');
+  return response.json() as Promise<PortfolioMark[]>;
+};
+
+const fetchWatches = async (): Promise<WatchSummary[]> => {
+  const response = await fetch('/api/watches');
+  if (!response.ok) throw new Error('Watch request failed');
+  return response.json() as Promise<WatchSummary[]>;
+};
+
 export const PortfolioScreen: React.FC = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const completePath = useOnboardingStore((state) => state.completePath);
-  const [isAddOpen, setIsAddOpen] = React.useState(() => searchParams.get('onboarding') === 'add' && user?.role !== 'viewer');
-  const [addError, setAddError] = React.useState<string | null>(null);
-  const [onboardingComplete, setOnboardingComplete] = React.useState(false);
+  const filters = portfolioFiltersFromParams(searchParams);
+  const [isAddOpen, setIsAddOpen] = useState(() => searchParams.get('onboarding') === 'add' && user?.role !== 'viewer');
+  const [addError, setAddError] = useState<string | null>(null);
+  const [watchMessage, setWatchMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [onboardingComplete, setOnboardingComplete] = useState(false);
+  const portfolio = useQuery({ queryKey: ['portfolio'], queryFn: fetchPortfolio, retry: false });
+  const watches = useQuery({ queryKey: ['watches'], queryFn: fetchWatches, retry: false });
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<PortfolioMarkValues>({ resolver: zodResolver(portfolioMarkSchema) });
-  const { data: marks, isLoading } = useQuery<PortfolioMark[]>({
-    queryKey: ['portfolio'],
-    queryFn: async () => {
-      const response = await fetch('/api/portfolio');
-      return response.json();
+
+  const visibleMarks = filterPortfolioMarks(portfolio.data ?? [], filters);
+  const upcomingRenewals = (portfolio.data ?? []).filter((mark) => getRenewalWarning(mark.renewalDate).days <= 90).length;
+  const watchedMarkIds = new Set((watches.data ?? []).map((watch) => watch.portfolioMarkId));
+
+  const setFilter = <Key extends keyof PortfolioFilters>(key: Key, value: PortfolioFilters[Key]) => {
+    const next = portfolioFiltersToParams({ ...filters, [key]: value });
+    const onboarding = searchParams.get('onboarding');
+    if (onboarding) next.set('onboarding', onboarding);
+    setSearchParams(next, { replace: true });
+  };
+
+  const createWatch = useMutation({
+    mutationFn: async (mark: PortfolioMark) => {
+      const response = await fetch(`/api/portfolio/${mark.id}/watch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alertChannel: 'email', alertMode: 'real-time', active: true }),
+      });
+      if (response.status === 403) throw new Error('You do not have permission to create watches.');
+      if (!response.ok) throw new Error('The watch could not be created. Retry the request.');
+      return response.json() as Promise<WatchSummary>;
     },
+    onSuccess: (created) => {
+      queryClient.setQueryData<WatchSummary[]>(['watches'], (current = []) => [...current, created]);
+      setWatchMessage({ type: 'success', text: `${created.markText} is now watched by email in real time. Mock persistence is active.` });
+    },
+    onError: (error) => setWatchMessage({ type: 'error', text: error instanceof Error ? error.message : 'Watch creation failed.' }),
   });
 
   const addMark = async (values: PortfolioMarkValues) => {
@@ -52,10 +97,7 @@ export const PortfolioScreen: React.FC = () => {
       const response = await fetch('/api/portfolio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...values,
-          niceClasses: values.niceClasses.split(',').map((value) => Number(value.trim())),
-        }),
+        body: JSON.stringify({ ...values, niceClasses: values.niceClasses.split(',').map((value) => Number(value.trim())) }),
       });
       if (!response.ok) throw new Error('Portfolio creation failed');
       const created = await response.json() as PortfolioMark;
@@ -71,130 +113,55 @@ export const PortfolioScreen: React.FC = () => {
     }
   };
 
-  if (isLoading) return <div className="p-8 text-center">Loading portfolio...</div>;
+  if (portfolio.isLoading) return <div className="p-8 text-center" role="status">Loading portfolio…</div>;
+  if (portfolio.isError) return <section role="alert" className="rounded border border-risk-high/30 bg-risk-high/10 p-8 text-center"><h1 className="text-xl font-bold">Portfolio unavailable</h1><p className="mt-2 text-text-secondary">Portfolio records could not be loaded.</p><Button className="mt-4" onClick={() => void portfolio.refetch()}>Retry portfolio</Button></section>;
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between md:max-xl:flex-col md:max-xl:items-stretch md:max-xl:gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Protected Portfolio</h1>
-          <p className="text-text-secondary text-sm">Managed trademarks and intellectual property assets</p>
-        </div>
-        <div className="flex flex-wrap items-start gap-3 md:max-xl:self-start">
-          <PdfExport
-            request={{
-              reportType: 'portfolio-summary',
-              context: {
-                screen: 'portfolio',
-                markIds: marks?.map((mark) => mark.id) ?? [],
-                firmId: marks?.[0]?.firmId,
-              },
-            }}
-            disabled={!marks?.length}
-            label="Export portfolio PDF"
-          />
-          {user?.role !== 'viewer' && (
-            <Button onClick={() => setIsAddOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" aria-hidden="true" />
-              Add mark
-            </Button>
-          )}
-        </div>
+      <header className="flex items-center justify-between gap-4 md:max-xl:flex-col md:max-xl:items-stretch">
+        <div><h1 className="text-2xl font-bold text-text-primary">Protected Portfolio</h1><p className="text-sm text-text-secondary">Managed marks, renewals, status history, and supporting records.</p></div>
+        <div className="flex flex-wrap items-start gap-3"><PdfExport request={{ reportType: 'portfolio-summary', context: { screen: 'portfolio', markIds: portfolio.data?.map((mark) => mark.id) ?? [], firmId: portfolio.data?.[0]?.firmId } }} disabled={!portfolio.data?.length} label="Export portfolio PDF" />{user?.role !== 'viewer' && <Button onClick={() => setIsAddOpen(true)}><Plus className="mr-2 h-4 w-4" aria-hidden="true" />Add mark</Button>}</div>
       </header>
 
-      {onboardingComplete && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-forge-teal-700 bg-forge-teal-700/10 p-4" role="status">
-          <p className="font-bold text-text-primary">First portfolio mark added on this browser.</p>
-          <Link to="/dashboard" className="font-bold text-forge-teal-700 underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">Continue to dashboard</Link>
-        </div>
-      )}
+      {portfolio.data?.some((mark) => mark.mocked) && <p className="rounded border border-risk-medium/40 bg-risk-medium/10 p-3 text-sm" role="status"><strong>Mock portfolio data:</strong> persistence, registry synchronization, attachments, and authorization still require backend services.</p>}
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <Card className="bg-forge-navy-950 text-white border-none">
-          <div className="text-[10px] text-forge-subtext-onDark uppercase font-bold mb-1">Total Assets</div>
-          <div className="text-3xl font-black">24</div>
-          <div className="text-xs text-forge-subtext-onDark mt-2 flex items-center gap-1">
-            <Shield className="w-3 h-3" /> 18 Marks Watched
-          </div>
-        </Card>
-        <Card>
-          <div className="text-[10px] text-text-secondary uppercase font-bold mb-1">Upcoming Renewals</div>
-          <div className="text-3xl font-black text-risk-medium">3</div>
-          <div className="text-xs text-text-secondary mt-2 flex items-center gap-1 text-risk-medium font-bold">
-            <AlertCircle className="w-3 h-3" /> Action required within 90 days
-          </div>
-        </Card>
-        <Card>
-          <div className="text-[10px] text-text-secondary uppercase font-bold mb-1">Active Watches</div>
-          <div className="text-3xl font-black text-forge-teal-700">12</div>
-          <div className="text-xs text-text-secondary mt-2">Monitoring 142 international registries</div>
-        </Card>
-      </div>
+      {onboardingComplete && <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-forge-teal-700 bg-forge-teal-700/10 p-4" role="status"><p className="font-bold">First portfolio mark added on this browser.</p><Link to="/dashboard" className="font-bold text-forge-teal-700 underline">Continue to dashboard</Link></div>}
+      {watchMessage && <div className={`rounded border p-4 ${watchMessage.type === 'success' ? 'border-risk-low bg-risk-low/10' : 'border-risk-high bg-risk-high/10'}`} role={watchMessage.type === 'error' ? 'alert' : 'status'}>{watchMessage.text}</div>}
 
-      <Card>
-        <div className="mb-3 hidden items-center gap-2 text-xs font-semibold text-text-secondary md:max-xl:flex">
-          <MoveHorizontal className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-          <span>Scroll horizontally to review all portfolio columns.</span>
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-3" aria-label="Portfolio summary">
+        <Card><p className="text-xs font-bold uppercase text-text-secondary">Total assets</p><p className="text-3xl font-black">{portfolio.data?.length ?? 0}</p></Card>
+        <Card><p className="text-xs font-bold uppercase text-text-secondary">Renewal warnings</p><p className="text-3xl font-black text-risk-medium">{upcomingRenewals}</p><p className="text-xs text-text-secondary">Due or overdue within 90 days</p></Card>
+        <Card><p className="text-xs font-bold uppercase text-text-secondary">Watched marks</p><p className="text-3xl font-black text-forge-teal-700">{watchedMarkIds.size}</p><p className="text-xs text-text-secondary">Mock watch status until backend persistence ships</p></Card>
+      </section>
+
+      <Card title="Filter portfolio">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div><label htmlFor="portfolio-filter-mark" className="mb-1 block text-sm font-bold">Mark</label><input id="portfolio-filter-mark" value={filters.mark} onChange={(event) => setFilter('mark', event.target.value)} className="w-full rounded border border-forge-silver-300 px-3 py-2" /></div>
+          <div><label htmlFor="portfolio-filter-jurisdiction" className="mb-1 block text-sm font-bold">Jurisdiction</label><select id="portfolio-filter-jurisdiction" value={filters.jurisdiction} onChange={(event) => setFilter('jurisdiction', event.target.value)} className="w-full rounded border border-forge-silver-300 bg-white px-3 py-2"><option value="">All jurisdictions</option><option value="US">United States</option><option value="EU">European Union</option><option value="GB">United Kingdom</option></select></div>
+          <div><label htmlFor="portfolio-filter-status" className="mb-1 block text-sm font-bold">Status</label><select id="portfolio-filter-status" value={filters.status} onChange={(event) => setFilter('status', event.target.value)} className="w-full rounded border border-forge-silver-300 bg-white px-3 py-2"><option value="">All statuses</option><option value="Registered">Registered</option><option value="Pending">Pending</option><option value="Draft">Draft</option></select></div>
+          <div><label htmlFor="portfolio-filter-renewal" className="mb-1 block text-sm font-bold">Renewal</label><select id="portfolio-filter-renewal" value={filters.renewalWindow} onChange={(event) => setFilter('renewalWindow', event.target.value as PortfolioFilters['renewalWindow'])} className="w-full rounded border border-forge-silver-300 bg-white px-3 py-2"><option value="all">Any date</option><option value="overdue">Overdue</option><option value="30">Next 30 days</option><option value="90">Next 90 days</option><option value="365">Next year</option></select></div>
+          <Button variant="ghost" className="self-end" onClick={() => setSearchParams(new URLSearchParams(), { replace: true })}><FilterX className="mr-2 h-4 w-4" aria-hidden="true" />Clear filters</Button>
         </div>
-        <Table
-          headers={['Mark', 'Jurisdiction', 'Classes', 'Status', 'Renewal Date', 'Actions']}
-          className="md:max-xl:overscroll-x-contain md:max-xl:[&>table]:min-w-[48rem]"
-        >
-          {marks?.map((mark) => (
-            <TableRow key={mark.id}>
-              <TableCell>
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-forge-silver-500" />
-                  <span className="font-bold uppercase font-mono">{mark.markText}</span>
-                </div>
-              </TableCell>
-              <TableCell>{mark.jurisdiction}</TableCell>
-              <TableCell>{mark.niceClasses.join(', ')}</TableCell>
-              <TableCell>
-                <Badge>{mark.status}</Badge>
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center gap-2">
-                   <Calendar className="w-4 h-4 text-text-secondary" />
-                   {mark.renewalDate}
-                </div>
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm">Details</Button>
-                  <Button variant="ghost" size="sm">
-                    <ExternalLink className="w-4 h-4" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
-          {(!marks || marks.length === 0) && (
-             <TableRow>
-               <TableCell className="text-center py-8" >
-                 No marks found in your portfolio.
-               </TableCell>
-             </TableRow>
-          )}
-        </Table>
       </Card>
 
-      <Modal
-        isOpen={isAddOpen}
-        onClose={() => setIsAddOpen(false)}
-        title="Add a portfolio mark"
-        footer={(
-          <>
-            <Button type="button" variant="ghost" onClick={() => setIsAddOpen(false)}>Cancel</Button>
-            <Button type="submit" form="add-portfolio-mark" disabled={isSubmitting}>{isSubmitting ? 'Adding…' : addError ? 'Retry adding mark' : 'Add mark'}</Button>
-          </>
-        )}
-      >
+      <Card>
+        <div className="mb-3 hidden items-center gap-2 text-xs font-semibold text-text-secondary md:max-xl:flex"><MoveHorizontal className="h-4 w-4" aria-hidden="true" />Scroll horizontally to review all portfolio columns.</div>
+        <div className="overflow-x-auto"><table className="w-full min-w-[64rem] border-collapse text-left"><caption className="sr-only">Portfolio marks and renewal deadlines</caption><thead><tr className="border-b border-forge-silver-300 bg-surface-base">{['Mark', 'Jurisdiction', 'Classes', 'Status', 'Renewal date', 'Renewal warning', 'Actions'].map((heading) => <th key={heading} scope="col" className="px-4 py-3 text-xs font-bold uppercase text-text-secondary">{heading}</th>)}</tr></thead><tbody className="divide-y divide-forge-silver-100">
+          {visibleMarks.map((mark) => {
+            const warning = getRenewalWarning(mark.renewalDate);
+            const detailState: PortfolioDetailRouteState = { mark, returnTo: `${location.pathname}${location.search}` };
+            return <tr key={mark.id} className="hover:bg-surface-base"><th scope="row" className="px-4 py-3"><span className="flex items-center gap-2 font-mono font-bold uppercase"><Shield className="h-4 w-4 text-forge-silver-500" aria-hidden="true" />{mark.markText}</span></th><td className="px-4 py-3">{mark.jurisdiction}</td><td className="px-4 py-3">{mark.niceClasses.join(', ')}</td><td className="px-4 py-3"><Badge>{mark.status}</Badge></td><td className="px-4 py-3"><span className="flex items-center gap-2"><Calendar className="h-4 w-4" aria-hidden="true" />{mark.renewalDate}</span></td><td className="px-4 py-3"><Badge risk={warning.level}>{warning.label}</Badge></td><td className="px-4 py-3"><div className="flex flex-wrap gap-2"><Link to={`/portfolio/${mark.id}`} state={detailState} className="rounded border border-forge-silver-500 px-3 py-1.5 text-sm font-medium focus-visible:ring-2 focus-visible:ring-accent">Details</Link>{user?.role !== 'viewer' && <Button variant="outline" size="sm" disabled={watchedMarkIds.has(mark.id) || (createWatch.isPending && createWatch.variables?.id === mark.id)} onClick={() => createWatch.mutate(mark)}><Eye className="mr-1 h-4 w-4" aria-hidden="true" />{watchedMarkIds.has(mark.id) ? 'Watching' : 'Create watch'}</Button>}</div></td></tr>;
+          })}
+          {visibleMarks.length === 0 && <tr><td colSpan={7} className="px-4 py-10 text-center text-text-secondary">No portfolio marks match these filters.</td></tr>}
+        </tbody></table></div>
+      </Card>
+
+      <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="Add a portfolio mark" footer={<><Button type="button" variant="ghost" onClick={() => setIsAddOpen(false)}>Cancel</Button><Button type="submit" form="add-portfolio-mark" disabled={isSubmitting}>{isSubmitting ? 'Adding…' : addError ? 'Retry adding mark' : 'Add mark'}</Button></>}>
         <form id="add-portfolio-mark" onSubmit={handleSubmit(addMark)} className="space-y-4" noValidate>
-          <div><label htmlFor="portfolio-mark-text" className="mb-1 block text-sm font-bold text-text-primary">Trademark name</label><input {...register('markText')} id="portfolio-mark-text" autoFocus aria-invalid={Boolean(errors.markText)} aria-describedby={errors.markText ? 'portfolio-mark-error' : undefined} className="w-full rounded border border-forge-silver-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2" />{errors.markText && <p id="portfolio-mark-error" className="mt-1 text-xs text-risk-high">{errors.markText.message}</p>}</div>
-          <div><label htmlFor="portfolio-jurisdiction" className="mb-1 block text-sm font-bold text-text-primary">Jurisdiction</label><select {...register('jurisdiction')} id="portfolio-jurisdiction" defaultValue="" aria-invalid={Boolean(errors.jurisdiction)} aria-describedby={errors.jurisdiction ? 'portfolio-jurisdiction-error' : undefined} className="w-full rounded border border-forge-silver-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"><option value="" disabled>Choose jurisdiction</option><option value="US">United States</option><option value="EU">European Union</option><option value="GB">United Kingdom</option></select>{errors.jurisdiction && <p id="portfolio-jurisdiction-error" className="mt-1 text-xs text-risk-high">{errors.jurisdiction.message}</p>}</div>
-          <div><label htmlFor="portfolio-classes" className="mb-1 block text-sm font-bold text-text-primary">Nice classes</label><input {...register('niceClasses')} id="portfolio-classes" placeholder="9, 35, 42" aria-invalid={Boolean(errors.niceClasses)} aria-describedby={errors.niceClasses ? 'portfolio-classes-error' : undefined} className="w-full rounded border border-forge-silver-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2" />{errors.niceClasses && <p id="portfolio-classes-error" className="mt-1 text-xs text-risk-high">{errors.niceClasses.message}</p>}</div>
-          <div><label htmlFor="portfolio-renewal" className="mb-1 block text-sm font-bold text-text-primary">Next renewal date</label><input {...register('renewalDate')} id="portfolio-renewal" type="date" aria-invalid={Boolean(errors.renewalDate)} aria-describedby={errors.renewalDate ? 'portfolio-renewal-error' : undefined} className="w-full rounded border border-forge-silver-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2" />{errors.renewalDate && <p id="portfolio-renewal-error" className="mt-1 text-xs text-risk-high">{errors.renewalDate.message}</p>}</div>
+          <div><label htmlFor="portfolio-mark-text" className="mb-1 block text-sm font-bold">Trademark name</label><input {...register('markText')} id="portfolio-mark-text" autoFocus aria-invalid={Boolean(errors.markText)} aria-describedby={errors.markText ? 'portfolio-mark-error' : undefined} className="w-full rounded border border-forge-silver-300 px-3 py-2" />{errors.markText && <p id="portfolio-mark-error" className="mt-1 text-xs text-risk-high">{errors.markText.message}</p>}</div>
+          <div><label htmlFor="portfolio-jurisdiction" className="mb-1 block text-sm font-bold">Jurisdiction</label><select {...register('jurisdiction')} id="portfolio-jurisdiction" defaultValue="" className="w-full rounded border border-forge-silver-300 bg-white px-3 py-2"><option value="" disabled>Choose jurisdiction</option><option value="US">United States</option><option value="EU">European Union</option><option value="GB">United Kingdom</option></select>{errors.jurisdiction && <p className="mt-1 text-xs text-risk-high">{errors.jurisdiction.message}</p>}</div>
+          <div><label htmlFor="portfolio-classes" className="mb-1 block text-sm font-bold">Nice classes</label><input {...register('niceClasses')} id="portfolio-classes" placeholder="9, 35, 42" className="w-full rounded border border-forge-silver-300 px-3 py-2" />{errors.niceClasses && <p className="mt-1 text-xs text-risk-high">{errors.niceClasses.message}</p>}</div>
+          <div><label htmlFor="portfolio-renewal" className="mb-1 block text-sm font-bold">Next renewal date</label><input {...register('renewalDate')} id="portfolio-renewal" type="date" className="w-full rounded border border-forge-silver-300 px-3 py-2" />{errors.renewalDate && <p className="mt-1 text-xs text-risk-high">{errors.renewalDate.message}</p>}</div>
           {addError && <p className="rounded bg-risk-high/10 p-3 text-sm text-risk-high" role="alert">{addError}</p>}
         </form>
       </Modal>

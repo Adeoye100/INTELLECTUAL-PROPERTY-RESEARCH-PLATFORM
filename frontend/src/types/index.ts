@@ -34,12 +34,55 @@ export interface PortfolioMark {
   filingDate: string;
   renewalDate: string;
   sourceRegistry: string;
+  mocked?: boolean;
+}
+
+export interface PortfolioStatusHistoryEntry {
+  id: string;
+  status: string;
+  effectiveAt: string;
+  source: string;
+  note?: string;
+}
+
+export type AttachmentAvailability = 'available' | 'unavailable';
+
+export interface PortfolioAttachment {
+  id: string;
+  portfolioMarkId: string;
+  fileName: string;
+  contentType: string;
+  uploadedAt: string;
+  availability: AttachmentAvailability;
+  mocked?: boolean;
+}
+
+export interface PortfolioMarkDetail extends PortfolioMark {
+  statusHistory: PortfolioStatusHistoryEntry[];
+}
+
+export interface PortfolioDetailRouteState {
+  mark: PortfolioMark;
+  returnTo: string;
 }
 
 export interface Watch {
   id: string;
   portfolioMarkId: string;
   userId: string;
+  alertChannel: WatchAlertChannel;
+  alertMode: WatchAlertMode;
+  active: boolean;
+}
+
+export interface WatchSummary extends Watch {
+  markText: string;
+  jurisdiction: string;
+  mocked?: boolean;
+}
+
+export interface WatchUpsertRequest {
+  portfolioMarkId: string;
   alertChannel: WatchAlertChannel;
   alertMode: WatchAlertMode;
   active: boolean;
@@ -52,6 +95,13 @@ export interface Alert {
   riskScoreId: string;
   read: boolean;
   createdAt: string;
+  matchedMarkText: string;
+  protectedMarkText: string;
+  riskResultId: string;
+  severity: RiskLevel;
+  source: string;
+  supportingEvidence: string[];
+  mocked?: boolean;
   riskScore?: RiskScore; // Joined data
 }
 

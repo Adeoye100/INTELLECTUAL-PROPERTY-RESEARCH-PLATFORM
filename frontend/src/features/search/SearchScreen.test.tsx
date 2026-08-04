@@ -10,9 +10,12 @@ import { useAuthStore } from '../auth/authStore';
 import { SearchScreen } from './SearchScreen';
 
 const renderSearch = (initialEntry = '/search') => {
-  const fetchMock = vi.fn().mockResolvedValue({
-    ok: true,
-    json: async () => mockSearchResponse,
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (String(input).includes('/api/portfolio/import') && init?.method === 'POST') return {
+      ok: true,
+      json: async () => ({ id: 'portfolio-import-1', firmId: 'f1', ownerUserId: 'search-user', markText: 'FORGE TEK', jurisdiction: 'US', niceClasses: [9, 42], status: 'Pending', filingDate: '2025-02-14', renewalDate: '2035-02-14', sourceRegistry: 'USPTO search import (mock)', mocked: true }),
+    };
+    return { ok: true, json: async () => mockSearchResponse };
   });
   vi.stubGlobal('fetch', fetchMock);
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -128,6 +131,17 @@ describe('SearchScreen', () => {
     await user.keyboard('{Enter}');
     expect(await screen.findByText('Risk detail destination')).toBeVisible();
   });
+
+  it('imports a search result into the portfolio with its result id', async () => {
+    const { fetchMock } = renderSearch();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Mark' }), { target: { value: 'FORGE' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Search trademarks' }));
+    await screen.findByRole('table', { name: /ranked by explicit risk/i });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Import to portfolio' })[0]);
+    expect(await screen.findByText(/FORGE TEK was imported to the portfolio/i)).toBeVisible();
+    const request = fetchMock.mock.calls.find(([input]) => String(input).includes('/api/portfolio/import'));
+    expect(JSON.parse(String(request?.[1]?.body))).toEqual({ searchResultId: '1' });
+  }, 20_000);
 
   it('has no automated accessibility violations before or after results load', async () => {
     const { container } = renderSearch();

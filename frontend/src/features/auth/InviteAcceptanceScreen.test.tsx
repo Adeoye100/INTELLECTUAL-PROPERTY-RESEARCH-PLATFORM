@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -37,8 +37,11 @@ describe('InviteAcceptanceScreen', () => {
     vi.stubGlobal('fetch', fetchMock);
     renderInvitation('network-retry');
 
-    const retry = await screen.findByRole('button', { name: 'Retry invitation' });
-    retry.focus();
+    const errorState = await screen.findByRole('alert');
+    await waitFor(() => expect(errorState).toHaveFocus());
+    const retry = screen.getByRole('button', { name: 'Retry invitation' });
+    await user.tab();
+    expect(retry).toHaveFocus();
     await user.keyboard('{Enter}');
 
     const name = await screen.findByRole('textbox', { name: 'Full name' });

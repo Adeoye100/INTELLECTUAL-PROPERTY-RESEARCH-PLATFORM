@@ -1,5 +1,5 @@
 import { http, HttpResponse, delay } from 'msw';
-import type { DashboardSummary, SearchResponse, SearchResult, OfficeActionRef, PortfolioMark, Matter, MatterSaveRequest, MatterSaveResult } from '../../types';
+import type { Alert, DashboardSummary, SearchResponse, SearchResult, OfficeActionRef, PortfolioAttachment, PortfolioMark, PortfolioMarkDetail, Matter, MatterSaveRequest, MatterSaveResult, WatchSummary, WatchUpsertRequest } from '../../types';
 
 const mockSearchResults: SearchResult[] = [
   {
@@ -222,6 +222,7 @@ const mockPortfolioMarks: PortfolioMark[] = [
     filingDate: '2022-01-15',
     renewalDate: '2032-01-15',
     sourceRegistry: 'USPTO',
+    mocked: true,
   },
   {
     id: 'p2',
@@ -232,8 +233,9 @@ const mockPortfolioMarks: PortfolioMark[] = [
     niceClasses: [42],
     status: 'Pending',
     filingDate: '2024-03-10',
-    renewalDate: '2034-03-10',
+    renewalDate: '2026-08-25',
     sourceRegistry: 'USPTO',
+    mocked: true,
   },
   {
     id: 'p3',
@@ -244,8 +246,50 @@ const mockPortfolioMarks: PortfolioMark[] = [
     niceClasses: [9, 35],
     status: 'Registered',
     filingDate: '2021-08-22',
-    renewalDate: '2031-08-22',
+    renewalDate: '2026-07-20',
     sourceRegistry: 'EUIPO',
+    mocked: true,
+  },
+];
+
+const mockPortfolioDetails: Record<string, PortfolioMarkDetail> = Object.fromEntries(mockPortfolioMarks.map((mark) => [mark.id, {
+  ...mark,
+  statusHistory: [
+    { id: `${mark.id}-history-filed`, status: 'Filed', effectiveAt: mark.filingDate, source: mark.sourceRegistry, note: 'Application received by registry.' },
+    { id: `${mark.id}-history-current`, status: mark.status, effectiveAt: mark.status === 'Pending' ? mark.filingDate : '2023-05-18', source: mark.sourceRegistry, note: 'Current mock registry status.' },
+  ],
+}])) as Record<string, PortfolioMarkDetail>;
+
+const mockAttachments: Record<string, PortfolioAttachment[]> = {
+  p1: [
+    { id: 'attachment-registration', portfolioMarkId: 'p1', fileName: 'registration-certificate.pdf', contentType: 'application/pdf', uploadedAt: '2023-05-18', availability: 'available', mocked: true },
+    { id: 'attachment-failed', portfolioMarkId: 'p1', fileName: 'assignment-record.pdf', contentType: 'application/pdf', uploadedAt: '2025-01-09', availability: 'available', mocked: true },
+  ],
+  p2: [],
+};
+
+const mockWatches: WatchSummary[] = [
+  { id: 'w1', portfolioMarkId: 'p1', userId: 'u1', alertChannel: 'email', alertMode: 'real-time', active: true, markText: 'FORGE GLOBAL', jurisdiction: 'US', mocked: true },
+];
+
+const mockAlerts: Alert[] = [
+  {
+    id: 'a-newest', watchId: 'w1', matchedFilingRef: 'US99887766', riskScoreId: 'r1', riskResultId: '1', read: false,
+    createdAt: '2026-08-04T14:35:00.000Z', matchedMarkText: 'FORGE LABS', protectedMarkText: 'FORGE GLOBAL',
+    severity: 'high', source: 'USPTO', supportingEvidence: ['92% phonetic similarity', 'Nice Class 42 overlap'], mocked: true,
+    riskScore: mockSearchResults[0].riskScore,
+  },
+  {
+    id: 'a-older', watchId: 'w1', matchedFilingRef: 'EU12345678', riskScoreId: 'r2', riskResultId: '2', read: true,
+    createdAt: '2026-08-02T09:15:00.000Z', matchedMarkText: 'FORTRESS GLOBAL', protectedMarkText: 'FORGE GLOBAL',
+    severity: 'medium', source: 'EUIPO', supportingEvidence: ['60% visual similarity', 'Shared GLOBAL element'], mocked: true,
+    riskScore: mockSearchResults[1].riskScore,
+  },
+  {
+    id: 'a-middle', watchId: 'w1', matchedFilingRef: 'GB00998877', riskScoreId: 'r3', riskResultId: '3', read: false,
+    createdAt: '2026-08-03T18:05:00.000Z', matchedMarkText: 'THE FORGE HOUSE', protectedMarkText: 'FORGE GLOBAL',
+    severity: 'low', source: 'UKIPO', supportingEvidence: ['35% visual similarity', 'No class overlap'], mocked: true,
+    riskScore: mockSearchResults[2].riskScore,
   },
 ];
 
@@ -409,6 +453,7 @@ export const handlers = [
 
   http.get('/api/search', async ({ request }) => {
     const url = new URL(request.url);
+    const resultId = url.searchParams.get('resultId');
     const mark = url.searchParams.get('mark')?.toLowerCase() ?? '';
     const requestedJurisdictions = url.searchParams.getAll('jurisdiction');
     const requestedClasses = (url.searchParams.get('class') ?? '').split(',').filter(Boolean).map(Number);
@@ -418,6 +463,15 @@ export const handlers = [
     const filedTo = url.searchParams.get('filedTo') ?? '';
 
     await delay(700);
+    if (resultId) {
+      const result = mockSearchResults.find(({ id }) => id === resultId);
+      return HttpResponse.json<SearchResponse>({
+        results: result ? [result] : [],
+        sourceStatuses: result ? [{ source: result.candidateSource, status: 'complete', resultCount: 1 }] : [],
+        partial: false,
+        requestId: `mock-result-${resultId}`,
+      }, { headers: { 'X-Mock-Response': 'true' } });
+    }
     if (mark === 'error') return HttpResponse.json({ message: 'Mock search failure' }, { status: 503 });
     if (mark === 'outage') return HttpResponse.json<SearchResponse>({
       results: [],
@@ -489,7 +543,29 @@ export const handlers = [
 
   http.get('/api/portfolio', async () => {
     await delay(500);
-    return HttpResponse.json(mockPortfolioMarks);
+    return HttpResponse.json(mockPortfolioMarks, { headers: { 'X-Mock-Response': 'true' } });
+  }),
+
+  // MOCK FE-14 detail and document endpoints. Real object storage download
+  // authorization and portfolio tenancy checks remain backend-blocked.
+  http.get('/api/portfolio/:markId', async ({ params }) => {
+    await delay(300);
+    const detail = mockPortfolioDetails[String(params.markId)];
+    if (!detail) return HttpResponse.json({ message: 'Mark not found', mocked: true }, { status: 404, headers: { 'X-Mock-Response': 'true' } });
+    return HttpResponse.json(detail, { headers: { 'X-Mock-Response': 'true' } });
+  }),
+
+  http.get('/api/portfolio/:markId/attachments', async ({ params }) => {
+    await delay(350);
+    const markId = String(params.markId);
+    if (markId === 'p3') return HttpResponse.json({ message: 'Mock document storage unavailable', mocked: true }, { status: 503, headers: { 'X-Mock-Response': 'true' } });
+    return HttpResponse.json(mockAttachments[markId] ?? [], { headers: { 'X-Mock-Response': 'true' } });
+  }),
+
+  http.get('/api/portfolio/:markId/attachments/:attachmentId/download', async ({ params }) => {
+    await delay(250);
+    if (String(params.attachmentId) === 'attachment-failed') return HttpResponse.json({ message: 'Mock download failure', mocked: true }, { status: 503, headers: { 'X-Mock-Response': 'true' } });
+    return HttpResponse.json({ downloadUrl: 'data:application/pdf;base64,JVBERi0xLjQKJSBtb2NrIHBvcnRmb2xpbyBhdHRhY2htZW50Cg==', fileName: 'registration-certificate.pdf', mocked: true }, { headers: { 'X-Mock-Response': 'true' } });
   }),
 
   http.post('/api/portfolio', async ({ request }) => {
@@ -511,48 +587,89 @@ export const handlers = [
       filingDate: new Date().toISOString().slice(0, 10),
       renewalDate: body.renewalDate,
       sourceRegistry: 'Manual entry (mock)',
-    }, { status: 201 });
+      mocked: true,
+    }, { status: 201, headers: { 'X-Mock-Response': 'true' } });
+  }),
+
+  http.post('/api/portfolio/import', async ({ request }) => {
+    const body = await request.json() as { searchResultId?: string };
+    const result = mockSearchResults.find(({ id }) => id === body.searchResultId);
+    if (!result) return HttpResponse.json({ message: 'Search result not found', mocked: true }, { status: 404, headers: { 'X-Mock-Response': 'true' } });
+    await delay(300);
+    const created: PortfolioMark = {
+      id: `portfolio-import-${result.id}`,
+      firmId: 'f1', ownerUserId: 'u1', markText: result.candidateMarkText, jurisdiction: result.jurisdiction,
+      niceClasses: result.niceClasses, status: result.status, filingDate: result.filingDate,
+      renewalDate: result.filingDate.replace(/^\d{4}/, String(Number(result.filingDate.slice(0, 4)) + 10)),
+      sourceRegistry: `${result.candidateSource} search import (mock)`, mocked: true,
+    };
+    if (!mockPortfolioMarks.some(({ id }) => id === created.id)) mockPortfolioMarks.push(created);
+    return HttpResponse.json(created, { status: 201, headers: { 'X-Mock-Response': 'true' } });
+  }),
+
+  http.post('/api/portfolio/:markId/watch', async ({ params, request }) => {
+    const mark = mockPortfolioMarks.find(({ id }) => id === String(params.markId));
+    if (!mark) return HttpResponse.json({ message: 'Mark not found', mocked: true }, { status: 404, headers: { 'X-Mock-Response': 'true' } });
+    const body = await request.json() as Omit<WatchUpsertRequest, 'portfolioMarkId'>;
+    const existing = mockWatches.find(({ portfolioMarkId }) => portfolioMarkId === mark.id);
+    if (existing) return HttpResponse.json(existing, { headers: { 'X-Mock-Response': 'true' } });
+    const created: WatchSummary = { id: `watch-mock-${Date.now()}`, portfolioMarkId: mark.id, userId: 'u1', alertChannel: body.alertChannel, alertMode: body.alertMode, active: body.active, markText: mark.markText, jurisdiction: mark.jurisdiction, mocked: true };
+    mockWatches.push(created);
+    return HttpResponse.json(created, { status: 201, headers: { 'X-Mock-Response': 'true' } });
   }),
 
   http.get('/api/watches', async () => {
     await delay(600);
-    return HttpResponse.json([
-      {
-        id: 'w1',
-        portfolioMarkId: 'p1',
-        userId: 'u1',
-        alertChannel: 'email',
-        alertMode: 'real-time',
-        active: true,
-        markText: 'FORGE GLOBAL', // Flattened for UI
-      }
-    ]);
+    return HttpResponse.json(mockWatches, { headers: { 'X-Mock-Response': 'true' } });
   }),
 
-  http.get('/api/alerts', async () => {
+  // MOCK FE-15 watch mutations. Server-side tenant/role authorization and
+  // registry scheduling remain required; SMS is deliberately rejected.
+  http.post('/api/watches', async ({ request }) => {
+    const body = await request.json() as WatchUpsertRequest;
+    if (!['email', 'in-app'].includes(body.alertChannel) || !['real-time', 'digest'].includes(body.alertMode) || !body.portfolioMarkId) return HttpResponse.json({ message: 'Invalid mock watch configuration', mocked: true }, { status: 422, headers: { 'X-Mock-Response': 'true' } });
+    const mark = mockPortfolioMarks.find(({ id }) => id === body.portfolioMarkId);
+    if (!mark) return HttpResponse.json({ message: 'Portfolio mark not found', mocked: true }, { status: 404, headers: { 'X-Mock-Response': 'true' } });
+    const created: WatchSummary = { ...body, id: `watch-mock-${Date.now()}`, userId: 'u1', markText: mark.markText, jurisdiction: mark.jurisdiction, mocked: true };
+    mockWatches.push(created);
+    return HttpResponse.json(created, { status: 201, headers: { 'X-Mock-Response': 'true' } });
+  }),
+
+  http.patch('/api/watches/:watchId', async ({ params, request }) => {
+    const index = mockWatches.findIndex(({ id }) => id === String(params.watchId));
+    if (index < 0) return HttpResponse.json({ message: 'Watch not found', mocked: true }, { status: 404, headers: { 'X-Mock-Response': 'true' } });
+    const body = await request.json() as WatchUpsertRequest;
+    const mark = mockPortfolioMarks.find(({ id }) => id === body.portfolioMarkId);
+    mockWatches[index] = { ...mockWatches[index], ...body, markText: mark?.markText ?? mockWatches[index].markText, jurisdiction: mark?.jurisdiction ?? mockWatches[index].jurisdiction, mocked: true };
+    return HttpResponse.json(mockWatches[index], { headers: { 'X-Mock-Response': 'true' } });
+  }),
+
+  http.get('/api/alerts', async ({ request }) => {
     await delay(700);
-    return HttpResponse.json([
-      {
-        id: 'a1',
-        watchId: 'w1',
-        matchedFilingRef: 'US99887766',
-        riskScoreId: 'r3',
-        read: false,
-        createdAt: new Date().toISOString(),
-        riskScore: {
-          id: 'r3',
-          phoneticScore: 92,
-          visualScore: 35,
-          conceptualScore: null,
-          classOverlap: true,
-          compositeRating: 'high',
-          matchedMarkRefs: [
-            { type: 'Phonetic', evidence: 'Identical phonetic match "FORGE"', score: 92 },
-          ],
-        },
-        matchedMarkText: 'FORGE LABS', // Flattened for UI
-      }
-    ]);
+    const params = new URL(request.url).searchParams;
+    const readState = params.get('read');
+    const severity = params.get('severity');
+    const source = params.get('source');
+    const dateFrom = params.get('dateFrom');
+    const dateTo = params.get('dateTo');
+    const filtered = mockAlerts.filter((alert) => {
+      if (readState === 'read' && !alert.read) return false;
+      if (readState === 'unread' && alert.read) return false;
+      if (severity && alert.severity !== severity) return false;
+      if (source && alert.source !== source) return false;
+      if (dateFrom && alert.createdAt < `${dateFrom}T00:00:00.000Z`) return false;
+      if (dateTo && alert.createdAt > `${dateTo}T23:59:59.999Z`) return false;
+      return true;
+    });
+    return HttpResponse.json(filtered, { headers: { 'X-Mock-Response': 'true' } });
+  }),
+
+  http.patch('/api/alerts/:alertId', async ({ params, request }) => {
+    const index = mockAlerts.findIndex(({ id }) => id === String(params.alertId));
+    if (index < 0) return HttpResponse.json({ message: 'Alert not found', mocked: true }, { status: 404, headers: { 'X-Mock-Response': 'true' } });
+    const body = await request.json() as { read?: boolean };
+    mockAlerts[index] = { ...mockAlerts[index], read: body.read ?? mockAlerts[index].read };
+    return HttpResponse.json(mockAlerts[index], { headers: { 'X-Mock-Response': 'true' } });
   }),
 
   http.get('/api/office-actions/search', async ({ request }) => {

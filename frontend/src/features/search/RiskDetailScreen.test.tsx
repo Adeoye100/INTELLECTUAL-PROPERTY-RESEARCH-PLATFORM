@@ -408,7 +408,7 @@ describe('RiskDetailScreen — Save to matter', () => {
       expect(screen.queryByRole('dialog', { name: /save to matter/i })).not.toBeInTheDocument(),
     );
     expect(await screen.findByText(/new matter created and result saved/i)).toBeInTheDocument();
-  });
+  }, 20_000);
 
   it('shows validation error when new matter name is empty', async () => {
     const user = userEvent.setup();

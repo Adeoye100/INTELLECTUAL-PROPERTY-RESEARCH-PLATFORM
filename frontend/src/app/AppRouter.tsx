@@ -8,6 +8,7 @@ import { SearchScreen } from '../features/search/SearchScreen';
 import { RiskDetailScreen } from '../features/search/RiskDetailScreen';
 import { OfficeActionResearchScreen } from '../features/office-action/OfficeActionResearchScreen';
 import { PortfolioScreen } from '../features/portfolio/PortfolioScreen';
+import { PortfolioDetailScreen } from '../features/portfolio/PortfolioDetailScreen';
 import { WatchesScreen } from '../features/watches/WatchesScreen';
 import { DashboardScreen } from '../features/dashboard/DashboardScreen';
 import { AdminScreen } from '../features/billing/AdminScreen';
@@ -59,6 +60,7 @@ const router = createBrowserRouter([
         ),
       },
       { path: 'portfolio', element: <PortfolioScreen /> },
+      { path: 'portfolio/:markId', element: <PortfolioDetailScreen /> },
       { path: 'watches', element: <WatchesScreen /> },
       { path: 'permission-denied', element: <PermissionDeniedScreen /> },
       {
