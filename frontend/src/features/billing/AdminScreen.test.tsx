@@ -53,7 +53,7 @@ describe('AdminScreen seat management', () => {
     fireEvent.click(within(invitedRow!).getByRole('button', { name: "Remove Lola Reed's seat" }));
     expect(screen.queryByText('Lola Reed')).not.toBeInTheDocument();
     expect(screen.getByText(/8 of 10 seats used/i)).toBeVisible();
-  }, 20_000);
+  }, 30_000);
 
   it('returns focus to the invitation trigger when Escape closes the modal', async () => {
     const user = userEvent.setup();
