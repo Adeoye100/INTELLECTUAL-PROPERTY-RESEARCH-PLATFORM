@@ -72,7 +72,7 @@ export const searchFiltersFromParams = (params: URLSearchParams): SearchFilters 
 });
 
 export const buildSearchRequestUrl = (filters: SearchFilters) =>
-  `/api/search?${searchFiltersToParams(filters).toString()}`;
+  `/search?${searchFiltersToParams(filters).toString()}`;
 
 const riskWeight = { high: 3, medium: 2, low: 1 } as const;
 

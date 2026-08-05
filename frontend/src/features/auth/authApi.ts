@@ -1,3 +1,5 @@
+import { ApiError, getApiClient, type ApiRequestOptions } from '../../lib/api/client';
+
 export type AuthErrorCode =
   | 'DUPLICATE_ACCOUNT'
   | 'EMAIL_NOT_VERIFIED'
@@ -26,35 +28,38 @@ export class AuthApiError extends Error {
 }
 
 export async function authRequest<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
-  let response: Response;
+  const path = String(input);
   try {
-    response = await fetch(input, init);
-  } catch {
-    throw new AuthApiError('NETWORK_ERROR', 'We could not reach the service. Check your connection and try again.');
-  }
-
-  if (!response.ok) {
-    const fallbackCode: AuthErrorCode = response.status === 401
-      ? 'INVALID_CREDENTIALS'
-      : response.status === 403
-        ? 'PERMISSION_DENIED'
-        : 'UNKNOWN_ERROR';
-    let payload: { code?: AuthErrorCode; message?: string } = {};
-    try {
-      payload = await response.json() as typeof payload;
-    } catch {
-      // Error bodies are optional; the accessible fallback below remains useful.
+    let body: unknown;
+    if (typeof init?.body === 'string' && init.body) body = JSON.parse(init.body);
+    const options: ApiRequestOptions = {
+      method: init?.method as ApiRequestOptions['method'],
+      headers: init?.headers,
+      signal: init?.signal ?? undefined,
+      body,
+    };
+    return await getApiClient().requestJson<T>(path, options);
+  } catch (error) {
+    if (!(error instanceof ApiError)) {
+      throw new AuthApiError('UNKNOWN_ERROR', 'The request could not be completed. Please try again.');
     }
-    throw new AuthApiError(
-      payload.code ?? fallbackCode,
-      payload.message ?? 'The request could not be completed. Please try again.',
-      response.status,
-    );
+    const knownServerCode = error.serverCode && [
+      'DUPLICATE_ACCOUNT', 'EMAIL_NOT_VERIFIED', 'EXPIRED_LINK', 'INVALID_CREDENTIALS',
+      'PERMISSION_DENIED', 'SEAT_LIMIT', 'SESSION_EXPIRED',
+    ].includes(error.serverCode) ? error.serverCode as AuthErrorCode : undefined;
+    const fallbackCode: AuthErrorCode = error.code === 'NETWORK_ERROR' || error.code === 'TIMEOUT'
+      ? 'NETWORK_ERROR'
+      : error.status === 401
+        ? useSessionErrorCode(path)
+        : error.status === 403
+          ? 'PERMISSION_DENIED'
+          : 'UNKNOWN_ERROR';
+    throw new AuthApiError(knownServerCode ?? fallbackCode, error.message, error.status);
   }
-
-  if (response.status === 204) return undefined as T;
-  return response.json() as Promise<T>;
 }
+
+const useSessionErrorCode = (path: string): AuthErrorCode =>
+  path === '/auth/login' ? 'INVALID_CREDENTIALS' : 'SESSION_EXPIRED';
 
 export const authErrorMessage = (error: unknown): string => {
   if (!(error instanceof AuthApiError)) return 'Something went wrong. Please try again.';

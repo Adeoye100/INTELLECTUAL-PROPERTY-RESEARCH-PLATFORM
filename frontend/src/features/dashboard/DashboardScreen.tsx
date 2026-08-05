@@ -10,12 +10,7 @@ import type { DashboardSummary } from '../../types';
 import { useAuthStore } from '../auth/authStore';
 import { OnboardingChecklist } from '../onboarding/OnboardingChecklist';
 import { useOnboardingStore } from '../onboarding/onboardingStore';
-
-const fetchDashboard = async (): Promise<DashboardSummary> => {
-  const response = await fetch('/api/dashboard/summary');
-  if (!response.ok) throw new Error('Dashboard request failed');
-  return response.json() as Promise<DashboardSummary>;
-};
+import { getDashboardSummary } from './dashboardApi';
 
 export const DashboardScreen: React.FC = () => {
   const user = useAuthStore((state) => state.user);
@@ -23,7 +18,7 @@ export const DashboardScreen: React.FC = () => {
   const showOnboarding = user?.onboardingRequired === true && !clientProgress?.completedPath;
   const dashboard = useQuery<DashboardSummary>({
     queryKey: ['dashboard', 'summary'],
-    queryFn: fetchDashboard,
+    queryFn: getDashboardSummary,
     enabled: !showOnboarding,
     retry: false,
   });

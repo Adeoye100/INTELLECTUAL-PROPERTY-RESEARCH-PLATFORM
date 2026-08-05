@@ -15,14 +15,14 @@ export function EmailVerificationScreen() {
   const verify = useCallback(async () => {
     if (!token) return;
     setStatus('loading'); setError(null);
-    try { await authRequest(`/api/auth/verify-email/${token}`); setStatus('verified'); }
+    try { await authRequest(`/auth/verify-email/${token}`); setStatus('verified'); }
     catch (caught) { setError(caught instanceof AuthApiError ? caught : new AuthApiError('UNKNOWN_ERROR', authErrorMessage(caught))); setStatus('error'); }
   }, [token]);
 
   useEffect(() => {
     if (!token) return;
     let active = true;
-    void authRequest(`/api/auth/verify-email/${token}`)
+    void authRequest(`/auth/verify-email/${token}`)
       .then(() => { if (active) setStatus('verified'); })
       .catch((caught) => {
         if (active) {
@@ -36,7 +36,7 @@ export function EmailVerificationScreen() {
 
   const resend = async () => {
     setStatus('loading'); setError(null);
-    try { await authRequest('/api/auth/verify-email/resend', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) }); setStatus('resent'); }
+    try { await authRequest('/auth/verify-email/resend', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) }); setStatus('resent'); }
     catch (caught) { setError(caught instanceof AuthApiError ? caught : new AuthApiError('UNKNOWN_ERROR', authErrorMessage(caught))); setStatus('error'); }
   };
 

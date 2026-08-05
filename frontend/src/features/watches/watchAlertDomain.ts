@@ -50,5 +50,5 @@ export const filterAlerts = (alerts: Alert[], filters: AlertFilters) => sortAler
 
 export const buildAlertsRequestUrl = (filters: AlertFilters) => {
   const params = alertFiltersToParams(filters);
-  return `/api/alerts${params.size ? `?${params.toString()}` : ''}`;
+  return `/alerts${params.size ? `?${params.toString()}` : ''}`;
 };

@@ -31,8 +31,8 @@ describe('FE-06 onboarding flow', () => {
     });
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.includes('/api/search')) return new Response(JSON.stringify(mockSearchResponse), { status: 200, headers: { 'Content-Type': 'application/json' } });
-      if (url.includes('/api/dashboard/summary')) return new Response(JSON.stringify(mockDashboardSummary), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      if (url.includes('/api/v1/search')) return new Response(JSON.stringify(mockSearchResponse), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      if (url.includes('/api/v1/dashboard/summary')) return new Response(JSON.stringify(mockDashboardSummary), { status: 200, headers: { 'Content-Type': 'application/json' } });
       return new Response(JSON.stringify([]), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }));
   });

@@ -36,7 +36,7 @@ export const SignupScreen: React.FC = () => {
     setSubmitError(null);
     setErrorCode(null);
     try {
-      await authRequest('/api/auth/signup', {
+      await authRequest('/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),

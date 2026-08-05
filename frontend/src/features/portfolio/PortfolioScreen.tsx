@@ -20,6 +20,8 @@ import {
   portfolioFiltersToParams,
   type PortfolioFilters,
 } from './portfolioDomain';
+import { createPortfolioMark, createPortfolioWatch, listPortfolioMarks } from './portfolioApi';
+import { listWatches } from '../watches/watchesApi';
 
 const portfolioMarkSchema = z.object({
   markText: z.string().trim().min(2, 'Enter the trademark name.'),
@@ -29,18 +31,6 @@ const portfolioMarkSchema = z.object({
 });
 
 type PortfolioMarkValues = z.infer<typeof portfolioMarkSchema>;
-
-const fetchPortfolio = async (): Promise<PortfolioMark[]> => {
-  const response = await fetch('/api/portfolio');
-  if (!response.ok) throw new Error('Portfolio request failed');
-  return response.json() as Promise<PortfolioMark[]>;
-};
-
-const fetchWatches = async (): Promise<WatchSummary[]> => {
-  const response = await fetch('/api/watches');
-  if (!response.ok) throw new Error('Watch request failed');
-  return response.json() as Promise<WatchSummary[]>;
-};
 
 export const PortfolioScreen: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -53,8 +43,8 @@ export const PortfolioScreen: React.FC = () => {
   const [addError, setAddError] = useState<string | null>(null);
   const [watchMessage, setWatchMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
-  const portfolio = useQuery({ queryKey: ['portfolio'], queryFn: fetchPortfolio, retry: false });
-  const watches = useQuery({ queryKey: ['watches'], queryFn: fetchWatches, retry: false });
+  const portfolio = useQuery({ queryKey: ['portfolio'], queryFn: listPortfolioMarks, retry: false });
+  const watches = useQuery({ queryKey: ['watches'], queryFn: listWatches, retry: false });
   const {
     register,
     handleSubmit,
@@ -74,16 +64,11 @@ export const PortfolioScreen: React.FC = () => {
   };
 
   const createWatch = useMutation({
-    mutationFn: async (mark: PortfolioMark) => {
-      const response = await fetch(`/api/portfolio/${mark.id}/watch`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ alertChannel: 'email', alertMode: 'real-time', active: true }),
-      });
-      if (response.status === 403) throw new Error('You do not have permission to create watches.');
-      if (!response.ok) throw new Error('The watch could not be created. Retry the request.');
-      return response.json() as Promise<WatchSummary>;
-    },
+    mutationFn: (mark: PortfolioMark) => createPortfolioWatch(mark.id, {
+      alertChannel: 'email',
+      alertMode: 'real-time',
+      active: true,
+    }),
     onSuccess: (created) => {
       queryClient.setQueryData<WatchSummary[]>(['watches'], (current = []) => [...current, created]);
       setWatchMessage({ type: 'success', text: `${created.markText} is now watched by email in real time. Mock persistence is active.` });
@@ -94,13 +79,10 @@ export const PortfolioScreen: React.FC = () => {
   const addMark = async (values: PortfolioMarkValues) => {
     setAddError(null);
     try {
-      const response = await fetch('/api/portfolio', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...values, niceClasses: values.niceClasses.split(',').map((value) => Number(value.trim())) }),
+      const created = await createPortfolioMark({
+        ...values,
+        niceClasses: values.niceClasses.split(',').map((value) => Number(value.trim())),
       });
-      if (!response.ok) throw new Error('Portfolio creation failed');
-      const created = await response.json() as PortfolioMark;
       queryClient.setQueryData<PortfolioMark[]>(['portfolio'], (current = []) => [...current, created]);
       if (user && searchParams.get('onboarding') === 'add') {
         completePath(user.id, 'portfolio');

@@ -8,16 +8,18 @@ import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
 import { Badge } from '../../components/Badge';
 import { Link, useSearchParams } from 'react-router-dom';
-import type { Alert, PortfolioMark, WatchSummary, WatchUpsertRequest } from '../../types';
+import type { Alert, WatchSummary, WatchUpsertRequest } from '../../types';
 import { Modal } from '../../components/Modal';
 import { useAuthStore } from '../auth/authStore';
 import {
   alertFiltersFromParams,
   alertFiltersToParams,
-  buildAlertsRequestUrl,
   filterAlerts,
   type AlertFilters,
 } from './watchAlertDomain';
+import { ApiError } from '../../lib/api/client';
+import { listPortfolioMarks } from '../portfolio/portfolioApi';
+import { createWatch, listAlerts, listWatches, updateAlertReadState, updateWatch } from './watchesApi';
 
 const watchSchema = z.object({
   portfolioMarkId: z.string().min(1, 'Choose a portfolio mark.'),
@@ -28,12 +30,6 @@ const watchSchema = z.object({
 
 type WatchFormValues = z.infer<typeof watchSchema>;
 
-const fetchJson = async <T,>(url: string): Promise<T> => {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error('Request failed');
-  return response.json() as Promise<T>;
-};
-
 export const WatchesScreen: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const user = useAuthStore((state) => state.user);
@@ -43,9 +39,9 @@ export const WatchesScreen: React.FC = () => {
   const [isWatchOpen, setIsWatchOpen] = useState(Boolean(selectedMarkId) && user?.role !== 'viewer');
   const [editingWatch, setEditingWatch] = useState<WatchSummary | null>(null);
   const [requestMessage, setRequestMessage] = useState<{ type: 'success' | 'permission' | 'error'; text: string } | null>(null);
-  const watches = useQuery({ queryKey: ['watches'], queryFn: () => fetchJson<WatchSummary[]>('/api/watches'), retry: false });
-  const portfolio = useQuery({ queryKey: ['portfolio'], queryFn: () => fetchJson<PortfolioMark[]>('/api/portfolio'), retry: false });
-  const alerts = useQuery({ queryKey: ['alerts', filters], queryFn: () => fetchJson<Alert[]>(buildAlertsRequestUrl(filters)), retry: false, placeholderData: (previous) => previous });
+  const watches = useQuery({ queryKey: ['watches'], queryFn: listWatches, retry: false });
+  const portfolio = useQuery({ queryKey: ['portfolio'], queryFn: listPortfolioMarks, retry: false });
+  const alerts = useQuery({ queryKey: ['alerts', filters], queryFn: () => listAlerts(filters), retry: false, placeholderData: (previous) => previous });
   const visibleAlerts = filterAlerts(alerts.data ?? [], filters);
   const {
     register,
@@ -66,14 +62,9 @@ export const WatchesScreen: React.FC = () => {
   };
 
   const saveWatch = useMutation({
-    mutationFn: async (values: WatchUpsertRequest) => {
-      const url = editingWatch ? `/api/watches/${editingWatch.id}` : '/api/watches';
-      const response = await fetch(url, { method: editingWatch ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values) });
-      if (response.status === 403) throw new Error('PERMISSION');
-      if (response.status === 422) throw new Error('VALIDATION');
-      if (!response.ok) throw new Error('REQUEST');
-      return response.json() as Promise<WatchSummary>;
-    },
+    mutationFn: (values: WatchUpsertRequest) => editingWatch
+      ? updateWatch(editingWatch.id, values)
+      : createWatch(values),
     onSuccess: (saved) => {
       queryClient.setQueryData<WatchSummary[]>(['watches'], (current = []) => editingWatch ? current.map((watch) => watch.id === saved.id ? saved : watch) : [...current, saved]);
       setRequestMessage({ type: 'success', text: `${saved.markText} watch ${editingWatch ? 'updated' : 'created'}. Mock persistence is active.` });
@@ -81,21 +72,17 @@ export const WatchesScreen: React.FC = () => {
       setEditingWatch(null);
     },
     onError: (error) => {
-      const code = error instanceof Error ? error.message : 'REQUEST';
-      setRequestMessage(code === 'PERMISSION'
+      const code = error instanceof ApiError ? error.code : 'HTTP_ERROR';
+      setRequestMessage(code === 'FORBIDDEN'
         ? { type: 'permission', text: 'You do not have permission to create or change watches.' }
-        : code === 'VALIDATION'
+        : code === 'VALIDATION_ERROR'
           ? { type: 'error', text: 'The server rejected this watch configuration. Review each field.' }
           : { type: 'error', text: 'The watch request failed. Your settings are preserved; retry when the service is available.' });
     },
   });
 
   const readMutation = useMutation({
-    mutationFn: async (alert: Alert) => {
-      const response = await fetch(`/api/alerts/${alert.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ read: !alert.read }) });
-      if (!response.ok) throw new Error('Alert update failed');
-      return response.json() as Promise<Alert>;
-    },
+    mutationFn: (alert: Alert) => updateAlertReadState(alert.id, !alert.read),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['alerts'] }),
   });
 

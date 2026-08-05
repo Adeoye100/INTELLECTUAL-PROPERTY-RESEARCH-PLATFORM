@@ -17,10 +17,10 @@ const alerts: Alert[] = [
 const renderWatches = () => {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    if (url.includes('/api/alerts') && !init?.method) return new Response(JSON.stringify(alerts), { status: 200 });
-    if (url.endsWith('/api/watches') && !init?.method) return new Response(JSON.stringify(watches), { status: 200 });
-    if (url.endsWith('/api/portfolio')) return new Response(JSON.stringify([mark]), { status: 200 });
-    if (url.endsWith('/api/watches') && init?.method === 'POST') return new Response(JSON.stringify({ id: 'w-new', userId: 'u1', markText: mark.markText, jurisdiction: mark.jurisdiction, mocked: true, ...JSON.parse(String(init.body)) }), { status: 201 });
+    if (url.includes('/api/v1/alerts') && !init?.method) return new Response(JSON.stringify(alerts), { status: 200 });
+    if (url.endsWith('/api/v1/watches') && !init?.method) return new Response(JSON.stringify(watches), { status: 200 });
+    if (url.endsWith('/api/v1/portfolio')) return new Response(JSON.stringify([mark]), { status: 200 });
+    if (url.endsWith('/api/v1/watches') && init?.method === 'POST') return new Response(JSON.stringify({ id: 'w-new', userId: 'u1', markText: mark.markText, jurisdiction: mark.jurisdiction, mocked: true, ...JSON.parse(String(init.body)) }), { status: 201 });
     return new Response('{}', { status: 500 });
   });
   vi.stubGlobal('fetch', fetchMock);

@@ -5,14 +5,13 @@ import { Link, useLocation, useParams } from 'react-router-dom';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
-import type { PortfolioAttachment, PortfolioDetailRouteState, PortfolioMarkDetail } from '../../types';
+import type { PortfolioAttachment, PortfolioDetailRouteState } from '../../types';
 import { getRenewalWarning } from './portfolioDomain';
-
-interface AttachmentDownloadResponse {
-  downloadUrl: string;
-  fileName: string;
-  mocked?: boolean;
-}
+import {
+  getPortfolioAttachmentDownload,
+  getPortfolioMark,
+  listPortfolioAttachments,
+} from './portfolioApi';
 
 type DownloadState =
   | { status: 'idle' }
@@ -20,34 +19,20 @@ type DownloadState =
   | { status: 'success'; downloadUrl: string; fileName: string; mocked: boolean }
   | { status: 'error'; message: string };
 
-const fetchDetail = async (id: string): Promise<PortfolioMarkDetail> => {
-  const response = await fetch(`/api/portfolio/${id}`);
-  if (!response.ok) throw new Error('Portfolio detail request failed');
-  return response.json() as Promise<PortfolioMarkDetail>;
-};
-
-const fetchAttachments = async (id: string): Promise<PortfolioAttachment[]> => {
-  const response = await fetch(`/api/portfolio/${id}/attachments`);
-  if (!response.ok) throw new Error('Attachments are unavailable');
-  return response.json() as Promise<PortfolioAttachment[]>;
-};
-
 export const PortfolioDetailScreen: React.FC = () => {
   const { markId = '' } = useParams<{ markId: string }>();
   const location = useLocation();
   const routeState = location.state as PortfolioDetailRouteState | null;
   const [downloads, setDownloads] = useState<Record<string, DownloadState>>({});
-  const detail = useQuery({ queryKey: ['portfolio', 'detail', markId], queryFn: () => fetchDetail(markId), retry: false });
-  const attachments = useQuery({ queryKey: ['portfolio', 'attachments', markId], queryFn: () => fetchAttachments(markId), retry: false });
+  const detail = useQuery({ queryKey: ['portfolio', 'detail', markId], queryFn: () => getPortfolioMark(markId), retry: false });
+  const attachments = useQuery({ queryKey: ['portfolio', 'attachments', markId], queryFn: () => listPortfolioAttachments(markId), retry: false });
   const displayMark = detail.data ?? routeState?.mark;
   const returnTo = routeState?.returnTo ?? '/portfolio';
 
   const downloadAttachment = async (attachment: PortfolioAttachment) => {
     setDownloads((current) => ({ ...current, [attachment.id]: { status: 'loading' } }));
     try {
-      const response = await fetch(`/api/portfolio/${markId}/attachments/${attachment.id}/download`);
-      if (!response.ok) throw new Error('Download failed. Check access and retry.');
-      const result = await response.json() as AttachmentDownloadResponse;
+      const result = await getPortfolioAttachmentDownload(markId, attachment.id);
       setDownloads((current) => ({ ...current, [attachment.id]: { status: 'success', downloadUrl: result.downloadUrl, fileName: result.fileName, mocked: result.mocked === true } }));
     } catch (error) {
       setDownloads((current) => ({ ...current, [attachment.id]: { status: 'error', message: error instanceof Error ? error.message : 'Download failed.' } }));

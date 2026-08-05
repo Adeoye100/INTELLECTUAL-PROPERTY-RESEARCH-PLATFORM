@@ -36,6 +36,7 @@ import type {
   MatterSaveRequest,
 } from '../../types';
 import { cn } from '../../lib/utils';
+import { getSearchResult } from './searchApi';
 import {
   ResponsiveContainer,
   RadarChart,
@@ -227,11 +228,7 @@ export const RiskDetailScreen: React.FC = () => {
   // API fallback: only fires when route state is absent (direct refresh, bookmark).
   const { data: searchResponse, isLoading: isFetching } = useQuery<SearchResponse>({
     queryKey: ['search-result', id],
-    queryFn: async () => {
-      const res = await fetch(`/api/search?resultId=${encodeURIComponent(id ?? '')}`);
-      if (!res.ok) throw new Error('Could not reload search results.');
-      return res.json() as Promise<SearchResponse>;
-    },
+    queryFn: () => getSearchResult(id ?? ''),
     // Only hit the API if route state is absent
     enabled: routeState === null,
   });

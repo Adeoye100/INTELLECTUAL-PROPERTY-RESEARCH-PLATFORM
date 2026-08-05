@@ -5,7 +5,7 @@
  *
  * ⚠️  THIS ADAPTER DOES NOT PERSIST DATA TO ANY SERVER.
  * It stores matter state in localStorage for the duration of the browser session.
- * Once the backend `/api/matters` and `POST /api/matters/:id/risk-results`
+ * Once the backend `/api/v1/matters` and `POST /api/v1/matters/:id/risk-results`
  * endpoints are implemented, replace this adapter with one that calls those APIs.
  *
  * The adapter satisfies the `MatterAdapter` interface so the swap is a single
@@ -81,7 +81,7 @@ export const matterAdapter: MatterAdapter = {
    * Returns all matters in the mock session.
    *
    * MOCK-ONLY: reads from localStorage.
-   * Replace with `GET /api/matters` when the backend is available.
+   * Replace with `GET /api/v1/matters` when the backend is available.
    */
   async listMatters(): Promise<Matter[]> {
     await simulateDelay();
@@ -92,7 +92,7 @@ export const matterAdapter: MatterAdapter = {
    * Saves a risk result to an existing or new matter.
    *
    * MOCK-ONLY: writes to localStorage only.
-   * Replace with `POST /api/matters/:id/risk-results` (or a create+link combo)
+   * Replace with `POST /api/v1/matters/:id/risk-results` (or a create+link combo)
    * when the backend is available.
    */
   async saveToMatter(request: MatterSaveRequest): Promise<MatterSaveResult> {

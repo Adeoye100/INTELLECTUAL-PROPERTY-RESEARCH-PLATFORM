@@ -13,7 +13,6 @@ import type { PortfolioMark, SearchResponse, RiskDetailRouteState, SearchResult 
 import { useAuthStore } from '../auth/authStore';
 import { useOnboardingStore } from '../onboarding/onboardingStore';
 import {
-  buildSearchRequestUrl,
   defaultSearchFilters,
   hasSearchFilterParams,
   normalizeSearchFilters,
@@ -24,6 +23,7 @@ import {
   searchFiltersToParams,
   type SearchFilters,
 } from './searchFilters';
+import { importSearchResultToPortfolio, searchTrademarks } from './searchApi';
 
 const jurisdictions = [
   ['US', 'United States (USPTO)'],
@@ -53,12 +53,6 @@ const loadInitialFilters = (params: URLSearchParams, userId: string | undefined)
   return { filters: defaultSearchFilters, submitted: false };
 };
 
-const fetchSearch = async (filters: SearchFilters): Promise<SearchResponse> => {
-  const response = await fetch(buildSearchRequestUrl(filters));
-  if (!response.ok) throw new Error('Search failed');
-  return response.json() as Promise<SearchResponse>;
-};
-
 export const SearchScreen: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const user = useAuthStore((state) => state.user);
@@ -83,7 +77,7 @@ export const SearchScreen: React.FC = () => {
 
   const searchQuery = useQuery<SearchResponse>({
     queryKey: ['search', submittedFilters],
-    queryFn: () => fetchSearch(submittedFilters!),
+    queryFn: () => searchTrademarks(submittedFilters!),
     enabled: submittedFilters !== null,
     retry: false,
     placeholderData: (previousData) => previousData,
@@ -97,16 +91,7 @@ export const SearchScreen: React.FC = () => {
   const hasIncompleteSources = sourceStatuses.some(({ status }) => status !== 'complete');
   const allSourcesUnavailable = sourceStatuses.length > 0 && sourceStatuses.every(({ status }) => status === 'unavailable');
   const importToPortfolio = useMutation({
-    mutationFn: async (result: SearchResult) => {
-      const response = await fetch('/api/portfolio/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ searchResultId: result.id }),
-      });
-      if (response.status === 403) throw new Error('You do not have permission to import portfolio marks.');
-      if (!response.ok) throw new Error('The search result could not be imported. Retry the request.');
-      return response.json() as Promise<PortfolioMark>;
-    },
+    mutationFn: (result: SearchResult) => importSearchResultToPortfolio(result.id),
     onSuccess: (created) => {
       queryClient.setQueryData<PortfolioMark[]>(['portfolio'], (current = []) => current.some((mark) => mark.id === created.id) ? current : [...current, created]);
       setPortfolioMessage({ type: 'success', text: `${created.markText} was imported to the portfolio. Mock persistence is active.` });
@@ -126,7 +111,7 @@ export const SearchScreen: React.FC = () => {
     try {
       await queryClient.fetchQuery({
         queryKey: ['search', normalized],
-        queryFn: () => fetchSearch(normalized),
+        queryFn: () => searchTrademarks(normalized),
       });
       if (user && onboarding === 'search') {
         completePath(user.id, 'search');

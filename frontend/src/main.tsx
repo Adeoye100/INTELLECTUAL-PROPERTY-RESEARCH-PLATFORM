@@ -1,11 +1,11 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
+import { getApiConfig, shouldEnableMocking } from './lib/api/config';
 
 async function enableMocking() {
-  if (!import.meta.env.DEV) {
-    return;
-  }
+  const config = getApiConfig();
+  if (!shouldEnableMocking(config)) return;
 
   const { worker } = await import('./lib/mocks/browser');
   return worker.start({
@@ -22,4 +22,11 @@ enableMocking().then(() => {
       <App />
     </StrictMode>,
   );
+}).catch((error: unknown) => {
+  const root = document.getElementById('root');
+  if (root) {
+    root.textContent = error instanceof Error
+      ? `Application configuration error: ${error.message}`
+      : 'Application configuration error.';
+  }
 });

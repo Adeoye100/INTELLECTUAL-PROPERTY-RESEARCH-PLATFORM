@@ -2,6 +2,7 @@ import React, { useEffect, useId, useState } from 'react';
 import { CheckCircle, Download, FileDown, LoaderCircle, RotateCcw } from 'lucide-react';
 import { Button } from './Button';
 import { cn } from '../lib/utils';
+import { generatePdfReport } from '../features/reports/reportsApi';
 
 export type PdfReportRequest =
   | {
@@ -44,12 +45,6 @@ interface PdfExportProps {
   label?: string;
 }
 
-interface PdfResponse {
-  downloadUrl: string;
-  fileName: string;
-  mocked?: boolean;
-}
-
 type ExportState =
   | { status: 'idle' }
   | { status: 'loading' }
@@ -79,36 +74,15 @@ export const PdfExport: React.FC<PdfExportProps> = ({
     setState({ status: 'loading' });
 
     try {
-      const response = await fetch('/api/reports/pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(request),
+      const result = await generatePdfReport(request);
+      const downloadUrl = URL.createObjectURL(result.blob);
+      setState({
+        status: 'success',
+        downloadUrl,
+        fileName: result.fileName,
+        objectUrl: true,
+        mocked: result.mocked,
       });
-      if (!response.ok) throw new Error('The report service could not generate this PDF.');
-
-      const contentType = response.headers.get('content-type') ?? '';
-      if (contentType.includes('application/pdf')) {
-        const blob = await response.blob();
-        const downloadUrl = URL.createObjectURL(blob);
-        const disposition = response.headers.get('content-disposition') ?? '';
-        const fileName = disposition.match(/filename="?([^";]+)"?/i)?.[1] ?? `${request.reportType}.pdf`;
-        setState({ status: 'success', downloadUrl, fileName, objectUrl: true, mocked: false });
-      } else {
-        const result = (await response.json()) as PdfResponse;
-        if (!result.downloadUrl || !result.fileName) throw new Error('The report response was incomplete.');
-        const isPdfDataUrl = result.downloadUrl.startsWith('data:application/pdf');
-        const protocol = isPdfDataUrl ? 'data:' : new URL(result.downloadUrl, window.location.origin).protocol;
-        if (!['data:', 'blob:', 'http:', 'https:'].includes(protocol)) {
-          throw new Error('The report service returned an unsafe download URL.');
-        }
-        setState({
-          status: 'success',
-          downloadUrl: result.downloadUrl,
-          fileName: result.fileName,
-          objectUrl: false,
-          mocked: result.mocked === true,
-        });
-      }
     } catch (error) {
       setState({
         status: 'error',

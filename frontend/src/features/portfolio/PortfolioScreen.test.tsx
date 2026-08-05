@@ -16,9 +16,9 @@ const watch: WatchSummary = { id: 'w1', portfolioMarkId: 'p1', userId: 'u1', ale
 const renderPortfolio = () => {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    if (url.endsWith('/api/portfolio') && !init?.method) return new Response(JSON.stringify(marks), { status: 200 });
-    if (url.endsWith('/api/watches')) return new Response(JSON.stringify([watch]), { status: 200 });
-    if (url.includes('/api/portfolio/p2/watch')) return new Response(JSON.stringify({ ...watch, id: 'w2', portfolioMarkId: 'p2', markText: 'INNOVATE PRO', jurisdiction: 'EU' }), { status: 201 });
+    if (url.endsWith('/api/v1/portfolio') && !init?.method) return new Response(JSON.stringify(marks), { status: 200 });
+    if (url.endsWith('/api/v1/watches')) return new Response(JSON.stringify([watch]), { status: 200 });
+    if (url.includes('/api/v1/portfolio/p2/watch')) return new Response(JSON.stringify({ ...watch, id: 'w2', portfolioMarkId: 'p2', markText: 'INNOVATE PRO', jurisdiction: 'EU' }), { status: 201 });
     return new Response('{}', { status: 500 });
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -41,7 +41,7 @@ describe('PortfolioScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create watch' }));
     expect(await screen.findByText(/INNOVATE PRO is now watched/i)).toBeVisible();
     const request = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST');
-    expect(String(request?.[0])).toContain('/api/portfolio/p2/watch');
+    expect(String(request?.[0])).toContain('/api/v1/portfolio/p2/watch');
     expect(JSON.parse(String(request?.[1]?.body))).toEqual({ alertChannel: 'email', alertMode: 'real-time', active: true });
   }, 20_000);
 

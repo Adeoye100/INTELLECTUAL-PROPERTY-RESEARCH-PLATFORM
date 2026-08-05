@@ -274,7 +274,7 @@ export interface RiskDetailRouteState {
 }
 
 // ---------------------------------------------------------------------------
-// FE-12: Matter types (mock-only until backend /api/matters is implemented)
+// FE-12: Matter types (mock-only until backend /api/v1/matters is implemented)
 // ---------------------------------------------------------------------------
 
 /**
@@ -319,7 +319,7 @@ export interface MatterSaveResult {
 
 /**
  * Interface that the matter adapter must satisfy. Enables easy swap to a
- * real API-backed implementation once the backend /api/matters endpoint ships.
+ * real API-backed implementation once the backend /api/v1/matters endpoint ships.
  */
 export interface MatterAdapter {
   /** List all matters for the current mock session. */

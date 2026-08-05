@@ -11,7 +11,7 @@ const attachment: PortfolioAttachment = { id: 'a1', portfolioMarkId: 'p1', fileN
 const renderDetail = (attachmentResponse: Response, downloadResponse?: Response) => {
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
-    if (url.endsWith('/api/portfolio/p1')) return new Response(JSON.stringify(detail), { status: 200 });
+    if (url.endsWith('/api/v1/portfolio/p1')) return new Response(JSON.stringify(detail), { status: 200 });
     if (url.endsWith('/attachments')) return attachmentResponse;
     if (url.endsWith('/download')) return downloadResponse ?? new Response('{}', { status: 503 });
     return new Response('{}', { status: 404 });

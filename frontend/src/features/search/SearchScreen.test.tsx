@@ -11,7 +11,7 @@ import { SearchScreen } from './SearchScreen';
 
 const renderSearch = (initialEntry = '/search') => {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    if (String(input).includes('/api/portfolio/import') && init?.method === 'POST') return {
+    if (String(input).includes('/api/v1/portfolio/import') && init?.method === 'POST') return {
       ok: true,
       json: async () => ({ id: 'portfolio-import-1', firmId: 'f1', ownerUserId: 'search-user', markText: 'FORGE TEK', jurisdiction: 'US', niceClasses: [9, 42], status: 'Pending', filingDate: '2025-02-14', renewalDate: '2035-02-14', sourceRegistry: 'USPTO search import (mock)', mocked: true }),
     };
@@ -60,7 +60,7 @@ describe('SearchScreen', () => {
 
     await screen.findByRole('table', { name: /ranked by explicit risk/i });
     const requestUrl = new URL(String(fetchMock.mock.calls[0][0]), 'https://example.test');
-    expect(requestUrl.pathname).toBe('/api/search');
+    expect(requestUrl.pathname).toBe('/api/v1/search');
     expect(requestUrl.searchParams.get('mark')).toBe('FORGE');
     expect(requestUrl.searchParams.getAll('jurisdiction')).toEqual(['EU', 'US']);
     expect(requestUrl.searchParams.get('class')).toBe('9,35');
@@ -139,7 +139,7 @@ describe('SearchScreen', () => {
     await screen.findByRole('table', { name: /ranked by explicit risk/i });
     fireEvent.click(screen.getAllByRole('button', { name: 'Import to portfolio' })[0]);
     expect(await screen.findByText(/FORGE TEK was imported to the portfolio/i)).toBeVisible();
-    const request = fetchMock.mock.calls.find(([input]) => String(input).includes('/api/portfolio/import'));
+    const request = fetchMock.mock.calls.find(([input]) => String(input).includes('/api/v1/portfolio/import'));
     expect(JSON.parse(String(request?.[1]?.body))).toEqual({ searchResultId: '1' });
   }, 20_000);
 

@@ -21,7 +21,7 @@ export function PasswordResetRequestScreen() {
   const submit = async ({ email }: EmailValues) => {
     setSubmitError(null);
     try {
-      await authRequest('/api/auth/password-reset', {
+      await authRequest('/auth/password-reset', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }),
       });
       setSentTo(email);
@@ -73,14 +73,14 @@ export function PasswordUpdateScreen() {
 
   const validate = useCallback(async () => {
     setValidating(true); setValidationError(null);
-    try { await authRequest(`/api/auth/password-reset/${token ?? ''}`); }
+    try { await authRequest(`/auth/password-reset/${token ?? ''}`); }
     catch (error) { setValidationError(error instanceof AuthApiError ? error : new AuthApiError('UNKNOWN_ERROR', authErrorMessage(error))); }
     finally { setValidating(false); }
   }, [token]);
 
   useEffect(() => {
     let active = true;
-    void authRequest(`/api/auth/password-reset/${token ?? ''}`)
+    void authRequest(`/auth/password-reset/${token ?? ''}`)
       .catch((error) => {
         if (active) setValidationError(error instanceof AuthApiError ? error : new AuthApiError('UNKNOWN_ERROR', authErrorMessage(error)));
       })
@@ -92,7 +92,7 @@ export function PasswordUpdateScreen() {
   const updatePassword = async ({ password }: PasswordValues) => {
     setSubmitError(null);
     try {
-      await authRequest(`/api/auth/password-reset/${token ?? ''}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
+      await authRequest(`/auth/password-reset/${token ?? ''}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
       navigate('/auth/login', { replace: true, state: { reason: 'password-updated' } });
     } catch (error) { setSubmitError(authErrorMessage(error)); }
   };

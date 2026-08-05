@@ -30,7 +30,7 @@ export const MainLayout: React.FC = () => {
 
   const signOut = async () => {
     try {
-      await authRequest<void>('/api/auth/logout', { method: 'POST' });
+      await authRequest<void>('/auth/logout', { method: 'POST' });
     } catch {
       // Local logout must still succeed when server revocation is unavailable.
     } finally {

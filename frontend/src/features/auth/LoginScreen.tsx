@@ -57,7 +57,7 @@ export const LoginScreen: React.FC = () => {
     setErrorCode(null);
 
     try {
-      const session = await authRequest<LoginResponse>('/api/auth/login', {
+      const session = await authRequest<LoginResponse>('/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),

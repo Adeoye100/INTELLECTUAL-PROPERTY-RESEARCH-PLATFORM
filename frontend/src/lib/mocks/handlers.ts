@@ -296,7 +296,7 @@ const mockAlerts: Alert[] = [
 // ---------------------------------------------------------------------------
 // MOCK-ONLY: Matter fixtures — FE-12
 // These fixtures exist only for frontend development while the backend
-// /api/matters endpoint has not been implemented. They must not be used as
+// /api/v1/matters endpoint has not been implemented. They must not be used as
 // production data or presented as server-persisted state.
 // ---------------------------------------------------------------------------
 const mockMatters: Matter[] = [
@@ -337,7 +337,7 @@ const mockAuthError = (status: number, code: string, message: string) =>
   HttpResponse.json({ code, message, mocked: true }, { status });
 
 export const handlers = [
-  http.post('/api/auth/login', async ({ request }) => {
+  http.post('/api/v1/auth/login', async ({ request }) => {
     const body = await request.json() as { email?: string };
     const email = body.email?.toLowerCase() ?? '';
     if (email.startsWith('retry') && failFirstMockAttempt(`login:${email}`)) return HttpResponse.error();
@@ -365,12 +365,12 @@ export const handlers = [
     });
   }),
 
-  http.post('/api/auth/logout', async () => {
+  http.post('/api/v1/auth/logout', async () => {
     await delay(150);
     return new HttpResponse(null, { status: 204 });
   }),
 
-  http.post('/api/auth/signup', async ({ request }) => {
+  http.post('/api/v1/auth/signup', async ({ request }) => {
     const body = await request.json() as { email?: string };
     const email = body.email?.toLowerCase() ?? '';
     if (email.startsWith('existing')) return mockAuthError(409, 'DUPLICATE_ACCOUNT', 'An account already exists.');
@@ -379,7 +379,7 @@ export const handlers = [
     return HttpResponse.json({ accepted: true, verificationRequired: true, mocked: true }, { status: 202 });
   }),
 
-  http.get('/api/auth/invitations/:token', async ({ params }) => {
+  http.get('/api/v1/auth/invitations/:token', async ({ params }) => {
     const token = String(params.token);
     if (token === 'network-retry' && failFirstMockAttempt('invite:network-retry')) return HttpResponse.error();
     if (token === 'network') return HttpResponse.error();
@@ -396,7 +396,7 @@ export const handlers = [
     });
   }),
 
-  http.post('/api/auth/invitations/:token/accept', async ({ params, request }) => {
+  http.post('/api/v1/auth/invitations/:token/accept', async ({ params, request }) => {
     const token = String(params.token);
     const body = await request.json() as { fullName?: string };
     if (token === 'expired') return mockAuthError(410, 'EXPIRED_LINK', 'The invitation expired before acceptance.');
@@ -418,27 +418,27 @@ export const handlers = [
     });
   }),
 
-  http.post('/api/auth/password-reset', async ({ request }) => {
+  http.post('/api/v1/auth/password-reset', async ({ request }) => {
     const body = await request.json() as { email?: string };
     if (body.email?.startsWith('network')) return HttpResponse.error();
     await delay(300);
     return HttpResponse.json({ accepted: true, mocked: true }, { status: 202 });
   }),
 
-  http.get('/api/auth/password-reset/:token', async ({ params }) => {
+  http.get('/api/v1/auth/password-reset/:token', async ({ params }) => {
     const token = String(params.token);
     if (token === 'expired') return mockAuthError(410, 'EXPIRED_LINK', 'The reset link has expired.');
     if (token === 'network') return HttpResponse.error();
     return HttpResponse.json({ valid: true, mocked: true });
   }),
 
-  http.post('/api/auth/password-reset/:token', async ({ params }) => {
+  http.post('/api/v1/auth/password-reset/:token', async ({ params }) => {
     if (String(params.token) === 'expired') return mockAuthError(410, 'EXPIRED_LINK', 'The reset link has expired.');
     await delay(300);
     return new HttpResponse(null, { status: 204 });
   }),
 
-  http.get('/api/auth/verify-email/:token', async ({ params }) => {
+  http.get('/api/v1/auth/verify-email/:token', async ({ params }) => {
     const token = String(params.token);
     if (token === 'expired') return mockAuthError(410, 'EXPIRED_LINK', 'The verification link has expired.');
     if (token === 'network') return HttpResponse.error();
@@ -446,12 +446,12 @@ export const handlers = [
     return HttpResponse.json({ verified: true, mocked: true });
   }),
 
-  http.post('/api/auth/verify-email/resend', async () => {
+  http.post('/api/v1/auth/verify-email/resend', async () => {
     await delay(250);
     return HttpResponse.json({ accepted: true, mocked: true }, { status: 202 });
   }),
 
-  http.get('/api/search', async ({ request }) => {
+  http.get('/api/v1/search', async ({ request }) => {
     const url = new URL(request.url);
     const resultId = url.searchParams.get('resultId');
     const mark = url.searchParams.get('mark')?.toLowerCase() ?? '';
@@ -518,7 +518,7 @@ export const handlers = [
 
   // MOCK dashboard lifecycle scenarios. Append ?scenario=empty|partial|error
   // while exercising frontend states; replace with an authenticated aggregate API.
-  http.get('/api/dashboard/summary', async ({ request }) => {
+  http.get('/api/v1/dashboard/summary', async ({ request }) => {
     const scenario = new URL(request.url).searchParams.get('scenario');
     await delay(500);
     if (scenario === 'error') return HttpResponse.json({ message: 'Mock dashboard failure' }, { status: 503 });
@@ -541,34 +541,34 @@ export const handlers = [
     return HttpResponse.json(mockDashboardSummary);
   }),
 
-  http.get('/api/portfolio', async () => {
+  http.get('/api/v1/portfolio', async () => {
     await delay(500);
     return HttpResponse.json(mockPortfolioMarks, { headers: { 'X-Mock-Response': 'true' } });
   }),
 
   // MOCK FE-14 detail and document endpoints. Real object storage download
   // authorization and portfolio tenancy checks remain backend-blocked.
-  http.get('/api/portfolio/:markId', async ({ params }) => {
+  http.get('/api/v1/portfolio/:markId', async ({ params }) => {
     await delay(300);
     const detail = mockPortfolioDetails[String(params.markId)];
     if (!detail) return HttpResponse.json({ message: 'Mark not found', mocked: true }, { status: 404, headers: { 'X-Mock-Response': 'true' } });
     return HttpResponse.json(detail, { headers: { 'X-Mock-Response': 'true' } });
   }),
 
-  http.get('/api/portfolio/:markId/attachments', async ({ params }) => {
+  http.get('/api/v1/portfolio/:markId/attachments', async ({ params }) => {
     await delay(350);
     const markId = String(params.markId);
     if (markId === 'p3') return HttpResponse.json({ message: 'Mock document storage unavailable', mocked: true }, { status: 503, headers: { 'X-Mock-Response': 'true' } });
     return HttpResponse.json(mockAttachments[markId] ?? [], { headers: { 'X-Mock-Response': 'true' } });
   }),
 
-  http.get('/api/portfolio/:markId/attachments/:attachmentId/download', async ({ params }) => {
+  http.get('/api/v1/portfolio/:markId/attachments/:attachmentId/download', async ({ params }) => {
     await delay(250);
     if (String(params.attachmentId) === 'attachment-failed') return HttpResponse.json({ message: 'Mock download failure', mocked: true }, { status: 503, headers: { 'X-Mock-Response': 'true' } });
     return HttpResponse.json({ downloadUrl: 'data:application/pdf;base64,JVBERi0xLjQKJSBtb2NrIHBvcnRmb2xpbyBhdHRhY2htZW50Cg==', fileName: 'registration-certificate.pdf', mocked: true }, { headers: { 'X-Mock-Response': 'true' } });
   }),
 
-  http.post('/api/portfolio', async ({ request }) => {
+  http.post('/api/v1/portfolio', async ({ request }) => {
     const body = await request.json() as {
       markText: string;
       jurisdiction: string;
@@ -591,7 +591,7 @@ export const handlers = [
     }, { status: 201, headers: { 'X-Mock-Response': 'true' } });
   }),
 
-  http.post('/api/portfolio/import', async ({ request }) => {
+  http.post('/api/v1/portfolio/import', async ({ request }) => {
     const body = await request.json() as { searchResultId?: string };
     const result = mockSearchResults.find(({ id }) => id === body.searchResultId);
     if (!result) return HttpResponse.json({ message: 'Search result not found', mocked: true }, { status: 404, headers: { 'X-Mock-Response': 'true' } });
@@ -607,7 +607,7 @@ export const handlers = [
     return HttpResponse.json(created, { status: 201, headers: { 'X-Mock-Response': 'true' } });
   }),
 
-  http.post('/api/portfolio/:markId/watch', async ({ params, request }) => {
+  http.post('/api/v1/portfolio/:markId/watch', async ({ params, request }) => {
     const mark = mockPortfolioMarks.find(({ id }) => id === String(params.markId));
     if (!mark) return HttpResponse.json({ message: 'Mark not found', mocked: true }, { status: 404, headers: { 'X-Mock-Response': 'true' } });
     const body = await request.json() as Omit<WatchUpsertRequest, 'portfolioMarkId'>;
@@ -618,14 +618,14 @@ export const handlers = [
     return HttpResponse.json(created, { status: 201, headers: { 'X-Mock-Response': 'true' } });
   }),
 
-  http.get('/api/watches', async () => {
+  http.get('/api/v1/watches', async () => {
     await delay(600);
     return HttpResponse.json(mockWatches, { headers: { 'X-Mock-Response': 'true' } });
   }),
 
   // MOCK FE-15 watch mutations. Server-side tenant/role authorization and
   // registry scheduling remain required; SMS is deliberately rejected.
-  http.post('/api/watches', async ({ request }) => {
+  http.post('/api/v1/watches', async ({ request }) => {
     const body = await request.json() as WatchUpsertRequest;
     if (!['email', 'in-app'].includes(body.alertChannel) || !['real-time', 'digest'].includes(body.alertMode) || !body.portfolioMarkId) return HttpResponse.json({ message: 'Invalid mock watch configuration', mocked: true }, { status: 422, headers: { 'X-Mock-Response': 'true' } });
     const mark = mockPortfolioMarks.find(({ id }) => id === body.portfolioMarkId);
@@ -635,7 +635,7 @@ export const handlers = [
     return HttpResponse.json(created, { status: 201, headers: { 'X-Mock-Response': 'true' } });
   }),
 
-  http.patch('/api/watches/:watchId', async ({ params, request }) => {
+  http.patch('/api/v1/watches/:watchId', async ({ params, request }) => {
     const index = mockWatches.findIndex(({ id }) => id === String(params.watchId));
     if (index < 0) return HttpResponse.json({ message: 'Watch not found', mocked: true }, { status: 404, headers: { 'X-Mock-Response': 'true' } });
     const body = await request.json() as WatchUpsertRequest;
@@ -644,7 +644,7 @@ export const handlers = [
     return HttpResponse.json(mockWatches[index], { headers: { 'X-Mock-Response': 'true' } });
   }),
 
-  http.get('/api/alerts', async ({ request }) => {
+  http.get('/api/v1/alerts', async ({ request }) => {
     await delay(700);
     const params = new URL(request.url).searchParams;
     const readState = params.get('read');
@@ -664,7 +664,7 @@ export const handlers = [
     return HttpResponse.json(filtered, { headers: { 'X-Mock-Response': 'true' } });
   }),
 
-  http.patch('/api/alerts/:alertId', async ({ params, request }) => {
+  http.patch('/api/v1/alerts/:alertId', async ({ params, request }) => {
     const index = mockAlerts.findIndex(({ id }) => id === String(params.alertId));
     if (index < 0) return HttpResponse.json({ message: 'Alert not found', mocked: true }, { status: 404, headers: { 'X-Mock-Response': 'true' } });
     const body = await request.json() as { read?: boolean };
@@ -672,7 +672,7 @@ export const handlers = [
     return HttpResponse.json(mockAlerts[index], { headers: { 'X-Mock-Response': 'true' } });
   }),
 
-  http.get('/api/office-actions/search', async ({ request }) => {
+  http.get('/api/v1/office-actions/search', async ({ request }) => {
     const url = new URL(request.url);
     const markText = url.searchParams.get('markText') || '';
     const niceClass = url.searchParams.get('niceClass') || '';
@@ -698,7 +698,7 @@ export const handlers = [
     return HttpResponse.json(filteredResults);
   }),
 
-  http.post('/api/office-actions/link', async ({ request }) => {
+  http.post('/api/v1/office-actions/link', async ({ request }) => {
     const body = await request.json() as {
       officeActionId: string;
       portfolioMarkId: string;
@@ -716,16 +716,16 @@ export const handlers = [
 
   // ---------------------------------------------------------------------------
   // MOCK-ONLY: Matter endpoints — FE-12
-  // Replace with real API calls once the backend /api/matters endpoint ships.
+  // Replace with real API calls once the backend /api/v1/matters endpoint ships.
   // These handlers return mocked: true to make the mock-only state explicit.
   // ---------------------------------------------------------------------------
 
-  http.get('/api/matters', async () => {
+  http.get('/api/v1/matters', async () => {
     await delay(400);
     return HttpResponse.json<Matter[]>(mockMatters);
   }),
 
-  http.post('/api/matters', async ({ request }) => {
+  http.post('/api/v1/matters', async ({ request }) => {
     const body = await request.json() as { name: string; clientRef?: string };
     if (!body.name?.trim()) {
       return HttpResponse.json({ message: 'name is required' }, { status: 422 });
@@ -742,7 +742,7 @@ export const handlers = [
     return HttpResponse.json<Matter & { mocked: true }>({ ...newMatter, mocked: true }, { status: 201 });
   }),
 
-  http.post('/api/matters/:matterId/risk-results', async ({ params, request }) => {
+  http.post('/api/v1/matters/:matterId/risk-results', async ({ params, request }) => {
     const matterId = String(params.matterId);
     const body = await request.json() as MatterSaveRequest;
 
@@ -761,7 +761,7 @@ export const handlers = [
   }),
 
   // TEMPORARY FE-17 FALLBACK: remove once authenticated server-generated PDF endpoint is available.
-  http.post('/api/reports/pdf', async ({ request }) => {
+  http.post('/api/v1/reports/pdf', async ({ request }) => {
     const body = await request.json() as {
       reportType?: 'search-results' | 'risk-detail' | 'portfolio-summary';
       context?: { screen?: string };
@@ -778,10 +778,12 @@ export const handlers = [
 
     await delay(600);
     const fileName = `forge-${body.reportType}-${new Date().toISOString().slice(0, 10)}.pdf`;
-    return HttpResponse.json({
-      fileName,
-      downloadUrl: 'data:application/pdf;base64,JVBERi0xLjQKJUVPRgo=',
-      mocked: true,
+    return new HttpResponse('%PDF-1.4\n% mock PDF fixture\n%%EOF', {
+      headers: {
+        'Content-Disposition': `attachment; filename="${fileName}"`,
+        'Content-Type': 'application/pdf',
+        'X-Mock-Response': 'true',
+      },
     });
   }),
 ];

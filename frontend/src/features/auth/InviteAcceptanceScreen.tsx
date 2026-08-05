@@ -52,7 +52,7 @@ export function InviteAcceptanceScreen() {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const details = await authRequest<InvitationDetails>(`/api/auth/invitations/${token ?? ''}`);
+      const details = await authRequest<InvitationDetails>(`/auth/invitations/${token ?? ''}`);
       setInvitation(details);
     } catch (error) {
       setLoadError(error instanceof AuthApiError ? error : new AuthApiError('UNKNOWN_ERROR', authErrorMessage(error)));
@@ -63,7 +63,7 @@ export function InviteAcceptanceScreen() {
 
   useEffect(() => {
     let active = true;
-    void authRequest<InvitationDetails>(`/api/auth/invitations/${token ?? ''}`)
+    void authRequest<InvitationDetails>(`/auth/invitations/${token ?? ''}`)
       .then((details) => { if (active) setInvitation(details); })
       .catch((error) => {
         if (active) setLoadError(error instanceof AuthApiError ? error : new AuthApiError('UNKNOWN_ERROR', authErrorMessage(error)));
@@ -78,7 +78,7 @@ export function InviteAcceptanceScreen() {
   const acceptInvitation = async (values: AcceptanceValues) => {
     setSubmitError(null);
     try {
-      const session = await authRequest<InvitationSession>(`/api/auth/invitations/${token ?? ''}/accept`, {
+      const session = await authRequest<InvitationSession>(`/auth/invitations/${token ?? ''}/accept`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fullName: values.fullName, password: values.password }),

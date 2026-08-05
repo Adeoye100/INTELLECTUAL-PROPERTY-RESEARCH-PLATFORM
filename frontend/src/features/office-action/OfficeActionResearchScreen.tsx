@@ -8,6 +8,8 @@ import { Card } from '../../components/Card';
 import { Table, TableRow, TableCell } from '../../components/Table';
 import { Modal } from '../../components/Modal';
 import type { OfficeActionRef, PortfolioMark } from '../../types';
+import { listPortfolioMarks } from '../portfolio/portfolioApi';
+import { linkOfficeAction, searchOfficeActions } from './officeActionApi';
 
 interface SearchFilters {
   markText: string;
@@ -32,26 +34,14 @@ export const OfficeActionResearchScreen: React.FC = () => {
   // Search office actions
   const { data: officeActions, isLoading, isError } = useQuery<OfficeActionRef[]>({
     queryKey: ['office-actions', markText, niceClass],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (markText) params.append('markText', markText);
-      if (niceClass) params.append('niceClass', niceClass);
-      
-      const response = await fetch(`/api/office-actions/search?${params}`);
-      if (!response.ok) throw new Error('Search failed');
-      return response.json();
-    },
+    queryFn: () => searchOfficeActions({ markText, niceClass }),
     enabled: markText.length > 0 || niceClass.length > 0,
   });
 
   // Get portfolio marks for linking
   const { data: portfolioMarks } = useQuery<PortfolioMark[]>({
     queryKey: ['portfolio'],
-    queryFn: async () => {
-      const response = await fetch('/api/portfolio');
-      if (!response.ok) throw new Error('Failed to fetch portfolio marks');
-      return response.json();
-    },
+    queryFn: listPortfolioMarks,
   });
 
   const onSubmit = (data: SearchFilters) => {
@@ -67,21 +57,10 @@ export const OfficeActionResearchScreen: React.FC = () => {
     if (!selectedOfficeAction) return;
 
     try {
-      const response = await fetch('/api/office-actions/link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          officeActionId: selectedOfficeAction.id,
-          portfolioMarkId,
-        }),
-      });
-
-      if (response.ok) {
-        setIsLinkModalOpen(false);
-        setSelectedOfficeAction(null);
-        // In a real app, we'd refetch the data here
-        alert('Office action successfully linked to portfolio mark!');
-      }
+      await linkOfficeAction(selectedOfficeAction.id, portfolioMarkId);
+      setIsLinkModalOpen(false);
+      setSelectedOfficeAction(null);
+      alert('Office action successfully linked to portfolio mark!');
     } catch (error) {
       console.error('Failed to link office action:', error);
       alert('Failed to link office action. Please try again.');
