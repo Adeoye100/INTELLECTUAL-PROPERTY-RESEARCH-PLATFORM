@@ -2,5 +2,9 @@
 /conversation/
 /.idea/
 
+# Backend dependencies and generated reports
+/backend/node_modules/
+/backend/coverage/
+
 # Local environment configuration
 .env

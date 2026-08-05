@@ -1,0 +1,89 @@
+name: Backend quality
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-quality.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-quality.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Syntax, unit, and real-store integration tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: iprp_test
+          POSTGRES_USER: iprp
+          POSTGRES_PASSWORD: iprp-test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U iprp -d iprp_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql://iprp:iprp-test@127.0.0.1:5432/iprp_test
+      TEST_DATABASE_URL: postgresql://iprp:iprp-test@127.0.0.1:5432/iprp_test
+      REDIS_URL: redis://127.0.0.1:6379/0
+      TEST_REDIS_URL: redis://127.0.0.1:6379/15
+      JWT_ACCESS_SECRET: ci-only-secret-that-is-at-least-32-bytes
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: backend/pnpm-lock.yaml
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check JavaScript syntax
+        run: pnpm check
+
+      - name: Run migrations
+        run: pnpm migrate
+
+      - name: Run unit and real-store integration tests
+        run: pnpm test
+
+      - name: Report failure
+        if: failure()
+        run: |
+          echo '### Backend quality gate failed' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Inspect the failed syntax, migration, or test step above.' >> "$GITHUB_STEP_SUMMARY"

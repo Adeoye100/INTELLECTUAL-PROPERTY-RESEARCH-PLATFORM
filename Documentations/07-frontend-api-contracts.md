@@ -2,9 +2,17 @@
 
 ## Status and evidence
 
-Inspected on 2026-08-05. The repository's `backend/` directory contains only `package.json`. It has no application entry point, Express app, routes, controllers, tests, or generated API specification. Therefore **no live endpoint is verified and no staging integration is claimed**.
+Originally inspected on 2026-08-05 when `backend/` contained only `package.json`.
+BE-03/BE-04/BE-05 now add an Express auth implementation, raw PostgreSQL
+migration, Redis-backed refresh sessions, RBAC middleware, and real-store
+integration tests. This is repository implementation evidence only: no staging
+deployment is claimed, and the auth response contract still needs reconciliation
+with the frontend before FE-21 can call it live.
 
-The paths below are the existing frontend/MSW contract candidates, now consistently rooted at the documented `/api/v1` base path from `02-technical-requirements-document.md`. They are not evidence that a backend route exists. MSW fixtures are isolated-development aids and return mock data only.
+The paths below are the existing frontend/MSW contract candidates, consistently
+rooted at the documented `/api/v1` base path. Unless an entry explicitly records
+the BE-03/BE-04 implementation, the path is not evidence that a backend route
+exists. MSW fixtures remain isolated-development aids and return mock data only.
 
 ## Transport contract required from the backend
 
@@ -19,13 +27,17 @@ The paths below are the existing frontend/MSW contract candidates, now consisten
 
 ## Candidate endpoint contracts used by the frontend
 
-All entries in this section are **blocked/mock-only**, not verified live integrations.
+All entries remain **blocked from frontend live integration** until their shapes
+are reconciled. The four BE-04 auth routes are implemented and real-store tested
+locally, but their current response/refresh transport differs from the earlier
+frontend mock contract and has not been deployed to staging.
 
 | Candidate route | Request shape | Expected response shape | Intended role rule | Unresolved backend contract |
 |---|---|---|---|---|
-| `POST /api/v1/auth/login` | `{ email: string, password: string }` | `{ token: string, expiresAt: number, user: AuthenticatedUser }` | Public | Refresh token transport, MFA, lockout/rate limits, absolute vs relative expiry, error codes |
-| `POST /api/v1/auth/logout` | Empty; bearer token when present | `204` | Authenticated | Refresh-token revocation, all-device logout, CSRF/cookie behavior |
-| `POST /api/v1/auth/signup` | `{ fullName, email, password, company? }` as sent by the sign-up form | `202 { accepted: true, verificationRequired: true }` | Public/self-serve only if product enables it | Whether self-serve is permitted, firm creation, anti-enumeration behavior |
+| `POST /api/v1/auth/login` | Implemented: `{ email, password }` | Implemented: `{ accessToken, refreshToken, tokenType, expiresIn, refreshExpiresIn, user, firm }` | Public | Frontend currently expects `{ token, expiresAt, user }`; cookie policy, MFA, and BE-15 remain unresolved |
+| `POST /api/v1/auth/refresh` | Implemented: `{ refreshToken }` | Implemented: rotated access/refresh pair plus `user` | Holder of valid Redis-backed refresh session | Frontend refresh orchestration and JSON body vs HttpOnly cookie/CSRF policy |
+| `POST /api/v1/auth/logout` | Implemented: `{ refreshToken }` | `204` | Holder of refresh session | Frontend currently sends an empty body; all-device logout and cookie/CSRF policy |
+| `POST /api/v1/auth/signup` | Implemented: `{ firmName?: string, company?: string, email, password }`; frontend also sends unstored `fullName` | Implemented: `201` access/refresh pair plus `user` and `firm` | Public self-serve; first firm user Admin, later normalized-name matches Viewer | Frontend currently expects verification-required `202`; existing-firm admission needs invite/email verification before production |
 | `GET /api/v1/auth/invitations/:token` | Invitation token in path | `{ email, firmName, role, mocked? }` | Public holder of single-use token | Token format/expiry, disclosure rules, accepted/revoked states |
 | `POST /api/v1/auth/invitations/:token/accept` | `{ fullName, password }` | Session shape plus `mocked?` | Public holder of valid token | Atomic seat allocation, password policy, existing-account handling |
 | `POST /api/v1/auth/password-reset` | `{ email }` | `202 { accepted: true }` | Public | Anti-enumeration wording, throttling, delivery guarantees |
@@ -62,7 +74,7 @@ The product documents require these capabilities, but selecting HTTP methods or 
 
 | Capability | Required request/response decisions | Role rule |
 |---|---|---|
-| Session refresh and session inventory/revocation | Refresh token transport, rotation result, expiry, replay response, device/session model | Current user; Admin scope for firm-wide revocation is unresolved |
+| Session inventory and bulk/device revocation | Device/session model, inventory fields, current-session vs all-device revocation | Current user; Admin scope for firm-wide revocation is unresolved |
 | Authoritative onboarding status | Per-user completion flags derived from stored searches/portfolio records, update/reconciliation rules | Authenticated current user |
 | Firm member list | Pagination and user/seat/role status fields | Admin only |
 | Invite, revoke invitation, remove seat, change role | Target identifiers, allowed transitions, seat-limit conflicts, audit metadata | Admin only (invite is explicitly Admin-only in app flow) |
