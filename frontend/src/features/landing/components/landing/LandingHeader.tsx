@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 export function LandingHeader() {
   return (
-    <header className="fixed top-0 inset-x-0 z-30 flex items-center justify-between px-6 md:px-10 py-5">
+    <header className="fixed top-0 inset-x-0 z-30 flex items-center justify-between bg-forge-navy-950/90 px-6 py-3 backdrop-blur-sm md:px-10">
       <Link to="/" className="flex items-center gap-2.5">
         <img src="/logo.png" alt="Forge Global logo" className="h-16 w-auto object-contain" />
         <span className="font-semibold tracking-[0.18em] text-forge-text-onDark text-sm uppercase">

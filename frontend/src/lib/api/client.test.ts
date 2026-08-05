@@ -87,9 +87,9 @@ describe('ApiClient', () => {
       })),
     });
 
-    const request = client.requestJson('/slow');
+    const assertion = expect(client.requestJson('/slow')).rejects.toMatchObject({ code: 'TIMEOUT' });
     await vi.advanceTimersByTimeAsync(50);
-    await expect(request).rejects.toMatchObject({ code: 'TIMEOUT' });
+    await assertion;
     vi.useRealTimers();
   });
 });

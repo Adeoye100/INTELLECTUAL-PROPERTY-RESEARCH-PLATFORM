@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -13,15 +14,19 @@ const alerts: Alert[] = [
   { id: 'older', watchId: 'w1', matchedFilingRef: 'EU1', riskScoreId: 'r2', riskResultId: '2', read: true, createdAt: '2026-08-01T22:00:00Z', matchedMarkText: 'FORTRESS', protectedMarkText: 'FORGE GLOBAL', severity: 'medium', source: 'EUIPO', supportingEvidence: ['Visual match'] },
   { id: 'newest', watchId: 'w1', matchedFilingRef: 'US1', riskScoreId: 'r1', riskResultId: '1', read: false, createdAt: '2026-08-04T08:00:00Z', matchedMarkText: 'FORGE LABS', protectedMarkText: 'FORGE GLOBAL', severity: 'high', source: 'USPTO', supportingEvidence: ['Phonetic match'] },
 ];
+const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
+  status,
+  headers: { 'Content-Type': 'application/json' },
+});
 
 const renderWatches = () => {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    if (url.includes('/api/v1/alerts') && !init?.method) return new Response(JSON.stringify(alerts), { status: 200 });
-    if (url.endsWith('/api/v1/watches') && !init?.method) return new Response(JSON.stringify(watches), { status: 200 });
-    if (url.endsWith('/api/v1/portfolio')) return new Response(JSON.stringify([mark]), { status: 200 });
-    if (url.endsWith('/api/v1/watches') && init?.method === 'POST') return new Response(JSON.stringify({ id: 'w-new', userId: 'u1', markText: mark.markText, jurisdiction: mark.jurisdiction, mocked: true, ...JSON.parse(String(init.body)) }), { status: 201 });
-    return new Response('{}', { status: 500 });
+    if (url.includes('/api/v1/alerts') && init?.method === 'GET') return jsonResponse(alerts);
+    if (url.endsWith('/api/v1/watches') && init?.method === 'GET') return jsonResponse(watches);
+    if (url.endsWith('/api/v1/portfolio')) return jsonResponse([mark]);
+    if (url.endsWith('/api/v1/watches') && init?.method === 'POST') return jsonResponse({ id: 'w-new', userId: 'u1', markText: mark.markText, jurisdiction: mark.jurisdiction, mocked: true, ...JSON.parse(String(init.body)) }, 201);
+    return jsonResponse({}, 500);
   });
   vi.stubGlobal('fetch', fetchMock);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -61,5 +66,19 @@ describe('WatchesScreen', () => {
     expect(await screen.findByText(/FORGE GLOBAL watch created/i)).toBeVisible();
     const request = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST');
     expect(JSON.parse(String(request?.[1]?.body))).toEqual({ portfolioMarkId: 'p1', alertChannel: 'in-app', alertMode: 'digest', active: true });
+  }, 20_000);
+
+  it('supports keyboard watch creation', async () => {
+    const user = userEvent.setup();
+    renderWatches();
+    const open = screen.getByRole('button', { name: 'Create new watch' });
+    open.focus();
+    await user.keyboard('{Enter}');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Portfolio mark' }), 'p1');
+    const create = screen.getByRole('button', { name: 'Create watch' });
+    create.focus();
+    expect(create).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(await screen.findByText(/FORGE GLOBAL watch created/i)).toBeVisible();
   }, 20_000);
 });

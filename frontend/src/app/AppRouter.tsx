@@ -1,80 +1,70 @@
-import React from 'react';
+import { Suspense, type ComponentType } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { AuthLayout } from './AuthLayout';
 import { MainLayout } from './MainLayout';
-import { LoginScreen } from '../features/auth/LoginScreen';
-import { SignupScreen } from '../features/auth/SignupScreen';
-import { SearchScreen } from '../features/search/SearchScreen';
-import { RiskDetailScreen } from '../features/search/RiskDetailScreen';
-import { OfficeActionResearchScreen } from '../features/office-action/OfficeActionResearchScreen';
-import { PortfolioScreen } from '../features/portfolio/PortfolioScreen';
-import { PortfolioDetailScreen } from '../features/portfolio/PortfolioDetailScreen';
-import { WatchesScreen } from '../features/watches/WatchesScreen';
-import { DashboardScreen } from '../features/dashboard/DashboardScreen';
-import { AdminScreen } from '../features/billing/AdminScreen';
+import { RouteErrorScreen, RouteLoading } from './RouteFeedback';
+import { RequireAdmin, RequireAuthentication, RequireRole, RoleHomeRedirect } from '../features/auth/RouteGuards';
 
-import { LandingPage } from '../features/landing/pages/LandingPage';
-import { RequireAdmin, RequireAuthentication } from '../features/auth/RouteGuards';
-import { RequireRole, RoleHomeRedirect } from '../features/auth/RouteGuards';
-import { InviteAcceptanceScreen } from '../features/auth/InviteAcceptanceScreen';
-import { PasswordResetRequestScreen, PasswordUpdateScreen } from '../features/auth/PasswordResetScreens';
-import { EmailVerificationScreen } from '../features/auth/EmailVerificationScreen';
-import { PermissionDeniedScreen } from '../features/auth/PermissionDeniedScreen';
+type RouteModule = Record<string, ComponentType>;
+
+function lazyComponent(loader: () => Promise<RouteModule>, exportName: string) {
+  return async () => {
+    const module = await loader();
+    return { Component: module[exportName] };
+  };
+}
 
 const router = createBrowserRouter([
   {
     path: '/',
-    element: <LandingPage />,
+    errorElement: <RouteErrorScreen />,
+    lazy: lazyComponent(() => import('../features/landing/pages/LandingPage'), 'LandingPage'),
   },
   {
     path: '/auth',
     element: <AuthLayout />,
+    errorElement: <RouteErrorScreen />,
     children: [
-      { path: 'login', element: <LoginScreen /> },
-      { path: 'signup', element: <SignupScreen /> },
-      { path: 'invite/:token', element: <InviteAcceptanceScreen /> },
-      { path: 'forgot-password', element: <PasswordResetRequestScreen /> },
-      { path: 'reset-password/:token', element: <PasswordUpdateScreen /> },
-      { path: 'verify-email', element: <EmailVerificationScreen /> },
-      { path: 'verify-email/:token', element: <EmailVerificationScreen /> },
+      { path: 'login', lazy: lazyComponent(() => import('../features/auth/LoginScreen'), 'LoginScreen') },
+      { path: 'signup', lazy: lazyComponent(() => import('../features/auth/SignupScreen'), 'SignupScreen') },
+      { path: 'invite/:token', lazy: lazyComponent(() => import('../features/auth/InviteAcceptanceScreen'), 'InviteAcceptanceScreen') },
+      { path: 'forgot-password', lazy: lazyComponent(() => import('../features/auth/PasswordResetScreens'), 'PasswordResetRequestScreen') },
+      { path: 'reset-password/:token', lazy: lazyComponent(() => import('../features/auth/PasswordResetScreens'), 'PasswordUpdateScreen') },
+      { path: 'verify-email', lazy: lazyComponent(() => import('../features/auth/EmailVerificationScreen'), 'EmailVerificationScreen') },
+      { path: 'verify-email/:token', lazy: lazyComponent(() => import('../features/auth/EmailVerificationScreen'), 'EmailVerificationScreen') },
     ],
   },
   {
     path: '/',
-    element: (
-      <RequireAuthentication>
-        <MainLayout />
-      </RequireAuthentication>
-    ),
+    element: <RequireAuthentication><MainLayout /></RequireAuthentication>,
+    errorElement: <RouteErrorScreen />,
     children: [
-      { path: 'dashboard', element: <DashboardScreen /> },
+      { path: 'dashboard', lazy: lazyComponent(() => import('../features/dashboard/DashboardScreen'), 'DashboardScreen') },
       { path: 'app', element: <RoleHomeRedirect /> },
-      { path: 'search', element: <SearchScreen /> },
-      { path: 'search/risk/:id', element: <RiskDetailScreen /> },
+      { path: 'search', lazy: lazyComponent(() => import('../features/search/SearchScreen'), 'SearchScreen') },
+      { path: 'search/risk/:id', lazy: lazyComponent(() => import('../features/search/RiskDetailScreen'), 'RiskDetailScreen') },
       {
         path: 'office-actions',
-        element: (
-          <RequireRole allowedRoles={['admin', 'attorney']}>
-            <OfficeActionResearchScreen />
-          </RequireRole>
-        ),
+        lazy: async () => {
+          const { OfficeActionResearchScreen } = await import('../features/office-action/OfficeActionResearchScreen');
+          return { Component: () => <RequireRole allowedRoles={['admin', 'attorney']}><OfficeActionResearchScreen /></RequireRole> };
+        },
       },
-      { path: 'portfolio', element: <PortfolioScreen /> },
-      { path: 'portfolio/:markId', element: <PortfolioDetailScreen /> },
-      { path: 'watches', element: <WatchesScreen /> },
-      { path: 'permission-denied', element: <PermissionDeniedScreen /> },
+      { path: 'portfolio', lazy: lazyComponent(() => import('../features/portfolio/PortfolioScreen'), 'PortfolioScreen') },
+      { path: 'portfolio/:markId', lazy: lazyComponent(() => import('../features/portfolio/PortfolioDetailScreen'), 'PortfolioDetailScreen') },
+      { path: 'watches', lazy: lazyComponent(() => import('../features/watches/WatchesScreen'), 'WatchesScreen') },
+      { path: 'permission-denied', lazy: lazyComponent(() => import('../features/auth/PermissionDeniedScreen'), 'PermissionDeniedScreen') },
       {
         path: 'admin',
-        element: (
-          <RequireAdmin>
-            <AdminScreen />
-          </RequireAdmin>
-        ),
+        lazy: async () => {
+          const { AdminScreen } = await import('../features/billing/AdminScreen');
+          return { Component: () => <RequireAdmin><AdminScreen /></RequireAdmin> };
+        },
       },
     ],
   },
 ]);
 
-export const AppRouter: React.FC = () => {
-  return <RouterProvider router={router} />;
-};
+export function AppRouter() {
+  return <Suspense fallback={<RouteLoading />}><RouterProvider router={router} /></Suspense>;
+}

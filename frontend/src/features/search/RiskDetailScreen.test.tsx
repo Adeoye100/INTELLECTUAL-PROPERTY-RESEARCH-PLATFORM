@@ -126,7 +126,10 @@ const renderScreen = ({
   if (fetchResponse !== undefined) {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({ ok: true, json: async () => fetchResponse }),
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(fetchResponse), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })),
     );
   }
 

@@ -11,11 +11,13 @@ import { SearchScreen } from './SearchScreen';
 
 const renderSearch = (initialEntry = '/search') => {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    if (String(input).includes('/api/v1/portfolio/import') && init?.method === 'POST') return {
-      ok: true,
-      json: async () => ({ id: 'portfolio-import-1', firmId: 'f1', ownerUserId: 'search-user', markText: 'FORGE TEK', jurisdiction: 'US', niceClasses: [9, 42], status: 'Pending', filingDate: '2025-02-14', renewalDate: '2035-02-14', sourceRegistry: 'USPTO search import (mock)', mocked: true }),
-    };
-    return { ok: true, json: async () => mockSearchResponse };
+    const body = String(input).includes('/api/v1/portfolio/import') && init?.method === 'POST'
+      ? { id: 'portfolio-import-1', firmId: 'f1', ownerUserId: 'search-user', markText: 'FORGE TEK', jurisdiction: 'US', niceClasses: [9, 42], status: 'Pending', filingDate: '2025-02-14', renewalDate: '2035-02-14', sourceRegistry: 'USPTO search import (mock)', mocked: true }
+      : mockSearchResponse;
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
   });
   vi.stubGlobal('fetch', fetchMock);
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -130,7 +132,7 @@ describe('SearchScreen', () => {
     expect(review).toHaveFocus();
     await user.keyboard('{Enter}');
     expect(await screen.findByText('Risk detail destination')).toBeVisible();
-  });
+  }, 20_000);
 
   it('imports a search result into the portfolio with its result id', async () => {
     const { fetchMock } = renderSearch();

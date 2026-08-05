@@ -1,5 +1,22 @@
 import React, { useEffect, useRef } from 'react';
-import * as THREE from 'three';
+import {
+  ACESFilmicToneMapping,
+  AmbientLight,
+  Clock,
+  Color,
+  DirectionalLight,
+  Group,
+  MathUtils,
+  Mesh,
+  MeshStandardMaterial,
+  PerspectiveCamera,
+  PMREMGenerator,
+  PointLight,
+  Raycaster,
+  Scene,
+  Vector2,
+  WebGLRenderer,
+} from 'three';
 import {
   buildWedgeRuntimes,
   createEnvironmentTexture,
@@ -28,9 +45,9 @@ export function ShieldScene({ progressRef, onHover, onSelect }: ShieldSceneProps
     const container = containerRef.current;
     if (!container) return;
 
-    let renderer: THREE.WebGLRenderer;
+    let renderer: WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer = new WebGLRenderer({ antialias: true, alpha: true });
     } catch {
       return; // No WebGL — the page still reads fine without the scene.
     }
@@ -38,12 +55,12 @@ export function ShieldScene({ progressRef, onHover, onSelect }: ShieldSceneProps
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setClearColor(0x000000, 0);
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMapping = ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.05;
     container.appendChild(renderer.domElement);
 
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(
+    const scene = new Scene();
+    const camera = new PerspectiveCamera(
       32,
       container.clientWidth / Math.max(container.clientHeight, 1),
       0.1,
@@ -51,38 +68,38 @@ export function ShieldScene({ progressRef, onHover, onSelect }: ShieldSceneProps
     );
     camera.position.set(0, 0.1, 7.5);
 
-    const pmrem = new THREE.PMREMGenerator(renderer);
+    const pmrem = new PMREMGenerator(renderer);
     const envSource = createEnvironmentTexture();
     const envTarget = pmrem.fromEquirectangular(envSource);
     scene.environment = envTarget.texture;
     envSource.dispose();
     pmrem.dispose();
 
-    const ambient = new THREE.AmbientLight(0xbfd3dc, 0.35);
-    const keyLight = new THREE.DirectionalLight(0xf2f4f7, 1.4);
+    const ambient = new AmbientLight(0xbfd3dc, 0.35);
+    const keyLight = new DirectionalLight(0xf2f4f7, 1.4);
     keyLight.position.set(4, 5, 6);
-    const rimLight = new THREE.DirectionalLight(0x3fa9c0, 0.5);
+    const rimLight = new DirectionalLight(0x3fa9c0, 0.5);
     rimLight.position.set(-5, -2, 3);
-    const fillLight = new THREE.PointLight(0xedeff3, 0.6);
+    const fillLight = new PointLight(0xedeff3, 0.6);
     fillLight.position.set(0, 3, 4);
     scene.add(ambient, keyLight, rimLight, fillLight);
 
-    const group = new THREE.Group();
+    const group = new Group();
     scene.add(group);
 
     const runtimes = buildWedgeRuntimes();
-    const materials: THREE.MeshStandardMaterial[] = [];
+    const materials: MeshStandardMaterial[] = [];
     const meshes = runtimes.map((runtime) => {
-      const material = new THREE.MeshStandardMaterial({
-        color: new THREE.Color('#AEB6C2'),
+      const material = new MeshStandardMaterial({
+        color: new Color('#AEB6C2'),
         metalness: 1,
         roughness: 0.28,
-        emissive: new THREE.Color('#EDEFF3'),
+        emissive: new Color('#EDEFF3'),
         emissiveIntensity: 0.08,
         envMapIntensity: 1.15
       });
       materials.push(material);
-      const mesh = new THREE.Mesh(runtime.geometry, material);
+      const mesh = new Mesh(runtime.geometry, material);
       mesh.position.copy(runtime.scatteredPos);
       mesh.rotation.copy(runtime.scatteredRot);
       mesh.userData.facetIndex = runtime.index;
@@ -94,8 +111,8 @@ export function ShieldScene({ progressRef, onHover, onSelect }: ShieldSceneProps
     const flareStart: (number | null)[] = runtimes.map(() => null);
 
     // ---- Pointer interaction (hover / click reveals the facet description) ----
-    const raycaster = new THREE.Raycaster();
-    const pointer = new THREE.Vector2();
+    const raycaster = new Raycaster();
+    const pointer = new Vector2();
     let pointerActive = false;
     let hoveredIndex: number | null = null;
 
@@ -140,7 +157,7 @@ export function ShieldScene({ progressRef, onHover, onSelect }: ShieldSceneProps
     resizeObserver.observe(container);
 
     // ---- Render loop ----
-    const clock = new THREE.Clock();
+    const clock = new Clock();
     let frameId = 0;
     let raycastAccumulator = 0;
 
@@ -163,9 +180,9 @@ export function ShieldScene({ progressRef, onHover, onSelect }: ShieldSceneProps
         const p = easeOutCubic(raw);
 
         mesh.position.lerpVectors(runtime.scatteredPos, runtime.assembledPos, p);
-        mesh.rotation.x = THREE.MathUtils.lerp(runtime.scatteredRot.x, 0, p);
-        mesh.rotation.y = THREE.MathUtils.lerp(runtime.scatteredRot.y, 0, p);
-        mesh.rotation.z = THREE.MathUtils.lerp(runtime.scatteredRot.z, 0, p);
+        mesh.rotation.x = MathUtils.lerp(runtime.scatteredRot.x, 0, p);
+        mesh.rotation.y = MathUtils.lerp(runtime.scatteredRot.y, 0, p);
+        mesh.rotation.z = MathUtils.lerp(runtime.scatteredRot.z, 0, p);
 
         // Brief silver flare the moment a facet locks in.
         if (raw >= 0.999 && prevProgress[i] < 0.999) {

@@ -7,10 +7,11 @@ type RiskLevel = 'low' | 'medium' | 'high' | 'none';
 interface BadgeProps {
   children: React.ReactNode;
   risk?: RiskLevel;
+  tone?: 'neutral' | 'success' | 'warning' | 'danger';
   className?: string;
 }
 
-export const Badge: React.FC<BadgeProps> = ({ children, risk = 'none', className }) => {
+export const Badge: React.FC<BadgeProps> = ({ children, risk = 'none', tone = 'neutral', className }) => {
   const riskStyles = {
     low: 'bg-risk-low text-white',
     medium: 'bg-risk-medium text-white',
@@ -25,15 +26,29 @@ export const Badge: React.FC<BadgeProps> = ({ children, risk = 'none', className
     none: null,
   };
 
+  const toneStyles = {
+    neutral: riskStyles.none,
+    success: riskStyles.low,
+    warning: riskStyles.medium,
+    danger: riskStyles.high,
+  };
+
+  const toneIcons = {
+    neutral: null,
+    success: icons.low,
+    warning: icons.medium,
+    danger: icons.high,
+  };
+
   return (
     <span
       className={cn(
         'inline-flex items-center px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider',
-        riskStyles[risk],
+        risk === 'none' ? toneStyles[tone] : riskStyles[risk],
         className
       )}
     >
-      {icons[risk]}
+      {risk === 'none' ? toneIcons[tone] : icons[risk]}
       {children}
     </span>
   );

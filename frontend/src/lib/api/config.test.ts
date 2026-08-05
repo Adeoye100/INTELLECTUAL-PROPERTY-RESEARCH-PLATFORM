@@ -35,5 +35,13 @@ describe('API mode selection', () => {
       { VITE_API_BASE_URL: 'https://api.example.test/api' },
       { isDevelopment: false },
     )).toThrow(/must end.*\/api\/v1/i);
+    expect(() => resolveApiConfig(
+      { VITE_API_BASE_URL: '//unexpected.example.test/api/v1' },
+      { isDevelopment: false },
+    )).toThrow(/HTTP\(S\).*root-relative/i);
+    expect(() => resolveApiConfig(
+      { VITE_API_BASE_URL: 'http://api.example.test/api/v1' },
+      { isDevelopment: false },
+    )).toThrow(/must use HTTPS/i);
   });
 });

@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -12,14 +13,18 @@ const marks: PortfolioMark[] = [
   { id: 'p2', firmId: 'f1', ownerUserId: 'u1', markText: 'INNOVATE PRO', jurisdiction: 'EU', niceClasses: [42], status: 'Pending', filingDate: '2024-01-01', renewalDate: '2026-08-25', sourceRegistry: 'EUIPO' },
 ];
 const watch: WatchSummary = { id: 'w1', portfolioMarkId: 'p1', userId: 'u1', alertChannel: 'email', alertMode: 'real-time', active: true, markText: 'FORGE GLOBAL', jurisdiction: 'US', mocked: true };
+const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
+  status,
+  headers: { 'Content-Type': 'application/json' },
+});
 
 const renderPortfolio = () => {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    if (url.endsWith('/api/v1/portfolio') && !init?.method) return new Response(JSON.stringify(marks), { status: 200 });
-    if (url.endsWith('/api/v1/watches')) return new Response(JSON.stringify([watch]), { status: 200 });
-    if (url.includes('/api/v1/portfolio/p2/watch')) return new Response(JSON.stringify({ ...watch, id: 'w2', portfolioMarkId: 'p2', markText: 'INNOVATE PRO', jurisdiction: 'EU' }), { status: 201 });
-    return new Response('{}', { status: 500 });
+    if (url.endsWith('/api/v1/portfolio') && init?.method === 'GET') return jsonResponse(marks);
+    if (url.endsWith('/api/v1/watches')) return jsonResponse([watch]);
+    if (url.includes('/api/v1/portfolio/p2/watch')) return jsonResponse({ ...watch, id: 'w2', portfolioMarkId: 'p2', markText: 'INNOVATE PRO', jurisdiction: 'EU' }, 201);
+    return jsonResponse({}, 500);
   });
   vi.stubGlobal('fetch', fetchMock);
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -50,6 +55,20 @@ describe('PortfolioScreen', () => {
     await screen.findByText('INNOVATE PRO');
     fireEvent.change(screen.getByRole('combobox', { name: 'Jurisdiction' }), { target: { value: 'EU' } });
     fireEvent.click(screen.getByRole('link', { name: 'Details' }));
+    expect(await screen.findByText('Portfolio detail destination')).toBeVisible();
+  });
+
+  it('supports keyboard filtering and detail navigation', async () => {
+    const user = userEvent.setup();
+    renderPortfolio();
+    await screen.findByText('INNOVATE PRO');
+    const jurisdiction = screen.getByRole('combobox', { name: 'Jurisdiction' });
+    jurisdiction.focus();
+    await user.selectOptions(jurisdiction, 'EU');
+    const details = screen.getByRole('link', { name: 'Details' });
+    details.focus();
+    expect(details).toHaveFocus();
+    await user.keyboard('{Enter}');
     expect(await screen.findByText('Portfolio detail destination')).toBeVisible();
   });
 });

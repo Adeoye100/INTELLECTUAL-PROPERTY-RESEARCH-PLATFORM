@@ -38,7 +38,9 @@ export function resolveApiConfig(
   } catch {
     throw new Error('VITE_API_BASE_URL must be an absolute URL or a root-relative path.');
   }
-  if (!baseUrl.startsWith('/') && !/^https?:\/\//i.test(baseUrl)) {
+  const isRootRelative = baseUrl.startsWith('/') && !baseUrl.startsWith('//');
+  const isAbsoluteHttp = /^https?:\/\//i.test(baseUrl);
+  if (!isRootRelative && !isAbsoluteHttp) {
     throw new Error('VITE_API_BASE_URL must be an HTTP(S) URL or a root-relative path.');
   }
   if (parsed.username || parsed.password || parsed.search || parsed.hash) {
@@ -47,6 +49,9 @@ export function resolveApiConfig(
   if (!parsed.pathname.endsWith(API_VERSION_PATH)) {
     throw new Error(`VITE_API_BASE_URL must end with the documented ${API_VERSION_PATH} base path.`);
   }
+  if (!runtime.isDevelopment && isAbsoluteHttp && parsed.protocol !== 'https:') {
+    throw new Error('Absolute VITE_API_BASE_URL values must use HTTPS outside development.');
+  }
 
   return Object.freeze({ baseUrl, mode: requestedMode });
 }
@@ -54,7 +59,10 @@ export function resolveApiConfig(
 let runtimeConfig: ApiConfig | undefined;
 
 export function getApiConfig(): ApiConfig {
-  runtimeConfig ??= resolveApiConfig(import.meta.env, { isDevelopment: import.meta.env.DEV });
+  runtimeConfig ??= resolveApiConfig({
+    VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
+    VITE_API_MODE: import.meta.env.VITE_API_MODE,
+  }, { isDevelopment: import.meta.env.DEV });
   return runtimeConfig;
 }
 

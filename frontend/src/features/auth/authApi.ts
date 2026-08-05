@@ -50,7 +50,7 @@ export async function authRequest<T>(input: RequestInfo | URL, init?: RequestIni
     const fallbackCode: AuthErrorCode = error.code === 'NETWORK_ERROR' || error.code === 'TIMEOUT'
       ? 'NETWORK_ERROR'
       : error.status === 401
-        ? useSessionErrorCode(path)
+        ? sessionErrorCode(path)
         : error.status === 403
           ? 'PERMISSION_DENIED'
           : 'UNKNOWN_ERROR';
@@ -58,7 +58,7 @@ export async function authRequest<T>(input: RequestInfo | URL, init?: RequestIni
   }
 }
 
-const useSessionErrorCode = (path: string): AuthErrorCode =>
+const sessionErrorCode = (path: string): AuthErrorCode =>
   path === '/auth/login' ? 'INVALID_CREDENTIALS' : 'SESSION_EXPIRED';
 
 export const authErrorMessage = (error: unknown): string => {

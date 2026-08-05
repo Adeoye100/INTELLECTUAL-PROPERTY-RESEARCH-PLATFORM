@@ -1,5 +1,15 @@
 # React + TypeScript + Vite
 
+## API configuration
+
+Copy the relevant values from `.env.example` into deployment-managed environment configuration. Live mode requires `VITE_API_BASE_URL` and the value must end in `/api/v1`. `VITE_API_MODE` defaults to `live`; MSW starts only when `VITE_API_MODE=mock` is explicitly set while running a Vite development build. Staging and production builds reject mock mode.
+
+The current repository has no backend application implementation, so no live endpoint is claimed as integrated. See `../Documentations/07-frontend-api-contracts.md` for the mock-only candidate contracts and blockers.
+
+## Quality gate
+
+Run `pnpm lint`, `pnpm test`, and `pnpm build` from this directory. CI runs the same sequence with a locked install; run `git diff --check` from the repository root. The evidence-based frontend audit, including keyboard, accessibility, responsive, state, bundle, CI, and remaining manual checks, is in `../Documentations/08-frontend-quality-gate.md`.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:

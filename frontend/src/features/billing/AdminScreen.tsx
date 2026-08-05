@@ -170,7 +170,7 @@ export const AdminScreen: React.FC = () => {
                     </TableCell>
                     <TableCell><RoleBadge role={user.role} /></TableCell>
                     <TableCell>
-                      <Badge risk={user.status === 'Active' ? 'low' : 'none'}>{user.status}</Badge>
+                      <Badge tone={user.status === 'Active' ? 'success' : 'neutral'}>{user.status}</Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">

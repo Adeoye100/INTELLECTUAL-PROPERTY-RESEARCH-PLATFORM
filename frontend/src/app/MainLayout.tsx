@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Logo } from '../components/Logo';
 import { 
   Search, 
@@ -42,18 +42,20 @@ export const MainLayout: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen">
       <SessionExpiryMonitor />
+      <a href="#main-content" className="sr-only z-[70] rounded bg-white px-4 py-2 text-forge-navy-950 focus:not-sr-only focus:fixed focus:left-4 focus:top-4">Skip to main content</a>
       {/* Header */}
-      <header className="h-16 bg-forge-gradient flex items-center justify-between px-6 sticky top-0 z-40">
+      <header className="h-16 bg-forge-gradient flex items-center justify-between px-4 md:px-6 sticky top-0 z-40">
         <Logo />
         <div className="flex items-center gap-4 text-white">
-          <button
+          <Link
+            to="/watches"
             className="p-2 hover:bg-white/10 rounded-full relative"
             aria-label="Notifications — alerts pending"
           >
             <Bell className="w-5 h-5" aria-hidden="true" />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-risk-high rounded-full border border-forge-navy-950" aria-hidden="true"></span>
             <span className="sr-only">You have pending alerts</span>
-          </button>
+          </Link>
           <div className="flex items-center gap-2 border-l border-white/20 pl-4">
             <div className="w-8 h-8 rounded-full bg-forge-teal-700 flex items-center justify-center font-bold text-sm">
               {initials}
@@ -68,8 +70,8 @@ export const MainLayout: React.FC = () => {
 
       <div className="flex flex-1">
         {/* Sidebar */}
-        <aside className="w-64 bg-forge-navy-800 text-white flex flex-col sticky top-16 h-[calc(100vh-64px)] overflow-y-auto">
-          <nav className="flex-1 p-4 space-y-1">
+        <aside className="w-20 xl:w-64 bg-forge-navy-800 text-white flex flex-col sticky top-16 h-[calc(100vh-64px)] overflow-y-auto transition-[width]">
+          <nav className="flex-1 p-3 xl:p-4 space-y-1" aria-label="Application">
             <NavItem to="/dashboard" icon={<LayoutDashboard size={20} />} label="Dashboard" />
             <NavItem to="/search" icon={<Search size={20} />} label="Trademark Search" />
             <NavItem to="/portfolio" icon={<Briefcase size={20} />} label="Portfolio" />
@@ -82,18 +84,18 @@ export const MainLayout: React.FC = () => {
           <div className="p-4 border-t border-white/10">
             <Button
               variant="ghost"
-              className="w-full justify-start text-white hover:bg-white/10"
+              className="w-full justify-center xl:justify-start text-white hover:bg-white/10"
               size="sm"
               onClick={signOut}
             >
-              <LogOut size={18} className="mr-2" />
-              Sign Out
+              <LogOut size={18} className="xl:mr-2" aria-hidden="true" />
+              <span className="sr-only xl:not-sr-only">Sign Out</span>
             </Button>
           </div>
         </aside>
 
         {/* Main Content */}
-        <main className="min-w-0 flex-1 bg-surface-base p-8">
+        <main id="main-content" tabIndex={-1} className="min-w-0 flex-1 bg-surface-base p-4 md:p-6 xl:p-8 focus:outline-none">
           <Outlet />
         </main>
       </div>
@@ -113,15 +115,15 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label }) => {
       to={to}
       className={({ isActive }) =>
         cn(
-          'flex items-center gap-3 px-3 py-2 rounded transition-colors',
+          'flex items-center justify-center xl:justify-start gap-3 px-3 py-2 rounded transition-colors',
           isActive 
             ? 'bg-forge-teal-700 text-white font-semibold' 
             : 'text-forge-subtext-onDark hover:bg-white/5 hover:text-white'
         )
       }
     >
-      {icon}
-      <span>{label}</span>
+      <span aria-hidden="true">{icon}</span>
+      <span className="sr-only xl:not-sr-only">{label}</span>
     </NavLink>
   );
 };

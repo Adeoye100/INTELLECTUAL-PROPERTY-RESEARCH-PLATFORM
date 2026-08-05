@@ -1,4 +1,13 @@
-import * as THREE from 'three';
+import {
+  CanvasTexture,
+  EquirectangularReflectionMapping,
+  Euler,
+  ExtrudeGeometry,
+  Shape,
+  Vector2,
+  Vector3,
+  type Texture,
+} from 'three';
 import { buildFacetWedges, type Point2D, SHIELD_CENTER } from './shieldGeometry';
 
 const SCALE = 0.026;
@@ -7,14 +16,14 @@ const DEPTH = 0.1;
 
 export interface WedgeRuntime {
   index: number;
-  geometry: THREE.ExtrudeGeometry;
-  assembledPos: THREE.Vector3;
-  scatteredPos: THREE.Vector3;
-  scatteredRot: THREE.Euler;
+  geometry: ExtrudeGeometry;
+  assembledPos: Vector3;
+  scatteredPos: Vector3;
+  scatteredRot: Euler;
 }
 
-function toLocal(pt: Point2D, origin: Point2D): THREE.Vector2 {
-  return new THREE.Vector2((pt.x - origin.x) * SCALE, -(pt.y - origin.y) * SCALE);
+function toLocal(pt: Point2D, origin: Point2D): Vector2 {
+  return new Vector2((pt.x - origin.x) * SCALE, -(pt.y - origin.y) * SCALE);
 }
 
 export function easeOutCubic(t: number): number {
@@ -29,13 +38,13 @@ export function buildWedgeRuntimes(): WedgeRuntime[] {
     const localA = toLocal(wedge.a, wedge.centroid);
     const localB = toLocal(wedge.b, wedge.centroid);
 
-    const shape = new THREE.Shape();
+    const shape = new Shape();
     shape.moveTo(localCenter.x, localCenter.y);
     shape.lineTo(localA.x, localA.y);
     shape.lineTo(localB.x, localB.y);
     shape.lineTo(localCenter.x, localCenter.y);
 
-    const geometry = new THREE.ExtrudeGeometry(shape, {
+    const geometry = new ExtrudeGeometry(shape, {
       depth: DEPTH,
       bevelEnabled: true,
       bevelThickness: 0.025,
@@ -47,18 +56,18 @@ export function buildWedgeRuntimes(): WedgeRuntime[] {
     // position and rotation pivot correctly.
     geometry.translate(0, 0, -DEPTH / 2);
 
-    const assembledPos = new THREE.Vector3(
+    const assembledPos = new Vector3(
       (wedge.centroid.x - SHIELD_CENTER.x) * SCALE,
       -(wedge.centroid.y - SHIELD_CENTER.y) * SCALE,
       0
     );
 
-    const outward = new THREE.Vector3(wedge.outward.x, -wedge.outward.y, 0.35);
+    const outward = new Vector3(wedge.outward.x, -wedge.outward.y, 0.35);
     const scatteredPos = assembledPos.
     clone().
     add(outward.multiplyScalar(SCATTER_DISTANCE));
 
-    const scatteredRot = new THREE.Euler(
+    const scatteredRot = new Euler(
       (wedge.index % 2 === 0 ? 1 : -1) * 0.5,
       (wedge.index % 3 === 0 ? 1 : -1) * 0.4,
       (wedge.index % 2 === 0 ? -1 : 1) * 0.3
@@ -71,7 +80,7 @@ export function buildWedgeRuntimes(): WedgeRuntime[] {
 // A small brand-colored gradient used as an equirectangular environment map,
 // so the brushed-chrome material has something credible to reflect without
 // pulling in an external HDRI.
-export function createEnvironmentTexture(): THREE.Texture {
+export function createEnvironmentTexture(): Texture {
   const canvas = document.createElement('canvas');
   canvas.width = 128;
   canvas.height = 64;
@@ -93,7 +102,7 @@ export function createEnvironmentTexture(): THREE.Texture {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.mapping = THREE.EquirectangularReflectionMapping;
+  const texture = new CanvasTexture(canvas);
+  texture.mapping = EquirectangularReflectionMapping;
   return texture;
 }

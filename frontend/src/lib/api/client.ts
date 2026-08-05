@@ -95,6 +95,7 @@ async function readErrorPayload(response: Response): Promise<ErrorPayload> {
       const payload = await response.json();
       return payload && typeof payload === 'object' ? payload as ErrorPayload : {};
     }
+    if (!response.headers.get('content-type')?.toLowerCase().startsWith('text/plain')) return {};
     const message = (await response.text()).trim();
     return message ? { message } : {};
   } catch {
@@ -168,7 +169,7 @@ export class ApiClient {
 
     const token = this.getAccessToken();
     const headers = new Headers(options.headers);
-    headers.set('Accept', 'application/json');
+    if (!headers.has('Accept')) headers.set('Accept', 'application/json');
     if (token) headers.set('Authorization', `Bearer ${token}`);
     if (options.body !== undefined) headers.set('Content-Type', 'application/json');
 
@@ -182,8 +183,8 @@ export class ApiClient {
       });
 
       if (!response.ok) {
-        const payload = await readErrorPayload(response);
         if (response.status === 401 && token) this.onUnauthorized();
+        const payload = await readErrorPayload(response);
         throw new ApiError({
           code: codeForStatus(response.status),
           message: payload.message || defaultMessageForStatus(response.status),

@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { CheckCircle, Download, FileDown, LoaderCircle, RotateCcw } from 'lucide-react';
 import { Button } from './Button';
 import { cn } from '../lib/utils';
@@ -59,23 +59,24 @@ export const PdfExport: React.FC<PdfExportProps> = ({
 }) => {
   const [state, setState] = useState<ExportState>({ status: 'idle' });
   const statusId = useId();
+  const objectUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
-      if (state.status === 'success' && state.objectUrl) {
-        URL.revokeObjectURL(state.downloadUrl);
-      }
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     };
-  }, [state]);
+  }, []);
 
   const generate = async () => {
     if (disabled || state.status === 'loading') return;
-    if (state.status === 'success' && state.objectUrl) URL.revokeObjectURL(state.downloadUrl);
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    objectUrlRef.current = null;
     setState({ status: 'loading' });
 
     try {
       const result = await generatePdfReport(request);
       const downloadUrl = URL.createObjectURL(result.blob);
+      objectUrlRef.current = downloadUrl;
       setState({
         status: 'success',
         downloadUrl,

@@ -5,11 +5,11 @@ import { getApiConfig, shouldEnableMocking } from './lib/api/config';
 
 async function enableMocking() {
   const config = getApiConfig();
-  if (!shouldEnableMocking(config)) return;
+  if (!import.meta.env.DEV || !shouldEnableMocking(config)) return;
 
   const { worker } = await import('./lib/mocks/browser');
   return worker.start({
-    onUnhandledRequest: 'bypass',
+    onUnhandledRequest: 'error',
     serviceWorker: {
       url: '/mockServiceWorker.js',
     },

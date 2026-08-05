@@ -19,10 +19,12 @@ export default {
         },
         // Brand — navy-to-teal gradient
         'forge-navy': {
+          DEFAULT: '#0A1428',
           950: '#0A1428',   // deep navy, gradient start (top)
           800: '#0E2540',
         },
         'forge-teal': {
+          100: '#D8EEF2',
           700: '#0F4A57',
           600: '#146575',   // teal, gradient end (bottom)
         },
@@ -31,8 +33,11 @@ export default {
         'forge-silver': {
           100: '#E7EAEE',
           300: '#B9C1CA',
+          400: '#AAB4C0',
           500: '#8B939E',
+          600: '#75808D',
           700: '#5B6470',
+          800: '#3C4652',
         },
 
         // Text on dark brand surfaces
@@ -46,8 +51,8 @@ export default {
         'text-secondary': '#5B6470',
 
         // Risk semantics
-        'risk-low': '#1E8A5B',
-        'risk-medium': '#B8860B',
+        'risk-low': '#166B46',
+        'risk-medium': '#765400',
         'risk-high': '#B3261E',
       },
       backgroundImage: {

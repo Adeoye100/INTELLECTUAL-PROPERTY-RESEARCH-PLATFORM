@@ -90,3 +90,9 @@ Note the overlap by design: Frontend (weeks 4–9) starts one week into Backend 
 ## 6. Post-Launch (Yearly Renewal Scope)
 
 Per the agreement, the ₦200,000/year renewal covers hosting, maintenance, and the 99.5% uptime SLA — it does not cover new feature development. Any feature request after handover is a new, separately scoped engagement.
+
+## 7. Current execution evidence (2026-08-05)
+
+The frontend quality-gate audit and executable evidence are recorded in `08-frontend-quality-gate.md`; frontend/backend candidate contracts and unresolved role rules are recorded in `07-frontend-api-contracts.md`.
+
+The Phase 3 exit criterion is **not complete**. The frontend has a verified live-ready transport foundation and development fixtures, but `backend/` contains no application implementation or verifiable route. FE-21, live PDF generation, backend authorization/audit ownership, and staging integration remain blocked until the verification gates in the API contract register pass.

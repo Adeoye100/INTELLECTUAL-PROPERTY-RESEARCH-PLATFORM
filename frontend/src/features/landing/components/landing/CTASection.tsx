@@ -23,7 +23,7 @@ export function CTASection() {
           Sign in
         </Link>
       </div>
-      <p className="mt-16 text-xs text-forge-silver-600">
+      <p className="mt-16 text-xs text-forge-silver-400">
         © {new Date().getFullYear()} Forge Global. All rights reserved.
       </p>
     </section>);

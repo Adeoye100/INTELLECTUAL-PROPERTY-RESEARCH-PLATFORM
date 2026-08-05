@@ -190,7 +190,7 @@ export const SearchScreen: React.FC = () => {
           </Card>
         </aside>
 
-        <main className="min-w-0 space-y-4 lg:col-span-3" aria-label="Trademark search results">
+        <section className="min-w-0 space-y-4 lg:col-span-3" aria-label="Trademark search results">
           {!submittedFilters ? (
             <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-forge-silver-300 bg-surface-card py-24 text-center"><SearchIcon className="mb-4 h-12 w-12 text-forge-silver-300" aria-hidden="true" /><h2 className="text-lg font-semibold text-text-primary">Ready to search</h2><p className="max-w-sm text-text-secondary">Set the visible filters and submit to query the connected registries.</p></div>
           ) : searchQuery.isLoading ? (
@@ -235,7 +235,15 @@ export const SearchScreen: React.FC = () => {
                               <td className="px-3 py-3 text-sm text-text-primary">{result.jurisdiction ?? '—'}</td>
                               <td className="px-3 py-3 text-sm text-text-primary">{result.filingDate ?? '—'}</td>
                               <td className="px-3 py-3 text-sm text-text-primary"><span className="block">{result.candidateSource}</span><span className="font-mono text-xs text-text-secondary">{result.candidateRef}</span></td>
-                              <td className="px-3 py-3"><Badge risk={result.riskScore?.compositeRating}>{result.riskScore ? `${result.riskScore.compositeRating} risk` : 'Not scored'}</Badge></td>
+                              <td className="px-3 py-3">
+                                <Badge risk={result.riskScore?.compositeRating}>{result.riskScore ? `${result.riskScore.compositeRating} risk` : 'Not scored'}</Badge>
+                                {result.riskScore && (
+                                  <ul className="mt-2 max-w-52 space-y-1 text-xs text-text-secondary" aria-label={`Evidence for ${result.candidateMarkText} risk rating`}>
+                                    {result.riskScore.matchedMarkRefs.slice(0, 2).map((reference) => <li key={`${reference.type}-${reference.evidence}`}><strong>{reference.type}:</strong> {reference.evidence} ({reference.score})</li>)}
+                                    <li><strong>Class overlap:</strong> {result.riskScore.classOverlap ? 'Yes' : 'No'}</li>
+                                  </ul>
+                                )}
+                              </td>
                               <td className="px-3 py-3"><div className="flex flex-col items-start gap-2"><Link to={`/search/risk/${result.id}`} state={routeState} className="inline-flex rounded border border-forge-silver-500 px-3 py-1.5 text-sm font-medium text-text-primary hover:bg-forge-silver-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2" aria-label={`Review risk for ${result.candidateMarkText}`}>Review risk</Link>{user?.role !== 'viewer' && <Button variant="ghost" size="sm" disabled={importToPortfolio.isPending && importToPortfolio.variables?.id === result.id} onClick={() => importToPortfolio.mutate(result)}>{importToPortfolio.isPending && importToPortfolio.variables?.id === result.id ? 'Importing…' : 'Import to portfolio'}</Button>}</div></td>
                             </tr>
                           );
@@ -247,7 +255,7 @@ export const SearchScreen: React.FC = () => {
               )}
             </div>
           )}
-        </main>
+        </section>
       </div>
     </div>
   );

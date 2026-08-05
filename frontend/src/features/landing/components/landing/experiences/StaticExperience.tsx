@@ -10,7 +10,7 @@ export function StaticExperience() {
   return (
     <div
       className="relative min-h-screen text-forge-text-onDark"
-      style={{ backgroundImage: 'url(/landingpagebg.webp)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundAttachment: 'fixed' }}
+      style={{ backgroundImage: 'linear-gradient(rgba(10,20,40,0.38), rgba(10,20,40,0.38)), url(/landingpagebg.webp)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundAttachment: 'scroll' }}
     >
       <LandingHeader />
       <main>

@@ -31,7 +31,7 @@ export function FullExperience() {
   return (
     <div
       className="relative min-h-screen text-forge-text-onDark overflow-hidden"
-      style={{ backgroundImage: 'url(/landingpagebg.webp)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundAttachment: 'fixed' }}
+      style={{ backgroundImage: 'linear-gradient(rgba(10,20,40,0.38), rgba(10,20,40,0.38)), url(/landingpagebg.webp)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundAttachment: 'fixed' }}
     >
       <div className="fixed inset-0 z-0" aria-hidden="true">
         <Suspense fallback={null}>

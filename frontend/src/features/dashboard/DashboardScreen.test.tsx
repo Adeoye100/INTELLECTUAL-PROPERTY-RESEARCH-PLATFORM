@@ -8,7 +8,10 @@ import { useAuthStore } from '../auth/authStore';
 import { DashboardScreen } from './DashboardScreen';
 
 const renderDashboard = (response = mockDashboardSummary, ok = true) => {
-  const fetchMock = vi.fn().mockResolvedValue({ ok, json: async () => response });
+  const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(response), {
+    status: ok ? 200 : 503,
+    headers: { 'Content-Type': 'application/json' },
+  }));
   vi.stubGlobal('fetch', fetchMock);
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(

@@ -10,12 +10,12 @@ interface SourceStatusIndicatorProps {
 
 const statusPresentation: Record<
   SourceStatus,
-  { label: string; risk: 'low' | 'medium' | 'high' }
+  { label: string; tone: 'success' | 'warning' | 'danger' }
 > = {
-  complete: { label: 'Complete', risk: 'low' },
-  pending: { label: 'Pending', risk: 'medium' },
-  delayed: { label: 'Delayed', risk: 'medium' },
-  unavailable: { label: 'Unavailable', risk: 'high' },
+  complete: { label: 'Complete', tone: 'success' },
+  pending: { label: 'Pending', tone: 'warning' },
+  delayed: { label: 'Delayed', tone: 'warning' },
+  unavailable: { label: 'Unavailable', tone: 'danger' },
 };
 
 export const SourceStatusIndicator: React.FC<SourceStatusIndicatorProps> = ({ statuses }) => {
@@ -41,7 +41,7 @@ export const SourceStatusIndicator: React.FC<SourceStatusIndicatorProps> = ({ st
 
             return (
               <li key={source}>
-                <Badge risk={presentation.risk}>
+                <Badge tone={presentation.tone}>
                   {source}: {presentation.label}
                   {typeof resultCount === 'number' && ` (${resultCount})`}
                 </Badge>

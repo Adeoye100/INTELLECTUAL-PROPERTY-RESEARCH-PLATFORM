@@ -1,9 +1,10 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   buildFacetWedges,
   svgWedgePath,
   SHIELD_VIEWBOX } from
 './shieldGeometry';
+import { FACETS } from '../../data/facets';
 
 interface ShieldStaticProps {
   // 0-1 per facet, in facet order. Omit (or pass all 1s) for a fully assembled shield.
@@ -31,24 +32,23 @@ export function ShieldStatic({
   const uid = useId();
   const metalId = `shieldMetal-${uid}`;
   const flareId = `shieldFlare-${uid}`;
-  const progress = facetProgress ?? WEDGES.map(() => 1);
+  const progress = useMemo(() => facetProgress ?? WEDGES.map(() => 1), [facetProgress]);
   const prevProgress = useRef<number[]>(WEDGES.map(() => 0));
   const [flareKeys, setFlareKeys] = useState<number[]>(WEDGES.map(() => 0));
 
   useEffect(() => {
     if (!animated) return;
-    let changed = false;
-    const nextKeys = [...flareKeys];
+    const completed: number[] = [];
     progress.forEach((p, i) => {
       if (p >= 0.999 && prevProgress.current[i] < 0.999) {
-        nextKeys[i] += 1;
-        changed = true;
+        completed.push(i);
       }
       prevProgress.current[i] = p;
     });
-    if (changed) setFlareKeys(nextKeys);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [progress.join(',')]);
+    if (completed.length) {
+      setFlareKeys((current) => current.map((key, index) => completed.includes(index) ? key + 1 : key));
+    }
+  }, [animated, progress]);
 
   return (
     <svg
@@ -100,6 +100,17 @@ export function ShieldStatic({
               }}
               onMouseEnter={() => onFacetHover?.(wedge.index)}
               onMouseLeave={() => onFacetHover?.(null)}
+              onFocus={() => onFacetHover?.(wedge.index)}
+              onBlur={() => onFacetHover?.(null)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onFacetSelect?.(wedge.index);
+                }
+              }}
+              tabIndex={interactive ? 0 : undefined}
+              role={interactive ? 'button' : undefined}
+              aria-label={interactive ? `Show ${FACETS[wedge.index]?.title ?? `facet ${wedge.index + 1}`}` : undefined}
               onClick={() => onFacetSelect?.(wedge.index)} />
             
             {animated &&

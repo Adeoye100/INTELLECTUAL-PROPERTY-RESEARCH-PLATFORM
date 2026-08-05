@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { useDeviceCapability } from '../hooks/useDeviceCapability';
-import { FullExperience } from '../components/landing/experiences/FullExperience';
-import { LiteExperience } from '../components/landing/experiences/LiteExperience';
-import { StaticExperience } from '../components/landing/experiences/StaticExperience';
+
+const FullExperience = lazy(() => import('../components/landing/experiences/FullExperience').then((module) => ({ default: module.FullExperience })));
+const LiteExperience = lazy(() => import('../components/landing/experiences/LiteExperience').then((module) => ({ default: module.LiteExperience })));
+const StaticExperience = lazy(() => import('../components/landing/experiences/StaticExperience').then((module) => ({ default: module.StaticExperience })));
 
 // Public, unauthenticated marketing route at "/" — the front door to Forge
 // Global, before login. Picks one of three experiences based on motion
@@ -14,7 +15,9 @@ export function LandingPage() {
     document.title = 'Forge Global — Brand Protection and Intellectual Property Security';
   }, []);
 
-  if (tier === 'static') return <StaticExperience />;
-  if (tier === 'lite') return <LiteExperience />;
-  return <FullExperience />;
+  return (
+    <Suspense fallback={<main className="flex min-h-screen items-center justify-center bg-forge-navy-950 text-forge-subtext-onDark" role="status">Loading Forge Global…</main>}>
+      {tier === 'static' ? <StaticExperience /> : tier === 'lite' ? <LiteExperience /> : <FullExperience />}
+    </Suspense>
+  );
 }
