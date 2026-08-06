@@ -94,7 +94,13 @@ describe('auth API with real PostgreSQL and Redis', () => {
 
     const signupSessionKey = system.sessionStore.keyFor(signup.body.refreshToken);
     assert.equal(signupSessionKey.includes(signup.body.refreshToken), false);
-    assert.ok(await system.redisClient.get(signupSessionKey));
+    const signupSessionValue = await system.redisClient.get(signupSessionKey);
+    assert.ok(signupSessionValue);
+    assert.equal(signupSessionValue.includes(signup.body.refreshToken), false);
+    assert.deepEqual(
+      Object.keys(JSON.parse(signupSessionValue)).sort(),
+      ['createdAt', 'userId'],
+    );
 
     const stored = await system.pool.query(
       'SELECT password_hash, last_login_at FROM users WHERE email = $1',
@@ -127,7 +133,11 @@ describe('auth API with real PostgreSQL and Redis', () => {
     assert.notEqual(refresh.body.refreshToken, login.body.refreshToken);
     issuedRefreshTokens.push(refresh.body.refreshToken);
     assert.equal(await system.redisClient.get(system.sessionStore.keyFor(login.body.refreshToken)), null);
-    assert.ok(await system.redisClient.get(system.sessionStore.keyFor(refresh.body.refreshToken)));
+    const rotatedSessionValue = await system.redisClient.get(
+      system.sessionStore.keyFor(refresh.body.refreshToken),
+    );
+    assert.ok(rotatedSessionValue);
+    assert.equal(rotatedSessionValue.includes(refresh.body.refreshToken), false);
 
     const replay = await request(system.app).post('/api/v1/auth/refresh').send({
       refreshToken: login.body.refreshToken,

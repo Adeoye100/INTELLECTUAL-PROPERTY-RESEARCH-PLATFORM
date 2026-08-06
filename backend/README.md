@@ -34,19 +34,39 @@ an already-applied file, and serializes concurrent runners with a PostgreSQL
 advisory lock. This deliberately avoids committing the project to an ORM before
 the broader data-access architecture is selected.
 
+From `backend/`, apply the schema to any fresh development or production database
+by passing that database's connection string explicitly:
+
+```sh
+DATABASE_URL='postgresql://USER:PASSWORD@HOST:5432/DATABASE' pnpm migrate
+```
+
+The migration command needs PostgreSQL only; Redis and JWT configuration are not
+required. It is safe to run during deployment because already-applied migration
+checksums are verified and skipped. Never place a production connection string in
+source control or shell history; inject `DATABASE_URL` through the deployment
+secret manager.
+
 ## Firm matching and initial roles
 
-Self-serve signup matches a firm by its normalized name: trim leading/trailing
-whitespace, collapse internal whitespace, and compare case-insensitively. A
-PostgreSQL expression unique index makes that rule race-safe. Email-domain matching
-was not selected because the documented schema has no authoritative firm-domain
-field and consumer/shared domains would produce unsafe tenant joins.
+Self-serve signup reads `firmName`, falling back to the frontend-compatible
+`company` field. It trims leading/trailing whitespace, collapses every run of
+internal whitespace to one space, and lower-cases the result. The repository then
+performs an exact equality comparison against the same normalized PostgreSQL
+expression. It does not derive or compare a domain from the user's email. A unique
+expression index and transaction-scoped advisory lock make this exact matching
+rule race-safe.
 
 The first user for a new firm is `admin`; an additional self-serve user matching
-an existing firm receives the least-privileged `viewer` role. Production rollout
-should pair existing-firm admission with the separately scoped invitation and
-email-verification contracts rather than treating the submitted name as proof of
-firm membership.
+an existing firm receives the least-privileged `viewer` role.
+
+**This matching rule is not safe for production tenant admission.** An unrelated
+person can submit an existing firm's public name and receive Viewer access, two
+unrelated firms can legitimately share a normalized name, and aliases or spelling
+differences can split one firm into multiple tenants. Before real client data is
+stored, existing-firm signup must require an explicit single-use firm invitation
+or another verified administrator-controlled membership claim. Name normalization
+may remain a duplicate-warning signal, but must not grant tenant membership.
 
 ## Auth API
 
@@ -58,9 +78,11 @@ firm membership.
 | `POST /api/v1/auth/logout` | `{ refreshToken }` | `204`; Redis session invalidated |
 
 Access JWTs contain the verified user ID, firm ID, email, and role. Refresh tokens
-are opaque random values; only a SHA-256-derived key and minimal session state are
-stored in Redis with a TTL. Refresh rotates the token atomically via `GETDEL`, and
-reloads the user from PostgreSQL before signing claims.
+are opaque random values. Redis uses `session:<SHA-256(refresh token)>` as the key;
+the value is JSON containing only `userId` and `createdAt`. The raw refresh token
+is not stored in either the Redis key or value. Sessions have a TTL, refresh
+rotates the lookup key atomically via `GETDEL`, and the service reloads the user
+from PostgreSQL before signing new access claims.
 
 The current JSON-body refresh transport is an explicit foundation contract. A
 browser deployment must decide whether to move it to an HttpOnly/Secure/SameSite
