@@ -30,3 +30,18 @@ export function loadConfig(env = process.env) {
     refreshTokenTtlSeconds: positiveInteger(env, 'REFRESH_TOKEN_TTL_SECONDS', 2_592_000),
   };
 }
+
+export function loadUsptoIngestionConfig(env = process.env) {
+  return {
+    databaseUrl: required(env, 'DATABASE_URL'),
+    usptoBulkListingUrl: env.USPTO_BULK_LISTING_URL?.trim() || undefined,
+  };
+}
+
+export function loadElasticsearchSyncConfig(env = process.env) {
+  return {
+    databaseUrl: required(env, 'DATABASE_URL'),
+    elasticsearchUrl: required(env, 'ELASTICSEARCH_URL'),
+    elasticsearchIndex: env.ELASTICSEARCH_INDEX?.trim() || 'trademarks_composite',
+  };
+}

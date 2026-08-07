@@ -5,6 +5,9 @@ Node.js + Express, PostgreSQL, and Redis stack. It intentionally does not contai
 business APIs, password-reset/email-verification logic, rate limiting, or audit
 logging.
 
+It also contains the BE-07/BE-08 USPTO registry adapters and the explicitly
+Postgres-first trademark ingestion/projection commands described below.
+
 ## Local services and configuration
 
 The documented local assumption is Docker Compose with PostgreSQL 16 and Redis 7:
@@ -46,6 +49,44 @@ required. It is safe to run during deployment because already-applied migration
 checksums are verified and skipped. Never place a production connection string in
 source control or shell history; inject `DATABASE_URL` through the deployment
 secret manager.
+
+## USPTO ingestion and Elasticsearch projection
+
+The ingestion boundary is deliberately two commands:
+
+```sh
+# Inclusive UTC day. Reprocessing a day is safe because PostgreSQL uses an
+# attributed (source_registry, source_reference_id) UPSERT key.
+pnpm ingest:uspto -- --since 2026-01-05
+
+# Run separately after Postgres ingestion. This command is optional until BE-06
+# provides Elasticsearch; its absence does not block ingestion or its tests.
+pnpm sync:elasticsearch
+```
+
+`ingest:uspto` reads the daily `apcYYMMDD.zip` links from
+`USPTO_BULK_LISTING_URL`, streams each ZIP/XML file, and writes normalized rows
+to `registry_trademarks`. Every row carries `source_registry = 'USPTO'` and the
+USPTO serial number as `source_reference_id`. Unchanged replays do not update the
+row or create projection work.
+
+`sync:elasticsearch` is the only component that writes to the
+`trademarks_composite` index. It selects new/changed Postgres rows, submits an
+Elasticsearch bulk request, and marks the exact projected row version only after
+the bulk request succeeds. The adapter never receives an Elasticsearch client.
+
+These are manual commands for now. No `node-cron` scheduler was placed in the API
+process, and no Redis queue library was introduced merely for this ticket. The
+deployment scheduler or the later Redis-backed worker can invoke the same two
+commands in order without changing the ingestion services.
+
+The TSDR adapter implements only per-serial `getStatus`. It reads
+`USPTO_TSDR_API_KEY` at construction and raises a specific configuration error at
+call time when the key is missing. Its `fetchUpdates` and the bulk adapter's
+`getStatus` intentionally raise `NotSupportedError`.
+
+The verified real XML structure and sample provenance are recorded in
+`Documentations/09-uspto-bulk-xml-reference.md`.
 
 ## Firm matching and initial roles
 

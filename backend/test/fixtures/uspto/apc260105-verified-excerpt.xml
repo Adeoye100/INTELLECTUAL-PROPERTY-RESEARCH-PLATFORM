@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Field-for-field excerpt derived from real USPTO file apc260105.xml.
+  ZIP sha256: c9bdefba85ef1c05bca6e3f145c6502ccd50e4c297beff6958a361ea8b662eef
+  XML sha256: 1e8063ea57ea67e574dc498759c616256e6f8456d26a3018351e25e19d363619
+  Unrelated fields were omitted to keep the fixture reviewable; values and
+  nesting retained below were not invented or renamed.
+-->
+<trademark-applications-daily>
+  <version>
+    <version-no>2.0</version-no>
+    <version-date>20041108</version-date>
+  </version>
+  <creation-datetime>202601050529</creation-datetime>
+  <application-information>
+    <file-segments>
+      <file-segment>TRMK</file-segment>
+      <action-keys>
+        <action-key>IB</action-key>
+        <case-file>
+          <serial-number>98038829</serial-number>
+          <registration-number>7427779</registration-number>
+          <transaction-date>20260105</transaction-date>
+          <case-file-header>
+            <filing-date>20230612</filing-date>
+            <registration-date>20240625</registration-date>
+            <status-code>700</status-code>
+            <status-date>20240625</status-date>
+            <mark-identification>NIMBL VISUAL MEDIA &amp; DESIGN</mark-identification>
+          </case-file-header>
+          <classifications>
+            <classification>
+              <international-code>035</international-code>
+              <status-code>6</status-code>
+              <primary-code>035</primary-code>
+            </classification>
+            <classification>
+              <international-code>041</international-code>
+              <status-code>6</status-code>
+              <primary-code>041</primary-code>
+            </classification>
+            <classification>
+              <international-code>042</international-code>
+              <status-code>6</status-code>
+              <primary-code>042</primary-code>
+            </classification>
+          </classifications>
+          <case-file-owners>
+            <case-file-owner>
+              <party-type>30</party-type>
+              <party-name>Nimbl Marketing Co.</party-name>
+            </case-file-owner>
+          </case-file-owners>
+        </case-file>
+      </action-keys>
+      <action-keys>
+        <action-key>NA</action-key>
+        <case-file>
+          <serial-number>79373454</serial-number>
+          <registration-number>0000000</registration-number>
+          <transaction-date>20260105</transaction-date>
+          <case-file-header>
+            <filing-date>20230606</filing-date>
+            <status-code>602</status-code>
+            <status-date>20250104</status-date>
+            <mark-identification>VALORIA</mark-identification>
+            <abandonment-date>20241202</abandonment-date>
+          </case-file-header>
+          <classifications>
+            <classification>
+              <international-code>001</international-code>
+              <status-code>6</status-code>
+              <primary-code>001</primary-code>
+            </classification>
+            <classification>
+              <international-code>005</international-code>
+              <status-code>6</status-code>
+              <primary-code>005</primary-code>
+            </classification>
+          </classifications>
+          <case-file-owners>
+            <case-file-owner>
+              <party-type>10</party-type>
+              <party-name>Aphea.Bio, naamloze vennootschap</party-name>
+            </case-file-owner>
+          </case-file-owners>
+        </case-file>
+      </action-keys>
+    </file-segments>
+  </application-information>
+</trademark-applications-daily>
