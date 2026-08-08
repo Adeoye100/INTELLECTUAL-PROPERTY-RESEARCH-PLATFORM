@@ -9,7 +9,7 @@ export function createApp({ authService, authenticate }) {
   app.use(express.json({ limit: '16kb' }));
 
   app.use('/api/v1/auth', createAuthRouter(authService));
-  app.use('/api/v1', createProtectedRouter(authenticate));
+  app.use('/api/v1', createProtectedRouter(authenticate, authService));
 
   app.use((_request, response) => {
     response.status(404).json({ code: 'NOT_FOUND', message: 'Endpoint not found.' });

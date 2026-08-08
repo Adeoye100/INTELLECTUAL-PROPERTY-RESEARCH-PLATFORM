@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   ElasticsearchProjector,
+  projectToElasticsearch,
   syncRegistryTrademarksToElasticsearch,
 } from '../../src/ingestion/elasticsearch-projector.js';
 import { ingestRegistryUpdates } from '../../src/ingestion/ingest-registry.js';
@@ -68,5 +69,44 @@ describe('registry ingestion boundaries', () => {
     assert.match(request.options.body, /"_index":"trademarks_composite"/);
     assert.match(request.options.body, /"source_registry":"USPTO"/);
     assert.deepEqual(repositoryCalls, [[row]]);
+  });
+
+  it('projectToElasticsearch writes one PostgreSQL-shaped row in the composite shape', async () => {
+    let request;
+    const row = {
+      id: '34db3bd4-b9f4-4907-83c6-b79f25a19af7',
+      firm_id: 'not-projected',
+      mark_text: 'KWIK SEARCH',
+      owner: 'Example Owner',
+      jurisdiction: 'NG',
+      nice_classes: [9, 42],
+      status: 'filed',
+      filing_date: '2026-08-08',
+      source_registry: 'NIPO',
+      updated_at: '2026-08-08T10:00:00.000Z',
+    };
+
+    await projectToElasticsearch(row, {
+      baseUrl: 'http://elasticsearch.test:9200/',
+      fetchImpl: async (url, options) => {
+        request = { url, options };
+        return { ok: true, json: async () => ({ errors: false, items: [] }) };
+      },
+    });
+
+    assert.equal(request.url, 'http://elasticsearch.test:9200/_bulk');
+    const lines = request.options.body.trim().split('\n').map(JSON.parse);
+    assert.deepEqual(lines, [
+      { index: { _index: 'trademarks_composite', _id: row.id } },
+      {
+        mark_text: 'KWIK SEARCH',
+        owner: 'Example Owner',
+        jurisdiction: 'NG',
+        nice_classes: [9, 42],
+        status: 'filed',
+        filing_date: '2026-08-08',
+        source_registry: 'NIPO',
+      },
+    ]);
   });
 });

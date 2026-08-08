@@ -14,6 +14,20 @@ const mapUser = (row) => ({
   } : undefined,
 });
 
+const invitationError = (code) => Object.assign(new Error(code), { code });
+
+const mapInvitation = (row) => ({
+  id: row.id,
+  firmId: row.firm_id,
+  issuedByUserId: row.issued_by_user_id,
+  email: row.email,
+  intendedName: row.intended_name,
+  role: row.role,
+  expiresAt: row.expires_at,
+  usedAt: row.used_at,
+  firmName: row.firm_name,
+});
+
 export class UserRepository {
   constructor(pool) {
     this.pool = pool;
@@ -30,24 +44,21 @@ export class UserRepository {
         [normalizedFirmName],
       );
 
-      let firm = firmResult.rows[0];
-      let role = 'viewer';
-      if (!firm) {
-        const inserted = await client.query(
-          `INSERT INTO firms (name, subscription_tier)
-           VALUES ($1, 'free')
-           RETURNING id, name, subscription_tier`,
-          [firmName],
-        );
-        firm = inserted.rows[0];
-        role = 'admin';
-      }
+      if (firmResult.rowCount) throw invitationError('FIRM_NAME_EXISTS');
+
+      const inserted = await client.query(
+        `INSERT INTO firms (name, subscription_tier)
+         VALUES ($1, 'free')
+         RETURNING id, name, subscription_tier`,
+        [firmName],
+      );
+      const firm = inserted.rows[0];
 
       const userResult = await client.query(
         `INSERT INTO users (firm_id, email, password_hash, role)
          VALUES ($1, $2, $3, $4)
          RETURNING id, firm_id, email, password_hash, role, created_at, last_login_at`,
-        [firm.id, email, passwordHash, role],
+        [firm.id, email, passwordHash, 'admin'],
       );
       await client.query('COMMIT');
 
@@ -55,6 +66,86 @@ export class UserRepository {
         ...userResult.rows[0],
         firm_name: firm.name,
         subscription_tier: firm.subscription_tier,
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async createInvitation({ id, issuerUserId, firmId, email, intendedName, role, expiresAt }) {
+    const result = await this.pool.query(
+      `WITH inserted AS (
+         INSERT INTO firm_invitations (
+           id, firm_id, issued_by_user_id, email, intended_name, role, expires_at
+         )
+         SELECT $1, u.firm_id, u.id, $4, $5, $6, $7
+         FROM users u
+         WHERE u.id = $2 AND u.firm_id = $3 AND u.role = 'admin'
+         RETURNING *
+       )
+       SELECT inserted.*, firms.name AS firm_name
+       FROM inserted
+       JOIN firms ON firms.id = inserted.firm_id`,
+      [id, issuerUserId, firmId, email, intendedName, role, expiresAt],
+    );
+    return result.rowCount ? mapInvitation(result.rows[0]) : null;
+  }
+
+  async findInvitation(id) {
+    const result = await this.pool.query(
+      `SELECT i.*, f.name AS firm_name
+       FROM firm_invitations i
+       JOIN firms f ON f.id = i.firm_id
+       WHERE i.id = $1`,
+      [id],
+    );
+    return result.rowCount ? mapInvitation(result.rows[0]) : null;
+  }
+
+  async acceptInvitation({ id, firmId, email, role, expiresAtSeconds, passwordHash }) {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const invitationResult = await client.query(
+        `SELECT i.*, f.name AS firm_name, f.subscription_tier
+         FROM firm_invitations i
+         JOIN firms f ON f.id = i.firm_id
+         WHERE i.id = $1
+         FOR UPDATE OF i`,
+        [id],
+      );
+      if (!invitationResult.rowCount) throw invitationError('INVITATION_INVALID');
+
+      const invitation = invitationResult.rows[0];
+      if (invitation.used_at) throw invitationError('INVITATION_USED');
+      if (invitation.expires_at.getTime() <= Date.now()) {
+        throw invitationError('INVITATION_EXPIRED');
+      }
+      if (
+        invitation.firm_id !== firmId
+        || invitation.email !== email
+        || invitation.role !== role
+        || Math.floor(invitation.expires_at.getTime() / 1_000) !== expiresAtSeconds
+      ) {
+        throw invitationError('INVITATION_INVALID');
+      }
+
+      const userResult = await client.query(
+        `INSERT INTO users (firm_id, email, password_hash, role)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, firm_id, email, password_hash, role, created_at, last_login_at`,
+        [firmId, email, passwordHash, role],
+      );
+      await client.query('UPDATE firm_invitations SET used_at = now() WHERE id = $1', [id]);
+      await client.query('COMMIT');
+
+      return mapUser({
+        ...userResult.rows[0],
+        firm_name: invitation.firm_name,
+        subscription_tier: invitation.subscription_tier,
       });
     } catch (error) {
       await client.query('ROLLBACK');

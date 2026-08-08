@@ -19,11 +19,16 @@ if (!databaseUrl || !redisUrl) {
 const suffix = randomUUID();
 const firmName = `Integration Firm ${suffix}`;
 const adminEmail = `admin-${suffix}@example.test`;
-const viewerEmail = `viewer-${suffix}@example.test`;
+const invitedEmail = `viewer-${suffix}@example.test`;
+const blockedEmail = `blocked-${suffix}@example.test`;
+const expiredEmail = `expired-${suffix}@example.test`;
+const signupInviteEmail = `signup-invite-${suffix}@example.test`;
 const password = 'integration-password';
 const issuedRefreshTokens = [];
 let system;
 let firmId;
+let adminAccessToken;
+let acceptedInviteToken;
 
 const config = {
   databaseUrl,
@@ -47,6 +52,7 @@ after(async () => {
   if (!system) return;
   await Promise.all(issuedRefreshTokens.map((token) => system.sessionStore.invalidate(token)));
   if (firmId) {
+    await system.pool.query('DELETE FROM firm_invitations WHERE firm_id = $1', [firmId]);
     await system.pool.query('DELETE FROM users WHERE firm_id = $1', [firmId]);
     await system.pool.query('DELETE FROM firms WHERE id = $1', [firmId]);
   }
@@ -54,7 +60,7 @@ after(async () => {
 });
 
 describe('auth API with real PostgreSQL and Redis', () => {
-  it('creates the documented firms/users schema and role enum', async () => {
+  it('creates the documented firms/users/invitations schema and role enum', async () => {
     const columns = await system.pool.query(`
       SELECT table_name, column_name
       FROM information_schema.columns
@@ -70,6 +76,17 @@ describe('auth API with real PostgreSQL and Redis', () => {
       ['id', 'firm_id', 'email', 'password_hash', 'role', 'created_at', 'last_login_at'],
     );
 
+    const invitationColumns = await system.pool.query(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'firm_invitations'
+      ORDER BY ordinal_position
+    `);
+    assert.deepEqual(invitationColumns.rows.map(({ column_name }) => column_name), [
+      'id', 'firm_id', 'issued_by_user_id', 'email', 'intended_name', 'role',
+      'expires_at', 'used_at', 'created_at',
+    ]);
+
     const roles = await system.pool.query(`
       SELECT enumlabel FROM pg_enum
       JOIN pg_type ON pg_type.oid = pg_enum.enumtypid
@@ -79,7 +96,7 @@ describe('auth API with real PostgreSQL and Redis', () => {
     assert.deepEqual(roles.rows.map(({ enumlabel }) => enumlabel), ['admin', 'attorney', 'viewer']);
   });
 
-  it('runs signup, login, refresh rotation, and logout end to end', async () => {
+  it('keeps new-firm self-serve signup, login, refresh rotation, and logout working', async () => {
     const signup = await request(system.app).post('/api/v1/auth/signup').send({
       firmName,
       email: adminEmail,
@@ -90,6 +107,7 @@ describe('auth API with real PostgreSQL and Redis', () => {
     assert.ok(signup.body.accessToken);
     assert.ok(signup.body.refreshToken);
     firmId = signup.body.user.firmId;
+    adminAccessToken = signup.body.accessToken;
     issuedRefreshTokens.push(signup.body.refreshToken);
 
     const signupSessionKey = system.sessionStore.keyFor(signup.body.refreshToken);
@@ -156,38 +174,115 @@ describe('auth API with real PostgreSQL and Redis', () => {
     assert.equal(afterLogout.status, 401);
   });
 
-  it('matches normalized firm names, defaults additional users to Viewer, and enforces RBAC', async () => {
+  it('blocks self-serve signup when the normalized firm name already exists', async () => {
     const signup = await request(system.app).post('/api/v1/auth/signup').send({
       firmName: `  ${firmName.toUpperCase()}  `,
-      email: viewerEmail,
+      email: blockedEmail,
       password,
     });
-    assert.equal(signup.status, 201);
-    assert.equal(signup.body.user.firmId, firmId);
-    assert.equal(signup.body.user.role, 'viewer');
-    issuedRefreshTokens.push(signup.body.refreshToken);
+    assert.equal(signup.status, 409);
+    assert.equal(signup.body.code, 'FIRM_ALREADY_EXISTS');
+    assert.match(signup.body.message, /request an invitation/i);
+    assert.equal((await system.pool.query('SELECT 1 FROM users WHERE email = $1', [blockedEmail])).rowCount, 0);
+  });
+
+  it('lets an Admin issue a signed invite and joins with its intended firm and role', async () => {
+    const issued = await request(system.app)
+      .post('/api/v1/admin/invitations')
+      .set('Authorization', `Bearer ${adminAccessToken}`)
+      .send({ fullName: 'Invited Viewer', email: invitedEmail, role: 'viewer' });
+    assert.equal(issued.status, 201);
+    assert.equal(issued.body.email, invitedEmail);
+    assert.equal(issued.body.firmName, firmName);
+    assert.equal(issued.body.role, 'viewer');
+    assert.equal(typeof issued.body.token, 'string');
+
+    acceptedInviteToken = issued.body.token;
+    const details = await request(system.app)
+      .get(`/api/v1/auth/invitations/${acceptedInviteToken}`);
+    assert.equal(details.status, 200);
+    assert.deepEqual(details.body, { email: invitedEmail, firmName, role: 'viewer' });
+
+    const accepted = await request(system.app)
+      .post(`/api/v1/auth/invitations/${acceptedInviteToken}/accept`)
+      .send({ fullName: 'Invited Viewer', password });
+    assert.equal(accepted.status, 201);
+    assert.equal(accepted.body.user.firmId, firmId);
+    assert.equal(accepted.body.user.role, 'viewer');
+    assert.equal(accepted.body.user.email, invitedEmail);
+    assert.equal(accepted.body.token, accepted.body.accessToken);
+    assert.equal(typeof accepted.body.expiresAt, 'number');
+    issuedRefreshTokens.push(accepted.body.refreshToken);
 
     const viewerPing = await request(system.app)
       .get('/api/v1/viewer/ping')
-      .set('Authorization', `Bearer ${signup.body.accessToken}`);
+      .set('Authorization', `Bearer ${accepted.body.accessToken}`);
     assert.equal(viewerPing.status, 200);
 
     const forbidden = await request(system.app)
       .get('/api/v1/admin/ping')
-      .set('Authorization', `Bearer ${signup.body.accessToken}`);
+      .set('Authorization', `Bearer ${accepted.body.accessToken}`);
     assert.equal(forbidden.status, 403);
     assert.equal(forbidden.body.code, 'FORBIDDEN');
 
-    await system.pool.query("UPDATE users SET role = 'attorney' WHERE email = $1", [viewerEmail]);
-    const attorneyLogin = await request(system.app).post('/api/v1/auth/login').send({
-      email: viewerEmail,
+    const viewerIssueAttempt = await request(system.app)
+      .post('/api/v1/admin/invitations')
+      .set('Authorization', `Bearer ${accepted.body.accessToken}`)
+      .send({ fullName: 'Unauthorized Invite', email: 'unauthorized@example.test', role: 'viewer' });
+    assert.equal(viewerIssueAttempt.status, 403);
+  });
+
+  it('redeems an invite through signup and ignores any caller-supplied role or firm', async () => {
+    const issued = await request(system.app)
+      .post('/api/v1/admin/invitations')
+      .set('Authorization', `Bearer ${adminAccessToken}`)
+      .send({ fullName: 'Invited Attorney', email: signupInviteEmail, role: 'attorney' });
+    assert.equal(issued.status, 201);
+
+    const signup = await request(system.app).post('/api/v1/auth/signup').send({
+      inviteToken: issued.body.token,
+      fullName: 'Invited Attorney',
+      email: signupInviteEmail.toUpperCase(),
+      firmName: 'Caller Controlled Firm',
+      role: 'admin',
       password,
     });
-    issuedRefreshTokens.push(attorneyLogin.body.refreshToken);
-    const attorneyPing = await request(system.app)
-      .get('/api/v1/attorney/ping')
-      .set('Authorization', `Bearer ${attorneyLogin.body.accessToken}`);
-    assert.equal(attorneyPing.status, 200);
+    assert.equal(signup.status, 201);
+    assert.equal(signup.body.user.firmId, firmId);
+    assert.equal(signup.body.user.role, 'attorney');
+    assert.equal(signup.body.firm.name, firmName);
+    issuedRefreshTokens.push(signup.body.refreshToken);
+  });
+
+  it('rejects reuse of an accepted invitation with a clear error', async () => {
+    const replay = await request(system.app)
+      .post(`/api/v1/auth/invitations/${acceptedInviteToken}/accept`)
+      .send({ fullName: 'Invited Viewer', password });
+    assert.equal(replay.status, 410);
+    assert.equal(replay.body.code, 'EXPIRED_LINK');
+    assert.match(replay.body.message, /already been used/i);
+  });
+
+  it('rejects an expired invitation with a clear error', async () => {
+    const issued = await request(system.app)
+      .post('/api/v1/admin/invitations')
+      .set('Authorization', `Bearer ${adminAccessToken}`)
+      .send({ fullName: 'Expired Invite', email: expiredEmail, role: 'attorney' });
+    assert.equal(issued.status, 201);
+
+    await system.pool.query(
+      `UPDATE firm_invitations
+       SET created_at = now() - interval '2 days', expires_at = now() - interval '1 day'
+       WHERE email = $1`,
+      [expiredEmail],
+    );
+    const expired = await request(system.app)
+      .post(`/api/v1/auth/invitations/${issued.body.token}/accept`)
+      .send({ fullName: 'Expired Invite', password });
+    assert.equal(expired.status, 410);
+    assert.equal(expired.body.code, 'EXPIRED_LINK');
+    assert.match(expired.body.message, /expired/i);
+    assert.equal((await system.pool.query('SELECT 1 FROM users WHERE email = $1', [expiredEmail])).rowCount, 0);
   });
 
   it('never echoes a rejected password', async () => {

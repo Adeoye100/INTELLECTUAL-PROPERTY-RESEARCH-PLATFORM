@@ -30,6 +30,7 @@ export async function createSystem(config) {
     sessionStore,
     accessTokenTtlSeconds: config.accessTokenTtlSeconds,
     refreshTokenTtlSeconds: config.refreshTokenTtlSeconds,
+    inviteTokenTtlSeconds: config.inviteTokenTtlSeconds,
   });
 
   return {

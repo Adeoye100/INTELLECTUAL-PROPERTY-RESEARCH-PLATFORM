@@ -1,5 +1,41 @@
+import { TRADEMARKS_COMPOSITE_INDEX } from '../search/elasticsearch-indices.js';
+
+/**
+ * @typedef {object} PostgresTrademarkRecord
+ * @property {string} id
+ * @property {string} mark_text
+ * @property {string|null} [owner]
+ * @property {string} jurisdiction
+ * @property {number[]} nice_classes
+ * @property {string} status
+ * @property {string|Date|null} [filing_date]
+ * @property {string} source_registry
+ * @property {number[]} [similarity_vector]
+ */
+
+/** @param {PostgresTrademarkRecord} row */
+export function toCompositeTrademarkDocument(row) {
+  const document = {
+    mark_text: row.mark_text,
+    owner: row.owner ?? null,
+    jurisdiction: row.jurisdiction,
+    nice_classes: row.nice_classes,
+    status: row.status,
+    filing_date: row.filing_date ?? null,
+    source_registry: row.source_registry,
+  };
+  if (row.similarity_vector !== undefined) {
+    document.similarity_vector = row.similarity_vector;
+  }
+  return document;
+}
+
 export class ElasticsearchProjector {
-  constructor({ baseUrl, indexName = 'trademarks_composite', fetchImpl = globalThis.fetch }) {
+  constructor({
+    baseUrl,
+    indexName = TRADEMARKS_COMPOSITE_INDEX,
+    fetchImpl = globalThis.fetch,
+  }) {
     if (!baseUrl?.trim()) throw new Error('ELASTICSEARCH_URL is required for projection.');
     this.baseUrl = baseUrl.replace(/\/$/, '');
     this.indexName = indexName;
@@ -10,15 +46,7 @@ export class ElasticsearchProjector {
     if (!rows.length) return;
     const operations = rows.flatMap((row) => [
       JSON.stringify({ index: { _index: this.indexName, _id: row.id } }),
-      JSON.stringify({
-        mark_text: row.mark_text,
-        owner: row.owner,
-        jurisdiction: row.jurisdiction,
-        nice_classes: row.nice_classes,
-        status: row.status,
-        filing_date: row.filing_date,
-        source_registry: row.source_registry,
-      }),
+      JSON.stringify(toCompositeTrademarkDocument(row)),
     ]).join('\n') + '\n';
 
     const response = await this.fetchImpl(`${this.baseUrl}/_bulk`, {
@@ -35,6 +63,23 @@ export class ElasticsearchProjector {
       throw new Error(`Elasticsearch bulk projection reported ${failures} failed document(s).`);
     }
   }
+}
+
+/**
+ * Projects one PostgreSQL-shaped trademark or portfolio-mark row through the
+ * same bulk transport used by the BE-07/08 sync pipeline.
+ *
+ * @param {PostgresTrademarkRecord} record
+ * @param {{baseUrl?: string, indexName?: string, fetchImpl?: typeof fetch}} [options]
+ * @returns {Promise<void>}
+ */
+export async function projectToElasticsearch(record, options = {}) {
+  const projector = new ElasticsearchProjector({
+    baseUrl: options.baseUrl ?? process.env.ELASTICSEARCH_URL,
+    indexName: options.indexName,
+    fetchImpl: options.fetchImpl,
+  });
+  await projector.project([record]);
 }
 
 export async function syncRegistryTrademarksToElasticsearch({

@@ -23,7 +23,8 @@ node_modules/
 !.env.example
 !.env.*.example
 # This tracked backend template currently contains secret-like local values.
-/backend/.env.example
+/backend/.env
+/frontend/.env.example
 *.local
 
 # Credentials, private keys, and certificates

@@ -12,7 +12,7 @@ export const AuthLayout: React.FC = () => {
         <div className="bg-surface-card rounded-lg shadow-2xl p-8 border border-forge-silver-300">
           <Outlet />
         </div>
-        <footer className="mt-8 text-center text-forge-subtext-onDark text-sm">
+        <footer className="mt-8 w-full bg-forge-navy-950/90 py-4 backdrop-blur-sm rounded-lg text-center text-forge-subtext-onDark text-sm">
           © 2026 Forge Global Intellectual Property Security. All rights reserved.
         </footer>
       </div>

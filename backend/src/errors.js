@@ -16,6 +16,7 @@ export const forbidden = (message = 'You do not have permission to perform this 
   new AppError(403, 'FORBIDDEN', message)
 );
 export const conflict = (code, message) => new AppError(409, code, message);
+export const gone = (code, message) => new AppError(410, code, message);
 
 export function errorHandler(error, _request, response, _next) {
   if (error instanceof AppError) {

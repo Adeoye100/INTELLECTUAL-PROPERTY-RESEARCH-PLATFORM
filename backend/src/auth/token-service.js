@@ -50,4 +50,47 @@ export class TokenService {
       role: payload.role,
     };
   }
+
+  async issueInvitationToken(invitation) {
+    return new SignJWT({
+      type: 'firm-invitation',
+      firmId: invitation.firmId,
+      email: invitation.email,
+      role: invitation.role,
+    })
+      .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+      .setJti(invitation.id)
+      .setIssuer(this.issuer)
+      .setAudience(this.audience)
+      .setIssuedAt()
+      .setExpirationTime(Math.floor(invitation.expiresAt.getTime() / 1_000))
+      .sign(this.secret);
+  }
+
+  async verifyInvitationToken(token) {
+    const { payload } = await jwtVerify(token, this.secret, {
+      issuer: this.issuer,
+      audience: this.audience,
+      algorithms: ['HS256'],
+    });
+
+    if (
+      payload.type !== 'firm-invitation'
+      || typeof payload.jti !== 'string'
+      || typeof payload.firmId !== 'string'
+      || typeof payload.email !== 'string'
+      || !['admin', 'attorney', 'viewer'].includes(payload.role)
+      || typeof payload.exp !== 'number'
+    ) {
+      throw new Error('Invalid invitation-token claims.');
+    }
+
+    return {
+      id: payload.jti,
+      firmId: payload.firmId,
+      email: payload.email,
+      role: payload.role,
+      expiresAtSeconds: payload.exp,
+    };
+  }
 }

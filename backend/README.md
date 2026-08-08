@@ -10,24 +10,33 @@ Postgres-first trademark ingestion/projection commands described below.
 
 ## Local services and configuration
 
-The documented local assumption is Docker Compose with PostgreSQL 16 and Redis 7:
+The documented local assumption is Docker Compose with PostgreSQL 16, Redis 7,
+and Elasticsearch 9.4.2:
 
 ```sh
 docker compose up -d
-cp .env.example .env
+# Populate .env with the documented local service URLs and secrets, then:
 set -a; . ./.env; set +a
 pnpm migrate
+pnpm indices:elasticsearch
 pnpm test
 pnpm start
 ```
 
 The Compose initialization creates both `iprp` and disposable `iprp_test`
-databases. Integration tests require `TEST_DATABASE_URL` and `TEST_REDIS_URL` and
-fail instead of silently substituting in-memory stores. Use only disposable test
-stores; Redis database 15 is selected in `.env.example` to isolate test sessions.
+databases. Integration tests require `TEST_DATABASE_URL`, `TEST_REDIS_URL`, and
+`TEST_ELASTICSEARCH_URL` and fail instead of silently substituting in-memory
+stores. Use only disposable test stores; Redis database 15 is selected in
+`.env.example` to isolate test sessions.
+
+The compose Elasticsearch node is deliberately local-development-only. It runs
+as a single node with security disabled and port `9200` exposed. This is not a
+production security posture: any deployed cluster must enable authentication,
+TLS, authorization, backups, and appropriate node topology.
 
 All required environment variables and token lifetimes are documented in
-`.env.example`. `JWT_ACCESS_SECRET` must be at least 32 bytes.
+`.env.example`. `JWT_ACCESS_SECRET` must be at least 32 bytes. Firm invitations
+default to seven days and can be configured with `INVITE_TOKEN_TTL_SECONDS`.
 
 ## Migrations
 
@@ -59,8 +68,10 @@ The ingestion boundary is deliberately two commands:
 # attributed (source_registry, source_reference_id) UPSERT key.
 pnpm ingest:uspto -- --since 2026-01-05
 
-# Run separately after Postgres ingestion. This command is optional until BE-06
-# provides Elasticsearch; its absence does not block ingestion or its tests.
+# Create the exact composite and office-action mappings. Re-running is safe.
+pnpm indices:elasticsearch
+
+# Run separately after Postgres ingestion.
 pnpm sync:elasticsearch
 ```
 
@@ -70,15 +81,42 @@ to `registry_trademarks`. Every row carries `source_registry = 'USPTO'` and the
 USPTO serial number as `source_reference_id`. Unchanged replays do not update the
 row or create projection work.
 
-`sync:elasticsearch` is the only component that writes to the
-`trademarks_composite` index. It selects new/changed Postgres rows, submits an
-Elasticsearch bulk request, and marks the exact projected row version only after
-the bulk request succeeds. The adapter never receives an Elasticsearch client.
+The Elasticsearch projector is the only component that writes to the
+`trademarks_composite` index. `sync:elasticsearch` selects new/changed Postgres
+rows, submits them through that projector, and marks the exact projected row
+version only after the bulk request succeeds. The registry adapter never receives
+an Elasticsearch client.
 
 These are manual commands for now. No `node-cron` scheduler was placed in the API
 process, and no Redis queue library was introduced merely for this ticket. The
 deployment scheduler or the later Redis-backed worker can invoke the same two
 commands in order without changing the ingestion services.
+
+## Elasticsearch indices
+
+The custom local image installs Elastic's official `analysis-phonetic` plugin at
+the same pinned version as Elasticsearch. `trademarks_composite.mark_text` uses
+the standard analyzer for ordinary text matching and a `phonetic` multi-field
+using Double Metaphone for sound-alike spellings. Double Metaphone was selected
+over basic Soundex because it handles more spelling and pronunciation variation;
+the filter uses `replace: true` so the dedicated sub-field contains phonetic
+tokens without stacked original tokens. The Elasticsearch integration test proves
+the setup by indexing `Kwik` and retrieving it with a `Quick` phonetic query.
+
+`similarity_vector` is declared as a 384-dimension `dense_vector` with
+`index: false`. This reserves the shape for the lightweight multilingual E5-small
+embedding approach anticipated for cross-jurisdiction marks without paying kNN
+indexing cost while the field is empty. Selecting or populating the embedding
+model remains deferred as required; changing the model dimensionality later will
+require a versioned index and reindex.
+
+The `indices:elasticsearch` command sends idempotent HEAD/PUT requests for both
+`trademarks_composite` and `office_actions`. Existing indices are left untouched;
+creation races that return `resource_already_exists_exception` are also treated
+as success. `projectToElasticsearch(record)` is the typed, single-record adapter
+over the existing bulk projector and accepts the snake_case row shape returned by
+PostgreSQL. BE-07/08 can continue using the current batch sync without a second
+projection implementation.
 
 The TSDR adapter implements only per-serial `getStatus`. It reads
 `USPTO_TSDR_API_KEY` at construction and raises a specific configuration error at
@@ -88,32 +126,35 @@ call time when the key is missing. Its `fetchUpdates` and the bulk adapter's
 The verified real XML structure and sample provenance are recorded in
 `Documentations/09-uspto-bulk-xml-reference.md`.
 
-## Firm matching and initial roles
+## Firm creation and invite-only joining
 
 Self-serve signup reads `firmName`, falling back to the frontend-compatible
 `company` field. It trims leading/trailing whitespace, collapses every run of
 internal whitespace to one space, and lower-cases the result. The repository then
-performs an exact equality comparison against the same normalized PostgreSQL
-expression. It does not derive or compare a domain from the user's email. A unique
-expression index and transaction-scoped advisory lock make this exact matching
-rule race-safe.
+compares it with the same normalized PostgreSQL expression. A unique expression
+index and transaction-scoped advisory lock make the check race-safe.
 
-The first user for a new firm is `admin`; an additional self-serve user matching
-an existing firm receives the least-privileged `viewer` role.
+Self-serve signup can only create a new firm, whose first user is `admin`. If the
+normalized name already exists, signup returns `409 FIRM_ALREADY_EXISTS` with a
+message directing the user to request an invitation. A name match never grants a
+role or tenant membership.
 
-**This matching rule is not safe for production tenant admission.** An unrelated
-person can submit an existing firm's public name and receive Viewer access, two
-unrelated firms can legitimately share a normalized name, and aliases or spelling
-differences can split one firm into multiple tenants. Before real client data is
-stored, existing-firm signup must require an explicit single-use firm invitation
-or another verified administrator-controlled membership claim. Name normalization
-may remain a duplicate-warning signal, but must not grant tenant membership.
+Joining an existing firm requires an Admin-issued invitation. The signed JWT binds
+the invitation ID, firm ID, normalized email, intended role, and expiry. The
+database stores the authoritative invitation row. Acceptance locks that row,
+checks the signed claims against it, creates the user with the stored role, and
+marks the invitation used in one transaction. Expired and already-used invitations
+return `410 EXPIRED_LINK`; invalid or altered tokens return `403`.
 
 ## Auth API
 
 | Method and path | Body | Result |
 |---|---|---|
 | `POST /api/v1/auth/signup` | `{ firmName (or company), email, password }` | `201` access/refresh pair, user role, firm |
+| `POST /api/v1/auth/signup` | `{ inviteToken, fullName?, email?, password }` | `201` invite redemption; the optional email must match the invitation |
+| `POST /api/v1/admin/invitations` | `{ fullName, email, role }` plus Admin bearer token | `201` signed token, expiry, email, firm name, and role |
+| `GET /api/v1/auth/invitations/:token` | None | `200` invitation email, firm name, and role when usable |
+| `POST /api/v1/auth/invitations/:token/accept` | `{ fullName, password }` | `201` access/refresh pair plus frontend-compatible `token` and `expiresAt` aliases |
 | `POST /api/v1/auth/login` | `{ email, password }` | `200` access/refresh pair; records `last_login_at` |
 | `POST /api/v1/auth/refresh` | `{ refreshToken }` | `200` new access token and rotated refresh token |
 | `POST /api/v1/auth/logout` | `{ refreshToken }` | `204`; Redis session invalidated |
@@ -143,7 +184,9 @@ authentication receives `401`.
 ## Deferred security hooks
 
 - **BE-15:** Redis-backed IP/account rate limiting belongs immediately before the
-  public auth handlers in `src/routes/auth-routes.js`.
+  public auth handlers, including invitation lookup/redemption, in
+  `src/routes/auth-routes.js`.
 - **BE-16:** redacted audit events belong after successful auth state changes and,
-  later, protected business mutations. The error handler intentionally logs no
+  specifically, after invitation issuance and redemption. The hook points are
+  marked in `src/auth/auth-service.js`; the error handler intentionally logs no
   request body or password.

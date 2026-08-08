@@ -28,6 +28,7 @@ export function loadConfig(env = process.env) {
     jwtAudience: env.JWT_AUDIENCE?.trim() || 'iprp-web',
     accessTokenTtlSeconds: positiveInteger(env, 'ACCESS_TOKEN_TTL_SECONDS', 900),
     refreshTokenTtlSeconds: positiveInteger(env, 'REFRESH_TOKEN_TTL_SECONDS', 2_592_000),
+    inviteTokenTtlSeconds: positiveInteger(env, 'INVITE_TOKEN_TTL_SECONDS', 604_800),
   };
 }
 
@@ -43,5 +44,11 @@ export function loadElasticsearchSyncConfig(env = process.env) {
     databaseUrl: required(env, 'DATABASE_URL'),
     elasticsearchUrl: required(env, 'ELASTICSEARCH_URL'),
     elasticsearchIndex: env.ELASTICSEARCH_INDEX?.trim() || 'trademarks_composite',
+  };
+}
+
+export function loadElasticsearchIndexConfig(env = process.env) {
+  return {
+    elasticsearchUrl: required(env, 'ELASTICSEARCH_URL'),
   };
 }
