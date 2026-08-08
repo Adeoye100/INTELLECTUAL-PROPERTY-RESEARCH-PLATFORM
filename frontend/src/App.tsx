@@ -2,6 +2,7 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppRouter } from './app/AppRouter';
 import { NetworkStatusBanner } from './app/NetworkStatusBanner';
+import { DemoBanner } from './components/DemoBanner';
 import './styles/index.css';
 
 const queryClient = new QueryClient({
@@ -16,6 +17,7 @@ const queryClient = new QueryClient({
 const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
+      <DemoBanner />
       <NetworkStatusBanner />
       <AppRouter />
     </QueryClientProvider>

@@ -1,8 +1,9 @@
-export type ApiMode = 'live' | 'mock';
+export type ApiMode = 'live' | 'mock' | 'demo';
 
 export interface ApiEnvironment {
   VITE_API_BASE_URL?: string;
   VITE_API_MODE?: string;
+  VITE_ALLOW_DEMO_BUILD?: string;
 }
 
 export interface ApiConfig {
@@ -19,15 +20,23 @@ export function resolveApiConfig(
   runtime: { isDevelopment: boolean },
 ): ApiConfig {
   const requestedMode = environment.VITE_API_MODE?.trim() || 'live';
-  if (requestedMode !== 'live' && requestedMode !== 'mock') {
-    throw new Error('VITE_API_MODE must be either "live" or "mock".');
+  if (requestedMode !== 'live' && requestedMode !== 'mock' && requestedMode !== 'demo') {
+    throw new Error('VITE_API_MODE must be one of: "live", "mock", or "demo".');
   }
+
   if (requestedMode === 'mock' && !runtime.isDevelopment) {
     throw new Error('VITE_API_MODE=mock is allowed only by a Vite development build.');
   }
 
+  if (requestedMode === 'demo') {
+    const allowDemo = environment.VITE_ALLOW_DEMO_BUILD === 'true';
+    if (!allowDemo) {
+      throw new Error('VITE_API_MODE=demo requires VITE_ALLOW_DEMO_BUILD=true.');
+    }
+  }
+
   const configuredBaseUrl = environment.VITE_API_BASE_URL?.trim();
-  const baseUrl = normalizeBaseUrl(configuredBaseUrl || (requestedMode === 'mock' ? API_VERSION_PATH : ''));
+  const baseUrl = normalizeBaseUrl(configuredBaseUrl || (requestedMode !== 'live' ? API_VERSION_PATH : ''));
   if (!baseUrl) {
     throw new Error('VITE_API_BASE_URL is required when VITE_API_MODE is live.');
   }
@@ -62,8 +71,9 @@ export function getApiConfig(): ApiConfig {
   runtimeConfig ??= resolveApiConfig({
     VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
     VITE_API_MODE: import.meta.env.VITE_API_MODE,
+    VITE_ALLOW_DEMO_BUILD: import.meta.env.VITE_ALLOW_DEMO_BUILD,
   }, { isDevelopment: import.meta.env.DEV });
   return runtimeConfig;
 }
 
-export const shouldEnableMocking = (config: ApiConfig) => config.mode === 'mock';
+export const shouldEnableMocking = (config: ApiConfig) => config.mode === 'mock' || config.mode === 'demo';

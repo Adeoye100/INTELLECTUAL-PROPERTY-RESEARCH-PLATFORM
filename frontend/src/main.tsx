@@ -5,7 +5,8 @@ import { getApiConfig, shouldEnableMocking } from './lib/api/config';
 
 async function enableMocking() {
   const config = getApiConfig();
-  if (!import.meta.env.DEV || !shouldEnableMocking(config)) return;
+  if (!shouldEnableMocking(config)) return;
+  if (config.mode === 'mock' && !import.meta.env.DEV) return;
 
   const { worker } = await import('./lib/mocks/browser');
   return worker.start({

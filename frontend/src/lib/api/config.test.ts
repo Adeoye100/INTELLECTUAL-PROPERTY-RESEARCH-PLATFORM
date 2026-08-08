@@ -22,6 +22,23 @@ describe('API mode selection', () => {
     expect(shouldEnableMocking(config)).toBe(true);
   });
 
+  it('enables MSW when demo mode is enabled with allowance', () => {
+    const config = resolveApiConfig(
+      { VITE_API_MODE: 'demo', VITE_ALLOW_DEMO_BUILD: 'true' },
+      { isDevelopment: false },
+    );
+
+    expect(config).toEqual({ baseUrl: '/api/v1', mode: 'demo' });
+    expect(shouldEnableMocking(config)).toBe(true);
+  });
+
+  it('rejects demo mode without allowance', () => {
+    expect(() => resolveApiConfig(
+      { VITE_API_MODE: 'demo' },
+      { isDevelopment: false },
+    )).toThrow(/requires VITE_ALLOW_DEMO_BUILD=true/i);
+  });
+
   it('rejects mock mode outside development', () => {
     expect(() => resolveApiConfig(
       { VITE_API_MODE: 'mock', VITE_API_BASE_URL: '/api/v1' },

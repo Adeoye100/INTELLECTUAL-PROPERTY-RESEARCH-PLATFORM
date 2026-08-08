@@ -1,6 +1,7 @@
 {
   "name": "backend",
   "version": "1.0.0",
+  "packageManager": "pnpm@11.15.1",
   "description": "Express API for the Intellectual Property Research Platform",
   "main": "src/server.js",
   "scripts": {
