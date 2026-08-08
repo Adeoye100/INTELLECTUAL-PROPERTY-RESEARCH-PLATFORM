@@ -1,8 +1,23 @@
 # React + TypeScript + Vite
 
+## Deployment
+
+### Vercel
+
+The frontend is configured for deployment on Vercel using `frontend/vercel.json`.
+
+Required environment variables in Vercel:
+- `VITE_API_BASE_URL`: The absolute URL of the API (e.g., `https://api.example.com/api/v1`).
+- `VITE_API_MODE`: Set to `live` (default) or omit it.
+
+When importing the project to Vercel:
+1. Set the **Root Directory** to `frontend`.
+2. Vercel should automatically detect **Vite** as the Framework Preset.
+3. Configure the environment variables mentioned above.
+
 ## API configuration
 
-Copy the relevant values from `.env.example` into deployment-managed environment configuration. Live mode requires `VITE_API_BASE_URL` and the value must end in `/api/v1`. `VITE_API_MODE` defaults to `live`; MSW starts only when `VITE_API_MODE=mock` is explicitly set while running a Vite development build. Staging and production builds reject mock mode.
+Copy the relevant values from `.env` into deployment-managed environment configuration. Live mode requires `VITE_API_BASE_URL` and the value must end in `/api/v1`. `VITE_API_MODE` defaults to `live`; MSW starts only when `VITE_API_MODE=mock` is explicitly set while running a Vite development build. Staging and production builds reject mock mode.
 
 The current repository has no backend application implementation, so no live endpoint is claimed as integrated. See `../Documentations/07-frontend-api-contracts.md` for the mock-only candidate contracts and blockers.
 
