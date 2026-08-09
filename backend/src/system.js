@@ -9,7 +9,7 @@ import { createPool } from './db/pool.js';
 import { createApp } from './app.js';
 
 export async function createSystem(config) {
-  const pool = createPool(config.databaseUrl);
+  const pool = createPool(config.databaseUrl, config.databaseSsl);
   const redisClient = createClient({ url: config.redisUrl });
   redisClient.on('error', (error) => {
     console.error('Redis client error', { name: error.name, code: error.code ?? 'UNKNOWN' });

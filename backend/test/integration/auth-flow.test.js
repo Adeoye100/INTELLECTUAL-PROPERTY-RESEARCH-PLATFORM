@@ -8,6 +8,7 @@ import { runMigrations } from '../../src/db/migration-runner.js';
 import { createSystem } from '../../src/system.js';
 
 const databaseUrl = process.env.TEST_DATABASE_URL?.trim();
+const databaseSsl = process.env.DATABASE_SSL === 'true';
 const redisUrl = process.env.TEST_REDIS_URL?.trim();
 if (!databaseUrl || !redisUrl) {
   throw new Error(
@@ -32,6 +33,7 @@ let acceptedInviteToken;
 
 const config = {
   databaseUrl,
+  databaseSsl,
   redisUrl,
   jwtAccessSecret: 'integration-only-secret-that-is-at-least-32-bytes',
   jwtIssuer: 'iprp-integration-test',

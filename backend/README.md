@@ -59,6 +59,23 @@ checksums are verified and skipped. Never place a production connection string i
 source control or shell history; inject `DATABASE_URL` through the deployment
 secret manager.
 
+To run migrations against Supabase or other hosted providers requiring SSL:
+
+```sh
+DATABASE_URL='postgresql://postgres:[PASSWORD]@db.[REF].supabase.co:5432/postgres' \
+DATABASE_SSL=true \
+pnpm migrate
+```
+
+## Supabase Postgres connection
+
+Supabase provides two primary connection methods:
+
+1.  **Direct Connection (Port 5432)**: Use this for migrations and maintenance. The host follows the pattern `db.[REF].supabase.co`.
+2.  **Pooled Connection (Port 6543)**: Use this for the running application to handle connection pooling efficiently in serverless or highly concurrent environments. The host follows the pattern `[REF].pooler.supabase.com` (or similar depending on your region).
+
+Both methods require SSL. In the IPRP backend, this is enabled by setting `DATABASE_SSL=true` in the environment. The `pg` driver is configured to accept Supabase's certificate (using `rejectUnauthorized: false` for compatibility across various Node.js environments).
+
 ## USPTO ingestion and Elasticsearch projection
 
 The ingestion boundary is deliberately two commands:
