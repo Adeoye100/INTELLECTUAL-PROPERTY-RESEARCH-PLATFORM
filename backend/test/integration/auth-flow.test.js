@@ -40,6 +40,7 @@ const config = {
   jwtAudience: 'iprp-integration-client',
   accessTokenTtlSeconds: 900,
   refreshTokenTtlSeconds: 3_600,
+  protectedAuthMode: 'legacy',
 };
 
 before(async () => {
@@ -75,7 +76,10 @@ describe('auth API with real PostgreSQL and Redis', () => {
     );
     assert.deepEqual(
       columns.rows.filter(({ table_name }) => table_name === 'users').map(({ column_name }) => column_name),
-      ['id', 'firm_id', 'email', 'password_hash', 'role', 'created_at', 'last_login_at'],
+      [
+        'id', 'firm_id', 'email', 'password_hash', 'role', 'created_at', 'last_login_at',
+        'supabase_user_id',
+      ],
     );
 
     const invitationColumns = await system.pool.query(`

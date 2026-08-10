@@ -41,6 +41,7 @@ erDiagram
 | Column | Type | Notes |
 |---|---|---|
 | id | uuid PK | |
+| supabase_user_id | uuid, unique, nullable | canonical link to the verified Supabase Auth user during migration; no cross-database FK |
 | firm_id | uuid FK → firms | |
 | email | text, unique | |
 | password_hash | text | |

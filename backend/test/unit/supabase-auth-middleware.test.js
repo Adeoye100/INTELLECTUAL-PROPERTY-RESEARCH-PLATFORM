@@ -2,7 +2,11 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import express from 'express';
 import request from 'supertest';
-import { createSupabaseAuthenticate } from '../../src/auth/middleware.js';
+import {
+  createResolveRoleAndFirm,
+  createSupabaseAuthenticate,
+  requireRole,
+} from '../../src/auth/middleware.js';
 import { errorHandler } from '../../src/errors.js';
 
 function testApp(verifier, logger = { warn() {} }) {
@@ -10,7 +14,7 @@ function testApp(verifier, logger = { warn() {} }) {
   app.get(
     '/identity',
     createSupabaseAuthenticate(verifier, logger),
-    (req, res) => res.json(req.auth),
+    (req, res) => res.json({ auth: req.auth, user: req.user }),
   );
   app.use(errorHandler);
   return app;
@@ -37,9 +41,95 @@ describe('createSupabaseAuthenticate', () => {
       .set('Authorization', 'Bearer valid-token');
 
     assert.equal(response.status, 200);
-    assert.deepEqual(response.body, identity);
-    assert.equal(response.body.role, undefined);
-    assert.equal(response.body.firmId, undefined);
+    assert.deepEqual(response.body, { auth: identity, user: identity });
+    assert.equal(response.body.auth.role, undefined);
+    assert.equal(response.body.auth.firmId, undefined);
+  });
+
+  it('resolves membership after verification and attaches it to both request contexts', async () => {
+    const identity = {
+      userId: '11111111-1111-4111-8111-111111111111',
+      email: 'user@example.test',
+      supabaseRole: 'authenticated',
+      sessionId: null,
+      claims: { sub: '11111111-1111-4111-8111-111111111111' },
+    };
+    const calls = [];
+    const app = express();
+    app.get(
+      '/admin',
+      createSupabaseAuthenticate({ verifyAccessToken: async () => identity }),
+      createResolveRoleAndFirm({
+        async resolveRoleAndFirm(userId, email) {
+          calls.push({ userId, email });
+          return { role: 'admin', firmId: '22222222-2222-4222-8222-222222222222' };
+        },
+      }),
+      requireRole(['admin']),
+      (req, res) => res.json({ auth: req.auth, user: req.user }),
+    );
+    app.use(errorHandler);
+
+    const response = await request(app).get('/admin').set('Authorization', 'Bearer valid-token');
+    assert.equal(response.status, 200);
+    assert.equal(response.body.user.role, 'admin');
+    assert.equal(response.body.user.firmId, '22222222-2222-4222-8222-222222222222');
+    assert.deepEqual(response.body.auth, response.body.user);
+    assert.deepEqual(calls, [{ userId: identity.userId, email: identity.email }]);
+  });
+
+  it('does not treat a non-authenticated Supabase role as application authorization', async () => {
+    let resolved = false;
+    const app = express();
+    app.get(
+      '/admin',
+      createSupabaseAuthenticate({
+        verifyAccessToken: async () => ({
+          userId: '11111111-1111-4111-8111-111111111111',
+          email: 'user@example.test',
+          supabaseRole: 'service_role',
+          sessionId: null,
+          claims: {},
+        }),
+      }),
+      createResolveRoleAndFirm({
+        async resolveRoleAndFirm() {
+          resolved = true;
+          return { role: 'admin', firmId: '22222222-2222-4222-8222-222222222222' };
+        },
+      }),
+      requireRole(['admin']),
+      (_req, res) => res.json({ ok: true }),
+    );
+    app.use(errorHandler);
+
+    const response = await request(app).get('/admin').set('Authorization', 'Bearer valid-token');
+    assert.equal(response.status, 403);
+    assert.equal(resolved, false);
+  });
+
+  it('returns 403 for a verified identity with no linked local membership', async () => {
+    const app = express();
+    app.get(
+      '/admin',
+      createSupabaseAuthenticate({
+        verifyAccessToken: async () => ({
+          userId: '11111111-1111-4111-8111-111111111111',
+          email: 'missing@example.test',
+          supabaseRole: 'authenticated',
+          sessionId: null,
+          claims: {},
+        }),
+      }),
+      createResolveRoleAndFirm({ resolveRoleAndFirm: async () => null }),
+      requireRole(['admin']),
+      (_req, res) => res.json({ ok: true }),
+    );
+    app.use(errorHandler);
+
+    const response = await request(app).get('/admin').set('Authorization', 'Bearer valid-token');
+    assert.equal(response.status, 403);
+    assert.equal(response.body.code, 'FORBIDDEN');
   });
 
   it('returns the existing normalized 401 for a missing bearer token', async () => {

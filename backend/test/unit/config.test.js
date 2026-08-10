@@ -4,6 +4,7 @@ import { loadConfig, loadSupabaseConfig } from '../../src/config.js';
 
 const jwksEnvironment = {
   SUPABASE_URL: 'https://project-ref.supabase.co',
+  SUPABASE_SECRET_KEY: 'sb_secret_unit_test',
   SUPABASE_JWT_VERIFICATION_MODE: 'jwks',
   SUPABASE_JWT_ALGORITHMS: 'ES256',
 };
@@ -17,6 +18,7 @@ describe('Supabase configuration', () => {
     }), {
       supabaseUrl: 'https://project-ref.supabase.co',
       supabasePublishableKey: undefined,
+      supabaseSecretKey: 'sb_secret_unit_test',
       supabaseJwtVerificationMode: 'jwks',
       supabaseJwtAlgorithms: ['ES256', 'RS256'],
     });
@@ -31,8 +33,24 @@ describe('Supabase configuration', () => {
     });
 
     assert.equal(config.supabaseUrl, 'https://project-ref.supabase.co');
+    assert.equal(config.supabaseSecretKey, 'sb_secret_unit_test');
     assert.equal(config.supabaseJwtVerificationMode, 'jwks');
     assert.deepEqual(config.supabaseJwtAlgorithms, ['ES256']);
+    assert.equal(config.protectedAuthMode, 'supabase');
+  });
+
+  it('supports only explicit Supabase or legacy protected-route modes', () => {
+    const base = {
+      ...jwksEnvironment,
+      DATABASE_URL: 'postgresql://localhost/iprp',
+      REDIS_URL: 'redis://localhost:6379',
+      JWT_ACCESS_SECRET: 'unit-test-secret-that-is-at-least-32-bytes',
+    };
+    assert.equal(loadConfig({ ...base, PROTECTED_AUTH_MODE: 'legacy' }).protectedAuthMode, 'legacy');
+    assert.throws(
+      () => loadConfig({ ...base, PROTECTED_AUTH_MODE: 'fallback' }),
+      /must be either supabase or legacy/,
+    );
   });
 
   it('requires a publishable key in auth-server mode', () => {
@@ -52,9 +70,25 @@ describe('Supabase configuration', () => {
     }), {
       supabaseUrl: 'https://project-ref.supabase.co',
       supabasePublishableKey: 'sb_publishable_test',
+      supabaseSecretKey: undefined,
       supabaseJwtVerificationMode: 'auth-server',
       supabaseJwtAlgorithms: [],
     });
+  });
+
+  it('requires a server-only secret key when protected routes use Supabase', () => {
+    const environment = {
+      ...jwksEnvironment,
+      SUPABASE_SECRET_KEY: undefined,
+      DATABASE_URL: 'postgresql://localhost/iprp',
+      REDIS_URL: 'redis://localhost:6379',
+      JWT_ACCESS_SECRET: 'unit-test-secret-that-is-at-least-32-bytes',
+    };
+    assert.throws(() => loadConfig(environment), /SUPABASE_SECRET_KEY/);
+    assert.equal(
+      loadConfig({ ...environment, PROTECTED_AUTH_MODE: 'legacy' }).supabaseSecretKey,
+      undefined,
+    );
   });
 
   it('rejects an unsupported verification mode', () => {

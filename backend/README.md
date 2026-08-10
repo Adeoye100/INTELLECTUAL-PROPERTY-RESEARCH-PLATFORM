@@ -198,6 +198,72 @@ Every route verifies the bearer JWT before applying its explicit role list:
 Authenticated users outside a route's list receive `403`; absent or invalid
 authentication receives `401`.
 
+## Supabase identity and application authorization
+
+Supabase proves a request's identity; application PostgreSQL remains the source
+of truth for firm membership and the `admin`, `attorney`, and `viewer` roles.
+The two databases are separate, so this project does not use a Supabase Custom
+Access Token Hook and does not place application roles in Supabase JWT claims.
+
+Migration `004_add_supabase_user_identity.sql` adds the nullable, unique
+`users.supabase_user_id` link. It has no foreign key because `auth.users` is in a
+different database. On the first verified Supabase request, the backend first
+looks for this stable ID. If it is not linked, it lower-cases and trims the email
+from the verified token, fetches that user through Supabase's server-only Admin
+API, and requires the authoritative `email_confirmed_at` value to be present. The
+authoritative email must also match the verified token email after normalization.
+Only then does it link a local row whose stored email is an exact match and whose
+link is still null. It never trusts JWT `user_metadata` as proof of email ownership
+and never guesses a firm from an email domain. Unconfirmed users, mismatched
+emails, API failures, and link conflicts all fail closed. Long term,
+administrator-controlled provisioning is safer than automatic email linking.
+
+The Admin lookup uses `SUPABASE_SECRET_KEY`, which must be configured only in the
+backend environment and must never be exposed to browsers, logs, or source
+control. It happens only on the first-link path: Redis cache hits and users already
+linked by `supabase_user_id` do not call the Supabase Admin API.
+
+Resolved membership is cached in Redis under
+`role-cache:<supabase_user_id>` for exactly **60 seconds**. In plain language, a
+role, seat, or firm change can take at most 60 seconds to affect an already active
+user if the cache is not explicitly cleared. This short cache avoids a database
+query on every API request while bounding stale authorization. Changing the
+PostgreSQL row does not rewrite the cache entry. Role/seat mutation endpoints
+must call `RedisRoleFirmResolver.invalidate(supabaseUserId)` after committing the
+change.
+
+There is currently no backend endpoint that changes or removes an existing
+user's role/seat. Invitation acceptance creates a new local user but does not
+change an already linked membership, so there is no role-cache invalidation hook
+to wire yet. SB-04 or the future membership-management endpoint must add it when
+that state change is implemented.
+
+Protected routes use Supabase verification by default. Set
+`PROTECTED_AUTH_MODE=supabase` explicitly in deployed environments. The local
+token verifier remains available as an explicit rollback by setting
+`PROTECTED_AUTH_MODE=legacy`; the server selects one mode at startup and never
+falls back between token types per request.
+
+To exercise the live boundary, provide a fresh dedicated-user token only through
+the ignored `SUPABASE_TEST_ACCESS_TOKEN` environment variable, ensure that a
+matching local user exists, then run:
+
+```sh
+pnpm verify:supabase-rbac
+```
+
+The command verifies the real Supabase token, performs the authoritative Admin
+email check if the identity still needs its first link, observes a PostgreSQL
+membership lookup followed by a Redis cache hit, and checks an allowed route
+returns `200` while a disallowed route returns `403`. It prints no token, email,
+firm ID, secret key, or complete claims payload.
+
+Rollback is operational: set `PROTECTED_AUTH_MODE=legacy` and restart the API.
+The schema link may remain nullable. Only after Supabase authentication is fully
+retired may an administrator remove it with
+`ALTER TABLE users DROP CONSTRAINT users_supabase_user_id_key;` followed by
+`ALTER TABLE users DROP COLUMN supabase_user_id;`.
+
 ## Deferred security hooks
 
 - **BE-15:** Redis-backed IP/account rate limiting belongs immediately before the

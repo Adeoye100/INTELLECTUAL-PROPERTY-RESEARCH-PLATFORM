@@ -33,6 +33,41 @@ export class UserRepository {
     this.pool = pool;
   }
 
+  async findBySupabaseUserId(supabaseUserId) {
+    const result = await this.pool.query(
+      `SELECT role, firm_id
+       FROM users
+       WHERE supabase_user_id = $1`,
+      [supabaseUserId],
+    );
+    if (!result.rowCount) return null;
+    return { role: result.rows[0].role, firmId: result.rows[0].firm_id };
+  }
+
+  async findOrLinkBySupabaseIdentity(supabaseUserId, normalizedEmail) {
+    const result = await this.pool.query(
+      `WITH existing AS (
+         SELECT role, firm_id
+         FROM users
+         WHERE supabase_user_id = $1
+       ), linked AS (
+         UPDATE users
+         SET supabase_user_id = $1
+         WHERE supabase_user_id IS NULL
+           AND email = $2
+           AND NOT EXISTS (SELECT 1 FROM existing)
+         RETURNING role, firm_id
+       )
+       SELECT role, firm_id FROM existing
+       UNION ALL
+       SELECT role, firm_id FROM linked
+       LIMIT 1`,
+      [supabaseUserId, normalizedEmail],
+    );
+    if (!result.rowCount) return null;
+    return { role: result.rows[0].role, firmId: result.rows[0].firm_id };
+  }
+
   async createWithFirm({ firmName, normalizedFirmName, email, passwordHash }) {
     const client = await this.pool.connect();
     try {

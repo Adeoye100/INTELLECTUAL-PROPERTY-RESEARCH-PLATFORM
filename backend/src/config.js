@@ -15,6 +15,7 @@ function positiveInteger(env, name, fallback) {
 
 const SUPABASE_VERIFICATION_MODES = new Set(['jwks', 'auth-server']);
 const SUPABASE_ASYMMETRIC_ALGORITHMS = new Set(['ES256', 'RS256']);
+const PROTECTED_AUTH_MODES = new Set(['supabase', 'legacy']);
 
 function supabaseUrl(env) {
   const raw = required(env, 'SUPABASE_URL');
@@ -64,6 +65,7 @@ function asymmetricAlgorithms(env, mode) {
 export function loadSupabaseConfig(env = process.env) {
   const supabaseJwtVerificationMode = verificationMode(env);
   const supabasePublishableKey = env.SUPABASE_PUBLISHABLE_KEY?.trim() || undefined;
+  const supabaseSecretKey = env.SUPABASE_SECRET_KEY?.trim() || undefined;
   if (supabaseJwtVerificationMode === 'auth-server' && !supabasePublishableKey) {
     throw new Error('Missing required environment variable: SUPABASE_PUBLISHABLE_KEY');
   }
@@ -71,6 +73,7 @@ export function loadSupabaseConfig(env = process.env) {
   return {
     supabaseUrl: supabaseUrl(env),
     supabasePublishableKey,
+    supabaseSecretKey,
     supabaseJwtVerificationMode,
     supabaseJwtAlgorithms: asymmetricAlgorithms(env, supabaseJwtVerificationMode),
   };
@@ -80,6 +83,16 @@ export function loadConfig(env = process.env) {
   const jwtAccessSecret = required(env, 'JWT_ACCESS_SECRET');
   if (Buffer.byteLength(jwtAccessSecret, 'utf8') < 32) {
     throw new Error('JWT_ACCESS_SECRET must contain at least 32 bytes.');
+  }
+
+  const protectedAuthMode = env.PROTECTED_AUTH_MODE?.trim() || 'supabase';
+  if (!PROTECTED_AUTH_MODES.has(protectedAuthMode)) {
+    throw new Error('PROTECTED_AUTH_MODE must be either supabase or legacy.');
+  }
+
+  const supabaseConfig = loadSupabaseConfig(env);
+  if (protectedAuthMode === 'supabase' && !supabaseConfig.supabaseSecretKey) {
+    throw new Error('Missing required environment variable: SUPABASE_SECRET_KEY');
   }
 
   return {
@@ -93,7 +106,8 @@ export function loadConfig(env = process.env) {
     accessTokenTtlSeconds: positiveInteger(env, 'ACCESS_TOKEN_TTL_SECONDS', 900),
     refreshTokenTtlSeconds: positiveInteger(env, 'REFRESH_TOKEN_TTL_SECONDS', 2_592_000),
     inviteTokenTtlSeconds: positiveInteger(env, 'INVITE_TOKEN_TTL_SECONDS', 604_800),
-    ...loadSupabaseConfig(env),
+    protectedAuthMode,
+    ...supabaseConfig,
   };
 }
 
