@@ -4,6 +4,9 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { InviteAcceptanceScreen } from './InviteAcceptanceScreen';
 
+const auth = vi.hoisted(() => ({ signInWithPassword: vi.fn(), signUp: vi.fn() }));
+vi.mock('../../lib/supabase', () => ({ supabase: { auth } }));
+
 const renderInvitation = (token: string) => render(
   <MemoryRouter initialEntries={[`/auth/invite/${token}`]}>
     <Routes><Route path="/auth/invite/:token" element={<InviteAcceptanceScreen />} /></Routes>
@@ -13,6 +16,8 @@ const renderInvitation = (token: string) => render(
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  auth.signInWithPassword.mockReset();
+  auth.signUp.mockReset();
 });
 
 describe('InviteAcceptanceScreen', () => {
@@ -50,6 +55,50 @@ describe('InviteAcceptanceScreen', () => {
     expect(screen.getByLabelText('Create password')).toHaveFocus();
     await user.tab();
     expect(screen.getByLabelText('Confirm password')).toHaveFocus();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  }, 20_000);
+
+  it('keeps backend acceptance and establishes the resulting Supabase session', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        email: 'viewer-invite@invite.example', firmName: 'Forge Legal Partners', role: 'viewer',
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ accepted: true }), {
+        status: 201, headers: { 'Content-Type': 'application/json' },
+      }));
+    vi.stubGlobal('fetch', fetchMock);
+    auth.signUp.mockResolvedValue({
+      data: {
+        user: { id: 'supabase-user', identities: [{}] },
+        session: {
+          access_token: 'supabase-access-token',
+          user: {
+            id: 'supabase-user', email: 'viewer-invite@invite.example', email_confirmed_at: '2026-08-12T00:00:00Z',
+            app_metadata: {}, user_metadata: { full_name: 'Invited User', onboarding_required: true },
+          },
+        },
+      },
+      error: null,
+    });
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/auth/invite/viewer-invite']}>
+        <Routes>
+          <Route path="/auth/invite/:token" element={<InviteAcceptanceScreen />} />
+          <Route path="/dashboard" element={<h1>Onboarding dashboard</h1>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.type(await screen.findByRole('textbox', { name: 'Full name' }), 'Invited User');
+    await user.type(screen.getByLabelText('Create password'), 'safe-password');
+    await user.type(screen.getByLabelText('Confirm password'), 'safe-password');
+    await user.click(screen.getByRole('button', { name: 'Accept invitation' }));
+
+    expect(await screen.findByRole('heading', { name: 'Onboarding dashboard' })).toBeVisible();
+    expect(auth.signUp).toHaveBeenCalledWith(expect.objectContaining({
+      email: 'viewer-invite@invite.example', password: 'safe-password',
+    }));
     expect(fetchMock).toHaveBeenCalledTimes(2);
   }, 20_000);
 });

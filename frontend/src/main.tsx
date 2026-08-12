@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
+import { initializeAuth } from './features/auth/authStore';
 import { getApiConfig, shouldEnableMocking } from './lib/api/config';
 
 async function enableMocking() {
@@ -17,7 +18,8 @@ async function enableMocking() {
   });
 }
 
-enableMocking().then(() => {
+enableMocking().then(async () => {
+  await initializeAuth();
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <App />

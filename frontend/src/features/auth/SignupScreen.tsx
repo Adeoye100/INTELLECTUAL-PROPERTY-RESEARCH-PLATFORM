@@ -3,9 +3,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Check } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/Button';
-import { AuthApiError, authErrorMessage, authRequest } from './authApi';
+import { supabase } from '../../lib/supabase';
+import { AuthApiError, authErrorMessage, authRequest, toAuthApiError } from './authApi';
+import { syncSupabaseSession } from './authStore';
+import { authRedirectUrl, roleHomePath } from './roleRouting';
 
 const signupSchema = z.object({
   fullName: z.string().trim().min(2, 'Enter your full name.'),
@@ -17,6 +20,7 @@ const signupSchema = z.object({
 type SignupFormValues = z.infer<typeof signupSchema>;
 
 export const SignupScreen: React.FC = () => {
+  const navigate = useNavigate();
   const [isSuccess, setIsSuccess] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<AuthApiError['code'] | null>(null);
@@ -36,15 +40,40 @@ export const SignupScreen: React.FC = () => {
     setSubmitError(null);
     setErrorCode(null);
     try {
+      // The existing backend transaction remains the only firm/local-user
+      // provisioning path; Supabase remains the sole session authority.
       await authRequest('/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
+
+      const { data: authData, error: signupError } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          data: {
+            full_name: data.fullName,
+            onboarding_required: true,
+          },
+          emailRedirectTo: authRedirectUrl('/auth/verify-email'),
+        },
+      });
+      if (signupError) throw signupError;
+      if (!authData.user || authData.user.identities?.length === 0) {
+        throw new AuthApiError('DUPLICATE_ACCOUNT', 'An account already exists.');
+      }
+
+      if (authData.session) {
+        const user = await syncSupabaseSession(authData.session, 'admin');
+        navigate(roleHomePath(user.role), { replace: true });
+        return;
+      }
       setIsSuccess(true);
     } catch (error) {
-      setSubmitError(authErrorMessage(error));
-      setErrorCode(error instanceof AuthApiError ? error.code : 'UNKNOWN_ERROR');
+      const authError = toAuthApiError(error);
+      setSubmitError(authErrorMessage(authError));
+      setErrorCode(authError.code);
     }
   };
 

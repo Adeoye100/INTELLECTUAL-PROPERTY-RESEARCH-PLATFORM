@@ -337,39 +337,6 @@ const mockAuthError = (status: number, code: string, message: string) =>
   HttpResponse.json({ code, message, mocked: true }, { status });
 
 export const handlers = [
-  http.post('/api/v1/auth/login', async ({ request }) => {
-    const body = await request.json() as { email?: string };
-    const email = body.email?.toLowerCase() ?? '';
-    if (email.startsWith('retry') && failFirstMockAttempt(`login:${email}`)) return HttpResponse.error();
-    if (email.startsWith('network')) return HttpResponse.error();
-    if (email.startsWith('unverified')) return mockAuthError(403, 'EMAIL_NOT_VERIFIED', 'Email verification is required.');
-    if (email.startsWith('denied')) return mockAuthError(403, 'PERMISSION_DENIED', 'This account cannot access the requested firm.');
-
-    const role = email.startsWith('admin')
-      ? 'admin'
-      : email.startsWith('viewer')
-        ? 'viewer'
-        : 'attorney';
-    await delay(800);
-    return HttpResponse.json({
-      token: 'mock-token',
-      expiresAt: email.startsWith('short-session') ? Date.now() + 500 : Date.now() + 60 * 60 * 1_000,
-      user: {
-        id: 'u1',
-        email: body.email ?? 'attorney@forgeglobal.com',
-        role,
-        fullName: role === 'admin' ? 'Jane Smith' : role === 'viewer' ? 'Robert Ross' : 'John Doe',
-        emailVerified: true,
-        onboardingRequired: email.includes('new'),
-      },
-    });
-  }),
-
-  http.post('/api/v1/auth/logout', async () => {
-    await delay(150);
-    return new HttpResponse(null, { status: 204 });
-  }),
-
   http.post('/api/v1/auth/signup', async ({ request }) => {
     const body = await request.json() as { email?: string };
     const email = body.email?.toLowerCase() ?? '';
@@ -416,39 +383,6 @@ export const handlers = [
       },
       mocked: true,
     });
-  }),
-
-  http.post('/api/v1/auth/password-reset', async ({ request }) => {
-    const body = await request.json() as { email?: string };
-    if (body.email?.startsWith('network')) return HttpResponse.error();
-    await delay(300);
-    return HttpResponse.json({ accepted: true, mocked: true }, { status: 202 });
-  }),
-
-  http.get('/api/v1/auth/password-reset/:token', async ({ params }) => {
-    const token = String(params.token);
-    if (token === 'expired') return mockAuthError(410, 'EXPIRED_LINK', 'The reset link has expired.');
-    if (token === 'network') return HttpResponse.error();
-    return HttpResponse.json({ valid: true, mocked: true });
-  }),
-
-  http.post('/api/v1/auth/password-reset/:token', async ({ params }) => {
-    if (String(params.token) === 'expired') return mockAuthError(410, 'EXPIRED_LINK', 'The reset link has expired.');
-    await delay(300);
-    return new HttpResponse(null, { status: 204 });
-  }),
-
-  http.get('/api/v1/auth/verify-email/:token', async ({ params }) => {
-    const token = String(params.token);
-    if (token === 'expired') return mockAuthError(410, 'EXPIRED_LINK', 'The verification link has expired.');
-    if (token === 'network') return HttpResponse.error();
-    await delay(250);
-    return HttpResponse.json({ verified: true, mocked: true });
-  }),
-
-  http.post('/api/v1/auth/verify-email/resend', async () => {
-    await delay(250);
-    return HttpResponse.json({ accepted: true, mocked: true }, { status: 202 });
   }),
 
   http.get('/api/v1/search', async ({ request }) => {

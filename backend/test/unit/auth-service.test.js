@@ -26,13 +26,7 @@ function createService(overrides = {}) {
     tokenService: {
       async issueAccessToken() { return 'access-token'; },
     },
-    sessionStore: {
-      async create() { return 'refresh-token'; },
-      async rotate() { return null; },
-      async invalidate() {},
-    },
-    accessTokenTtlSeconds: 900,
-    refreshTokenTtlSeconds: 2_592_000,
+    inviteTokenTtlSeconds: 604_800,
     ...overrides,
   };
   return new AuthService(dependencies);
@@ -67,30 +61,5 @@ describe('AuthService', () => {
       passwordHash: 'argon2-hash',
     });
     assert.equal(JSON.stringify(persisted).includes('private-password'), false);
-  });
-
-  it('uses the generic credential error and dummy hash path for an unknown account', async () => {
-    let checkedDummy = false;
-    const service = createService({
-      passwordHasher: {
-        async hash() { return 'unused'; },
-        async verify() { return false; },
-        async verifyDummy() { checkedDummy = true; },
-      },
-    });
-
-    await assert.rejects(
-      service.login({ email: 'missing@example.test', password: 'private-password' }),
-      (error) => error.status === 401 && error.message === 'Email or password is incorrect.',
-    );
-    assert.equal(checkedDummy, true);
-  });
-
-  it('rejects invalid refresh sessions', async () => {
-    const service = createService();
-    await assert.rejects(
-      service.refresh({ refreshToken: 'unknown-token' }),
-      (error) => error.status === 401 && error.code === 'UNAUTHORIZED',
-    );
   });
 });

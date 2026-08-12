@@ -15,7 +15,6 @@ function positiveInteger(env, name, fallback) {
 
 const SUPABASE_VERIFICATION_MODES = new Set(['jwks', 'auth-server']);
 const SUPABASE_ASYMMETRIC_ALGORITHMS = new Set(['ES256', 'RS256']);
-const PROTECTED_AUTH_MODES = new Set(['supabase', 'legacy']);
 
 function supabaseUrl(env) {
   const raw = required(env, 'SUPABASE_URL');
@@ -85,13 +84,8 @@ export function loadConfig(env = process.env) {
     throw new Error('JWT_ACCESS_SECRET must contain at least 32 bytes.');
   }
 
-  const protectedAuthMode = env.PROTECTED_AUTH_MODE?.trim() || 'supabase';
-  if (!PROTECTED_AUTH_MODES.has(protectedAuthMode)) {
-    throw new Error('PROTECTED_AUTH_MODE must be either supabase or legacy.');
-  }
-
   const supabaseConfig = loadSupabaseConfig(env);
-  if (protectedAuthMode === 'supabase' && !supabaseConfig.supabaseSecretKey) {
+  if (!supabaseConfig.supabaseSecretKey) {
     throw new Error('Missing required environment variable: SUPABASE_SECRET_KEY');
   }
 
@@ -101,12 +95,7 @@ export function loadConfig(env = process.env) {
     databaseSsl: env.DATABASE_SSL === 'true',
     redisUrl: required(env, 'REDIS_URL'),
     jwtAccessSecret,
-    jwtIssuer: env.JWT_ISSUER?.trim() || 'iprp-api',
-    jwtAudience: env.JWT_AUDIENCE?.trim() || 'iprp-web',
-    accessTokenTtlSeconds: positiveInteger(env, 'ACCESS_TOKEN_TTL_SECONDS', 900),
-    refreshTokenTtlSeconds: positiveInteger(env, 'REFRESH_TOKEN_TTL_SECONDS', 2_592_000),
     inviteTokenTtlSeconds: positiveInteger(env, 'INVITE_TOKEN_TTL_SECONDS', 604_800),
-    protectedAuthMode,
     ...supabaseConfig,
   };
 }

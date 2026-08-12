@@ -1,13 +1,12 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import axe from 'axe-core';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EmailVerificationScreen } from './EmailVerificationScreen';
 
-const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
-  status,
-  headers: { 'Content-Type': 'application/json' },
-});
+const auth = vi.hoisted(() => ({ exchangeCodeForSession: vi.fn(), resend: vi.fn() }));
+vi.mock('../../lib/supabase', () => ({ supabase: { auth } }));
 
 const renderVerification = (entry: string) => render(
   <MemoryRouter initialEntries={[entry]}>
@@ -19,61 +18,64 @@ const renderVerification = (entry: string) => render(
 );
 
 afterEach(() => {
-  vi.restoreAllMocks();
+  vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
 
 describe('EmailVerificationScreen', () => {
-  it('shows and focuses the verified state', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ verified: true }));
-    vi.stubGlobal('fetch', fetchMock);
-    renderVerification('/auth/verify-email/valid-token');
+  it('exchanges the Supabase confirmation code and focuses the verified state', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 403 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      })));
+    auth.exchangeCodeForSession.mockResolvedValue({
+      data: {
+        session: {
+          access_token: 'confirmed-token',
+          user: {
+            id: 'u1', email: 'confirmed@example.test', email_confirmed_at: '2026-08-12T00:00:00Z',
+            app_metadata: {}, user_metadata: { full_name: 'Confirmed User' },
+          },
+        },
+      },
+      error: null,
+    });
+    renderVerification('/auth/verify-email?code=valid-code');
 
     await screen.findByRole('heading', { name: 'Email verified' });
     const status = screen.getByRole('status');
     await waitFor(() => expect(status).toHaveFocus());
-    expect(screen.getByRole('heading', { name: 'Email verified' })).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Continue to sign in' })).toHaveAttribute('href', '/auth/login');
-    expect(String(fetchMock.mock.calls[0][0])).toContain('/api/v1/auth/verify-email/valid-token');
+    expect(auth.exchangeCodeForSession).toHaveBeenCalledWith('valid-code');
+    expect(screen.getByRole('link', { name: 'Continue to the app' })).toHaveAttribute('href', '/app');
   });
 
-  it('shows the pending verification state without issuing a request', async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
+  it('shows the pending verification state accessibly without an auth call', async () => {
     const { container } = renderVerification('/auth/verify-email?email=pending%40example.test');
 
     expect(screen.getByRole('heading', { name: 'Check your email' })).toBeVisible();
     expect(screen.getByText(/pending@example\.test/)).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Resend verification email' })).toBeEnabled();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(auth.exchangeCodeForSession).not.toHaveBeenCalled();
     expect((await axe.run(container)).violations).toEqual([]);
   });
 
-  it('shows the expired verification-link state', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
-      code: 'EXPIRED_LINK',
-      message: 'Verification link expired.',
-    }, 410)));
-    renderVerification('/auth/verify-email/expired-token');
+  it('resends confirmation through Supabase', async () => {
+    auth.resend.mockResolvedValue({ data: {}, error: null });
+    const user = userEvent.setup();
+    renderVerification('/auth/verify-email?email=pending%40example.test');
+
+    await user.click(screen.getByRole('button', { name: 'Resend verification email' }));
+
+    expect(await screen.findByText('A new verification email was sent.')).toBeVisible();
+    expect(auth.resend).toHaveBeenCalledWith(expect.objectContaining({ type: 'signup', email: 'pending@example.test' }));
+  });
+
+  it('shows the expired Supabase confirmation-link state', async () => {
+    auth.exchangeCodeForSession.mockResolvedValue({ data: { session: null }, error: { code: 'otp_expired', message: 'Confirmation expired' } });
+    renderVerification('/auth/verify-email?code=expired-code&email=pending%40example.test');
 
     const alert = await screen.findByRole('alert');
     await waitFor(() => expect(alert).toHaveFocus());
     expect(screen.getByRole('heading', { name: 'Verification link expired' })).toBeVisible();
-    expect(screen.getByText(/expired or has already been used/i)).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Send a new verification email' })).toBeEnabled();
-  });
-
-  it('shows the generic invalid-link state without calling it expired', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
-      code: 'INVALID_LINK',
-      message: 'Verification token is invalid.',
-    }, 400)));
-    renderVerification('/auth/verify-email/invalid-token');
-
-    const alert = await screen.findByRole('alert');
-    await waitFor(() => expect(alert).toHaveFocus());
-    expect(screen.getByRole('heading', { name: 'Verification failed' })).toBeVisible();
-    expect(screen.getByText('Verification token is invalid.')).toBeVisible();
-    expect(screen.queryByRole('heading', { name: /expired/i })).not.toBeInTheDocument();
   });
 });

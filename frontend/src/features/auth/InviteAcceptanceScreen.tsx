@@ -5,21 +5,16 @@ import { AlertTriangle, CheckCircle } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import * as z from 'zod';
 import { Button } from '../../components/Button';
+import { supabase } from '../../lib/supabase';
 import type { UserRole } from '../../types';
-import { AuthApiError, authErrorMessage, authRequest } from './authApi';
-import { roleHomePath } from './roleRouting';
-import { useAuthStore, type AuthenticatedUser } from './authStore';
+import { AuthApiError, authErrorMessage, authRequest, toAuthApiError } from './authApi';
+import { authRedirectUrl, roleHomePath } from './roleRouting';
+import { syncSupabaseSession } from './authStore';
 
 interface InvitationDetails {
   email: string;
   firmName: string;
   role: UserRole;
-}
-
-interface InvitationSession {
-  token: string;
-  expiresAt: number;
-  user: AuthenticatedUser;
 }
 
 const acceptanceSchema = z.object({
@@ -36,7 +31,6 @@ type AcceptanceValues = z.infer<typeof acceptanceSchema>;
 export function InviteAcceptanceScreen() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
-  const setSession = useAuthStore((state) => state.setSession);
   const [invitation, setInvitation] = useState<InvitationDetails | null>(null);
   const [loadError, setLoadError] = useState<AuthApiError | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -78,15 +72,39 @@ export function InviteAcceptanceScreen() {
   const acceptInvitation = async (values: AcceptanceValues) => {
     setSubmitError(null);
     try {
-      const session = await authRequest<InvitationSession>(`/auth/invitations/${token ?? ''}/accept`, {
+      await authRequest(`/auth/invitations/${token ?? ''}/accept`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fullName: values.fullName, password: values.password }),
       });
-      setSession(session.token, session.user, session.expiresAt);
-      navigate(session.user.onboardingRequired ? '/dashboard' : roleHomePath(session.user.role), { replace: true });
+
+      const credentials = { email: invitation!.email, password: values.password };
+      const { data: signupData, error: signupError } = await supabase.auth.signUp({
+        ...credentials,
+        options: {
+          data: {
+            full_name: values.fullName,
+            onboarding_required: true,
+          },
+          emailRedirectTo: authRedirectUrl('/auth/verify-email'),
+        },
+      });
+
+      let authData = signupData;
+      if (signupError || authData.user?.identities?.length === 0) {
+        const signIn = await supabase.auth.signInWithPassword(credentials);
+        if (signIn.error) throw signupError ?? signIn.error;
+        authData = signIn.data;
+      }
+
+      if (!authData.session) {
+        navigate(`/auth/verify-email?email=${encodeURIComponent(invitation!.email)}`, { replace: true });
+        return;
+      }
+      const user = await syncSupabaseSession(authData.session, invitation!.role);
+      navigate(user.onboardingRequired ? '/dashboard' : roleHomePath(user.role), { replace: true });
     } catch (error) {
-      setSubmitError(authErrorMessage(error));
+      setSubmitError(authErrorMessage(toAuthApiError(error)));
     }
   };
 

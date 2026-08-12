@@ -43,7 +43,7 @@ describe('role access', () => {
     expect(screen.queryByText('Administration content')).not.toBeInTheDocument();
   });
 
-  it('allows Admin users to open /admin and persists their role', () => {
+  it('allows Admin users to open /admin', () => {
     setRole('admin');
     render(
       <MemoryRouter initialEntries={['/admin']}>
@@ -52,7 +52,6 @@ describe('role access', () => {
     );
 
     expect(screen.getByText('Administration content')).toBeVisible();
-    expect(localStorage.getItem('forge-auth-session')).toContain('"role":"admin"');
   });
 
   it.each([
@@ -108,10 +107,8 @@ describe('role access', () => {
     expect(screen.getByText('Permission denied destination')).toBeVisible();
   });
 
-  it('rejects an expired persisted session from a protected route', () => {
-    useAuthStore.getState().setSession('expired-token', {
-      id: 'u1', email: 'attorney@example.com', fullName: 'Attorney User', role: 'attorney',
-    }, Date.now() - 1);
+  it('redirects an unauthenticated Supabase state from a protected route', () => {
+    useAuthStore.getState().clearSession();
     render(
       <MemoryRouter initialEntries={['/search']}>
         <Routes>

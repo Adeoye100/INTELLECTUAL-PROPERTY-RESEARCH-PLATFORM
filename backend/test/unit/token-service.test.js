@@ -4,9 +4,7 @@ import { TokenService } from '../../src/auth/token-service.js';
 
 const createTokenService = () => new TokenService({
   secret: 'unit-test-secret-that-is-at-least-32-bytes',
-  issuer: 'iprp-unit-test',
-  audience: 'iprp-unit-client',
-  accessTokenTtlSeconds: 900,
+  inviteTokenTtlSeconds: 604_800,
 });
 
 describe('firm invitation tokens', () => {

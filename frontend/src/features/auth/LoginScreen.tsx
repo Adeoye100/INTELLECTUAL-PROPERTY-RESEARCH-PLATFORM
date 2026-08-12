@@ -4,9 +4,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/Button';
-import { AuthApiError, authErrorMessage, authRequest } from './authApi';
-import { roleHomePath } from './roleRouting';
-import { useAuthStore, type AuthenticatedUser } from './authStore';
+import { supabase } from '../../lib/supabase';
+import { AuthApiError, authErrorMessage, toAuthApiError } from './authApi';
+import { authRedirectUrl, roleHomePath, safeAppRedirect } from './roleRouting';
+import { syncSupabaseSession } from './authStore';
 
 const loginSchema = z.object({
   email: z.string().trim().email('Enter a valid email address.'),
@@ -14,12 +15,6 @@ const loginSchema = z.object({
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
-
-interface LoginResponse {
-  token: string;
-  expiresAt: number;
-  user: AuthenticatedUser;
-}
 
 interface LoginLocationState {
   from?: string;
@@ -36,9 +31,9 @@ const notices: Record<NonNullable<LoginLocationState['reason']>, string> = {
 export const LoginScreen: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const setSession = useAuthStore((state) => state.setSession);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<AuthApiError['code'] | null>(null);
+  const [oauthProvider, setOauthProvider] = useState<'google' | 'github' | null>(null);
   const errorRef = useRef<HTMLDivElement>(null);
   const locationState = location.state as LoginLocationState | null;
   const {
@@ -57,20 +52,40 @@ export const LoginScreen: React.FC = () => {
     setErrorCode(null);
 
     try {
-      const session = await authRequest<LoginResponse>('/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      setSession(session.token, session.user, session.expiresAt);
+      const { data: authData, error } = await supabase.auth.signInWithPassword(data);
+      if (error) throw error;
+      if (!authData.session) throw new Error('Supabase did not return a session.');
+      const user = await syncSupabaseSession(authData.session);
 
-      const destination = session.user.onboardingRequired
+      const destination = user.onboardingRequired
         ? '/dashboard'
-        : locationState?.from ?? roleHomePath(session.user.role);
+        : safeAppRedirect(locationState?.from, roleHomePath(user.role));
       navigate(destination, { replace: true });
     } catch (error) {
-      setSubmitError(authErrorMessage(error));
-      setErrorCode(error instanceof AuthApiError ? error.code : 'UNKNOWN_ERROR');
+      const authError = toAuthApiError(error);
+      setSubmitError(authErrorMessage(authError));
+      setErrorCode(authError.code);
+    }
+  };
+
+  const signInWithOAuth = async (provider: 'google' | 'github') => {
+    setSubmitError(null);
+    setErrorCode(null);
+    setOauthProvider(provider);
+    try {
+      const next = safeAppRedirect(locationState?.from, '/app');
+      const callback = new URL(authRedirectUrl('/auth/callback'));
+      callback.searchParams.set('next', next);
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: callback.toString() },
+      });
+      if (error) throw error;
+    } catch (error) {
+      const authError = toAuthApiError(error);
+      setSubmitError(authErrorMessage(authError));
+      setErrorCode(authError.code);
+      setOauthProvider(null);
     }
   };
 
@@ -134,6 +149,22 @@ export const LoginScreen: React.FC = () => {
           {isSubmitting ? 'Signing in…' : errorCode === 'NETWORK_ERROR' ? 'Retry sign in' : 'Sign in'}
         </Button>
       </form>
+
+      <div className="relative" aria-hidden="true">
+        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-forge-silver-100" /></div>
+        <div className="relative flex justify-center text-xs uppercase"><span className="bg-surface-card px-2 text-text-secondary">Or continue with</span></div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Button type="button" variant="outline" disabled={Boolean(oauthProvider)} onClick={() => void signInWithOAuth('google')}>
+          <span className="mr-2 font-bold" aria-hidden="true">G</span>
+          {oauthProvider === 'google' ? 'Redirecting…' : 'Google'}
+        </Button>
+        <Button type="button" variant="outline" disabled={Boolean(oauthProvider)} onClick={() => void signInWithOAuth('github')}>
+          <span className="mr-2 font-mono font-bold" aria-hidden="true">&lt;/&gt;</span>
+          {oauthProvider === 'github' ? 'Redirecting…' : 'GitHub'}
+        </Button>
+      </div>
 
       <div className="border-t border-forge-silver-100 pt-4 text-center">
         <p className="text-sm text-text-secondary">

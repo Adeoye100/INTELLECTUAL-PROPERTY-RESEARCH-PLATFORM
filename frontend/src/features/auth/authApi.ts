@@ -1,4 +1,5 @@
 import { ApiError, getApiClient, type ApiRequestOptions } from '../../lib/api/client';
+import { supabase } from '../../lib/supabase';
 
 export type AuthErrorCode =
   | 'DUPLICATE_ACCOUNT'
@@ -29,6 +30,11 @@ export class AuthApiError extends Error {
 
 export async function authRequest<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
   const path = String(input);
+  if (path === '/auth/logout') {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw toAuthApiError(error);
+    return undefined as T;
+  }
   try {
     let body: unknown;
     if (typeof init?.body === 'string' && init.body) body = JSON.parse(init.body);
@@ -76,3 +82,37 @@ export const authErrorMessage = (error: unknown): string => {
   };
   return messages[error.code];
 };
+
+interface SupabaseErrorLike {
+  code?: string;
+  message?: string;
+  name?: string;
+  status?: number;
+}
+
+export function toAuthApiError(error: unknown): AuthApiError {
+  if (error instanceof AuthApiError) return error;
+  const candidate = error && typeof error === 'object' ? error as SupabaseErrorLike : {};
+  const detail = `${candidate.code ?? ''} ${candidate.name ?? ''} ${candidate.message ?? ''}`.toLowerCase();
+
+  if (/fetch|network|offline|retryable/.test(detail) || candidate.status === 0) {
+    return new AuthApiError('NETWORK_ERROR', 'The authentication service could not be reached.', candidate.status);
+  }
+  if (/email[_ ]?not[_ ]?confirmed|email[_ ]?not[_ ]?verified/.test(detail)) {
+    return new AuthApiError('EMAIL_NOT_VERIFIED', candidate.message ?? 'Email verification is required.', candidate.status);
+  }
+  if (/invalid[_ ]?credentials|invalid login credentials/.test(detail)) {
+    return new AuthApiError('INVALID_CREDENTIALS', candidate.message ?? 'Invalid credentials.', candidate.status);
+  }
+  if (/already[_ ]?(?:registered|exists)|identity_already_exists|user_already_exists/.test(detail)) {
+    return new AuthApiError('DUPLICATE_ACCOUNT', candidate.message ?? 'An account already exists.', candidate.status);
+  }
+  if (/expired|otp_expired|flow_state_not_found/.test(detail)) {
+    return new AuthApiError('EXPIRED_LINK', candidate.message ?? 'The link has expired.', candidate.status);
+  }
+  return new AuthApiError(
+    'UNKNOWN_ERROR',
+    candidate.message || 'The request could not be completed. Please try again.',
+    candidate.status,
+  );
+}

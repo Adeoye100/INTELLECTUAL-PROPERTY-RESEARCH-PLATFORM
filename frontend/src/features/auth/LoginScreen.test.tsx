@@ -5,19 +5,38 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from './authStore';
 import { LoginScreen } from './LoginScreen';
 
+const auth = vi.hoisted(() => ({
+  signInWithOAuth: vi.fn(),
+  signInWithPassword: vi.fn(),
+}));
+
+vi.mock('../../lib/supabase', () => ({ supabase: { auth } }));
+
+const session = {
+  access_token: 'supabase-token',
+  user: {
+    id: 'u1',
+    email: 'attorney@example.test',
+    email_confirmed_at: '2026-08-12T00:00:00Z',
+    app_metadata: { application_role: 'attorney' },
+    user_metadata: { full_name: 'Attorney User' },
+  },
+};
+
 afterEach(() => {
   useAuthStore.getState().clearSession();
-  vi.restoreAllMocks();
+  vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
 
 describe('LoginScreen', () => {
-  it('supports keyboard sign-in and role-based navigation', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      token: 'token',
-      expiresAt: Date.now() + 60_000,
-      user: { id: 'u1', email: 'attorney@example.test', fullName: 'Attorney User', role: 'attorney' },
-    }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+  it('supports keyboard sign-in and role-based navigation through Supabase', async () => {
+    auth.signInWithPassword.mockResolvedValue({ data: { session, user: session.user }, error: null });
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 403 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      })));
     const user = userEvent.setup();
     render(<MemoryRouter initialEntries={['/auth/login']}><Routes><Route path="/auth/login" element={<LoginScreen />} /><Route path="/dashboard" element={<h1>Dashboard destination</h1>} /></Routes></MemoryRouter>);
 
@@ -30,6 +49,21 @@ describe('LoginScreen', () => {
     const submit = screen.getByRole('button', { name: 'Sign in' });
     submit.focus();
     await user.keyboard('{Enter}');
+
     expect(await screen.findByRole('heading', { name: 'Dashboard destination' })).toBeVisible();
+    expect(auth.signInWithPassword).toHaveBeenCalledWith({ email: 'attorney@example.test', password: 'safe-password' });
   }, 20_000);
+
+  it.each(['google', 'github'] as const)('starts %s OAuth with the callback route', async (provider) => {
+    auth.signInWithOAuth.mockResolvedValue({ data: { provider, url: 'https://provider.test' }, error: null });
+    const user = userEvent.setup();
+    render(<MemoryRouter initialEntries={['/auth/login']}><LoginScreen /></MemoryRouter>);
+
+    await user.click(screen.getByRole('button', { name: provider === 'google' ? 'Google' : 'GitHub' }));
+
+    expect(auth.signInWithOAuth).toHaveBeenCalledWith({
+      provider,
+      options: { redirectTo: expect.stringMatching(/\/auth\/callback\?next=%2Fapp$/) },
+    });
+  });
 });

@@ -2,10 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { CheckCircle } from 'lucide-react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import * as z from 'zod';
 import { Button } from '../../components/Button';
-import { AuthApiError, authErrorMessage, authRequest } from './authApi';
+import { supabase } from '../../lib/supabase';
+import { AuthApiError, authErrorMessage, toAuthApiError } from './authApi';
+import { authRedirectUrl } from './roleRouting';
 
 const emailSchema = z.object({ email: z.string().trim().email('Enter a valid email address.') });
 type EmailValues = z.infer<typeof emailSchema>;
@@ -21,12 +23,13 @@ export function PasswordResetRequestScreen() {
   const submit = async ({ email }: EmailValues) => {
     setSubmitError(null);
     try {
-      await authRequest('/auth/password-reset', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }),
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: authRedirectUrl('/auth/reset-password'),
       });
+      if (error) throw error;
       setSentTo(email);
     } catch (error) {
-      setSubmitError(authErrorMessage(error));
+      setSubmitError(authErrorMessage(toAuthApiError(error)));
     }
   };
 
@@ -64,37 +67,64 @@ type PasswordValues = z.infer<typeof passwordSchema>;
 
 export function PasswordUpdateScreen() {
   const { token } = useParams<{ token: string }>();
+  const [searchParams] = useSearchParams();
+  const recoveryCode = searchParams.get('code') ?? token;
   const navigate = useNavigate();
   const [validating, setValidating] = useState(true);
   const [validationError, setValidationError] = useState<AuthApiError | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const statusRef = useRef<HTMLDivElement>(null);
+  const validationPromise = useRef<Promise<void> | null>(null);
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<PasswordValues>({ resolver: zodResolver(passwordSchema) });
+
+  const validateRecoverySession = useCallback(async () => {
+    if (!validationPromise.current) {
+      validationPromise.current = (async () => {
+        if (recoveryCode) {
+          const { error } = await supabase.auth.exchangeCodeForSession(recoveryCode);
+          if (error) throw error;
+          return;
+        }
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        if (!data.session) throw new AuthApiError('EXPIRED_LINK', 'No password-recovery session was found.');
+      })();
+    }
+    try {
+      await validationPromise.current;
+    } catch (error) {
+      validationPromise.current = null;
+      throw error;
+    }
+  }, [recoveryCode]);
 
   const validate = useCallback(async () => {
     setValidating(true); setValidationError(null);
-    try { await authRequest(`/auth/password-reset/${token ?? ''}`); }
-    catch (error) { setValidationError(error instanceof AuthApiError ? error : new AuthApiError('UNKNOWN_ERROR', authErrorMessage(error))); }
+    try { await validateRecoverySession(); }
+    catch (error) { setValidationError(toAuthApiError(error)); }
     finally { setValidating(false); }
-  }, [token]);
+  }, [validateRecoverySession]);
 
   useEffect(() => {
     let active = true;
-    void authRequest(`/auth/password-reset/${token ?? ''}`)
+    void validateRecoverySession()
       .catch((error) => {
-        if (active) setValidationError(error instanceof AuthApiError ? error : new AuthApiError('UNKNOWN_ERROR', authErrorMessage(error)));
+        if (active) setValidationError(toAuthApiError(error));
       })
       .finally(() => { if (active) setValidating(false); });
     return () => { active = false; };
-  }, [token]);
+  }, [validateRecoverySession]);
   useEffect(() => { if (validationError || submitError) statusRef.current?.focus(); }, [submitError, validationError]);
 
   const updatePassword = async ({ password }: PasswordValues) => {
     setSubmitError(null);
     try {
-      await authRequest(`/auth/password-reset/${token ?? ''}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) throw signOutError;
       navigate('/auth/login', { replace: true, state: { reason: 'password-updated' } });
-    } catch (error) { setSubmitError(authErrorMessage(error)); }
+    } catch (error) { setSubmitError(authErrorMessage(toAuthApiError(error))); }
   };
 
   if (validating) return <p role="status" className="text-center text-text-secondary">Checking reset link…</p>;

@@ -163,29 +163,22 @@ checks the signed claims against it, creates the user with the stored role, and
 marks the invitation used in one transaction. Expired and already-used invitations
 return `410 EXPIRED_LINK`; invalid or altered tokens return `403`.
 
-## Auth API
+### Authentication
+
+The foundational auth API uses Supabase for identity and a local PostgreSQL/Redis
+stack for firm membership and RBAC.
 
 | Method and path | Body | Result |
 |---|---|---|
-| `POST /api/v1/auth/signup` | `{ firmName (or company), email, password }` | `201` access/refresh pair, user role, firm |
-| `POST /api/v1/auth/signup` | `{ inviteToken, fullName?, email?, password }` | `201` invite redemption; the optional email must match the invitation |
-| `POST /api/v1/admin/invitations` | `{ fullName, email, role }` plus Admin bearer token | `201` signed token, expiry, email, firm name, and role |
-| `GET /api/v1/auth/invitations/:token` | None | `200` invitation email, firm name, and role when usable |
-| `POST /api/v1/auth/invitations/:token/accept` | `{ fullName, password }` | `201` access/refresh pair plus frontend-compatible `token` and `expiresAt` aliases |
-| `POST /api/v1/auth/login` | `{ email, password }` | `200` access/refresh pair; records `last_login_at` |
-| `POST /api/v1/auth/refresh` | `{ refreshToken }` | `200` new access token and rotated refresh token |
-| `POST /api/v1/auth/logout` | `{ refreshToken }` | `204`; Redis session invalidated |
+| `POST /api/v1/auth/signup` | `{ firmName, email, password }` | `201` user role and firm info (provisioning only) |
+| `POST /api/v1/auth/signup` | `{ inviteToken, fullName?, email?, password }` | `201` invite redemption (provisioning only) |
+| `POST /api/v1/admin/invitations` | `{ fullName, email, role }` plus Bearer token | `201` signed invitation token and info |
+| `GET /api/v1/auth/invitations/:token` | None | `200` invitation details |
+| `POST /api/v1/auth/invitations/:token/accept` | `{ fullName, password }` | `201` user/firm provisioning info |
 
-Access JWTs contain the verified user ID, firm ID, email, and role. Refresh tokens
-are opaque random values. Redis uses `session:<SHA-256(refresh token)>` as the key;
-the value is JSON containing only `userId` and `createdAt`. The raw refresh token
-is not stored in either the Redis key or value. Sessions have a TTL, refresh
-rotates the lookup key atomically via `GETDEL`, and the service reloads the user
-from PostgreSQL before signing new access claims.
-
-The current JSON-body refresh transport is an explicit foundation contract. A
-browser deployment must decide whether to move it to an HttpOnly/Secure/SameSite
-cookie and add the corresponding CSRF policy before production.
+Identity is verified on every request using the Supabase JWT. Local routes
+provision the firm/user link. Legacy local session management (login/refresh/logout)
+is retired.
 
 ## RBAC demonstration routes
 
@@ -238,11 +231,8 @@ change an already linked membership, so there is no role-cache invalidation hook
 to wire yet. SB-04 or the future membership-management endpoint must add it when
 that state change is implemented.
 
-Protected routes use Supabase verification by default. Set
-`PROTECTED_AUTH_MODE=supabase` explicitly in deployed environments. The local
-token verifier remains available as an explicit rollback by setting
-`PROTECTED_AUTH_MODE=legacy`; the server selects one mode at startup and never
-falls back between token types per request.
+Protected routes use Supabase verification. The local token verifier and
+`PROTECTED_AUTH_MODE` have been retired.
 
 To exercise the live boundary, provide a fresh dedicated-user token only through
 the ignored `SUPABASE_TEST_ACCESS_TOKEN` environment variable, ensure that a
@@ -257,12 +247,6 @@ email check if the identity still needs its first link, observes a PostgreSQL
 membership lookup followed by a Redis cache hit, and checks an allowed route
 returns `200` while a disallowed route returns `403`. It prints no token, email,
 firm ID, secret key, or complete claims payload.
-
-Rollback is operational: set `PROTECTED_AUTH_MODE=legacy` and restart the API.
-The schema link may remain nullable. Only after Supabase authentication is fully
-retired may an administrator remove it with
-`ALTER TABLE users DROP CONSTRAINT users_supabase_user_id_key;` followed by
-`ALTER TABLE users DROP COLUMN supabase_user_id;`.
 
 ## Deferred security hooks
 

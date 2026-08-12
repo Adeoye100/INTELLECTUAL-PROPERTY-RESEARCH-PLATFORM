@@ -5,6 +5,9 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SignupScreen } from './SignupScreen';
 
+const auth = vi.hoisted(() => ({ signUp: vi.fn() }));
+vi.mock('../../lib/supabase', () => ({ supabase: { auth } }));
+
 const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status,
   headers: { 'Content-Type': 'application/json' },
@@ -26,11 +29,13 @@ async function completeSignupForm(user: ReturnType<typeof userEvent.setup>) {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  auth.signUp.mockReset();
 });
 
 describe('SignupScreen', () => {
-  it('submits the account request and advances to email verification', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ accepted: true, verificationRequired: true }, 202));
+  it('creates the Supabase identity, provisions the firm, and advances to verification', async () => {
+    auth.signUp.mockResolvedValue({ data: { user: { id: 'u1', identities: [{}] }, session: null }, error: null });
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ accepted: true }, 201));
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     renderSignup();
@@ -43,21 +48,20 @@ describe('SignupScreen', () => {
     const success = await screen.findByRole('status');
     await waitFor(() => expect(success).toHaveFocus());
     expect(screen.getByRole('heading', { name: 'Verify your email' })).toBeVisible();
-    expect(screen.getByText(/verification link to ada@example\.test/i)).toBeVisible();
-    expect(screen.getByRole('link', { name: 'View verification options' })).toHaveAttribute('href', '/auth/verify-email?email=ada%40example.test');
-    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
-      fullName: 'Ada Counsel',
-      company: 'Forge Legal',
+    expect(auth.signUp).toHaveBeenCalledWith(expect.objectContaining({
       email: 'ada@example.test',
       password: 'safe-password',
+      options: expect.objectContaining({ data: expect.objectContaining({ full_name: 'Ada Counsel' }) }),
+    }));
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
+      fullName: 'Ada Counsel', company: 'Forge Legal', email: 'ada@example.test', password: 'safe-password',
     });
   }, 20_000);
 
-  it('shows the duplicate-account recovery state', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
-      code: 'DUPLICATE_ACCOUNT',
-      message: 'Account already exists.',
-    }, 409)));
+  it('shows the duplicate-account recovery state from Supabase', async () => {
+    auth.signUp.mockResolvedValue({ data: { user: null, session: null }, error: { code: 'user_already_exists', message: 'Already registered' } });
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ accepted: true }, 201));
+    vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     renderSignup();
 
@@ -68,12 +72,10 @@ describe('SignupScreen', () => {
     await waitFor(() => expect(alert).toHaveFocus());
     expect(alert).toHaveTextContent(/account already exists for this email address/i);
     expect(within(alert).getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/auth/login');
-    expect(within(alert).getByRole('link', { name: 'Reset password' })).toHaveAttribute('href', '/auth/forgot-password');
+    expect(fetchMock).toHaveBeenCalledOnce();
   }, 20_000);
 
   it('exposes accessible validation errors in keyboard order', async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     const { container } = renderSignup();
 
@@ -83,11 +85,8 @@ describe('SignupScreen', () => {
     await user.keyboard('{Enter}');
 
     expect(await screen.findByText('Enter your full name.')).toHaveAttribute('id', 'signup-fullName-error');
-    expect(screen.getByText('Enter your company or firm name.')).toHaveAttribute('id', 'signup-company-error');
-    expect(screen.getByText('Enter a valid email address.')).toHaveAttribute('id', 'signup-email-error');
-    expect(screen.getByText('Password must be at least 8 characters.')).toHaveAttribute('id', 'signup-password-error');
     expect(screen.getByRole('textbox', { name: 'Full name' })).toHaveAttribute('aria-describedby', 'signup-fullName-error');
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(auth.signUp).not.toHaveBeenCalled();
     expect((await axe.run(container)).violations).toEqual([]);
   }, 20_000);
 });

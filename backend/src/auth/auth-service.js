@@ -30,17 +30,11 @@ export class AuthService {
     userRepository,
     passwordHasher,
     tokenService,
-    sessionStore,
-    accessTokenTtlSeconds,
-    refreshTokenTtlSeconds,
     inviteTokenTtlSeconds = 604_800,
   }) {
     this.userRepository = userRepository;
     this.passwordHasher = passwordHasher;
     this.tokenService = tokenService;
-    this.sessionStore = sessionStore;
-    this.accessTokenTtlSeconds = accessTokenTtlSeconds;
-    this.refreshTokenTtlSeconds = refreshTokenTtlSeconds;
     this.inviteTokenTtlSeconds = inviteTokenTtlSeconds;
   }
 
@@ -53,20 +47,6 @@ export class AuthService {
     return { email, password: input.password };
   }
 
-  async issueTokenPair(user) {
-    const [accessToken, refreshToken] = await Promise.all([
-      this.tokenService.issueAccessToken(user),
-      this.sessionStore.create(user),
-    ]);
-    return {
-      accessToken,
-      refreshToken,
-      tokenType: 'Bearer',
-      expiresIn: this.accessTokenTtlSeconds,
-      refreshExpiresIn: this.refreshTokenTtlSeconds,
-      user: publicUser(user),
-    };
-  }
 
   async signup(input) {
     if (input?.inviteToken !== undefined) {
@@ -106,7 +86,7 @@ export class AuthService {
     }
 
     return {
-      ...(await this.issueTokenPair(user)),
+      user: publicUser(user),
       firm: user.firm,
     };
   }
@@ -188,13 +168,9 @@ export class AuthService {
 
     // BE-15 redemption rate limiting belongs on the public route. BE-16 audit
     // logging belongs here, after the transaction marks the invitation used.
-    const session = await this.issueTokenPair(user);
     return {
-      ...session,
-      token: session.accessToken,
-      expiresAt: Date.now() + this.accessTokenTtlSeconds * 1_000,
       user: {
-        ...session.user,
+        ...publicUser(user),
         fullName: String(input?.fullName ?? '').trim().replace(/\s+/g, ' '),
         emailVerified: true,
         onboardingRequired: true,
@@ -248,41 +224,8 @@ export class AuthService {
 
     user.lastLoginAt = await this.userRepository.recordLogin(user.id);
     return {
-      ...(await this.issueTokenPair(user)),
+      user: publicUser(user),
       firm: user.firm,
     };
-  }
-
-  async refresh(input) {
-    const refreshToken = input?.refreshToken;
-    if (typeof refreshToken !== 'string' || !refreshToken) {
-      throw badRequest('VALIDATION_ERROR', 'Refresh token is required.', { field: 'refreshToken' });
-    }
-
-    const rotated = await this.sessionStore.rotate(refreshToken);
-    if (!rotated) throw unauthorized('Refresh session is invalid or expired.');
-
-    const user = await this.userRepository.findById(rotated.userId);
-    if (!user) {
-      await this.sessionStore.invalidate(rotated.refreshToken);
-      throw unauthorized('Refresh session is invalid or expired.');
-    }
-
-    return {
-      accessToken: await this.tokenService.issueAccessToken(user),
-      refreshToken: rotated.refreshToken,
-      tokenType: 'Bearer',
-      expiresIn: this.accessTokenTtlSeconds,
-      refreshExpiresIn: this.refreshTokenTtlSeconds,
-      user: publicUser(user),
-    };
-  }
-
-  async logout(input) {
-    const refreshToken = input?.refreshToken;
-    if (typeof refreshToken !== 'string' || !refreshToken) {
-      throw badRequest('VALIDATION_ERROR', 'Refresh token is required.', { field: 'refreshToken' });
-    }
-    await this.sessionStore.invalidate(refreshToken);
   }
 }

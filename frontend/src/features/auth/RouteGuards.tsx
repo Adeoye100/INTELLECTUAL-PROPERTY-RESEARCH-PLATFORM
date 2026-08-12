@@ -1,29 +1,24 @@
 import { useEffect, type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuthStore } from './authStore';
+import { initializeAuth, useAuthStore } from './authStore';
 import type { UserRole } from '../../types';
-import { isSessionExpired } from './authStore';
 import { roleHomePath } from './roleRouting';
 
 interface RouteGuardProps {
   children: ReactNode;
 }
 
-function ExpiredSessionRedirect({ from }: { from: string }) {
-  const clearSession = useAuthStore((state) => state.clearSession);
-  useEffect(() => clearSession(), [clearSession]);
-  return <Navigate to="/auth/login" replace state={{ from, reason: 'session-expired' }} />;
-}
-
 export function RequireAuthentication({ children }: RouteGuardProps) {
   const location = useLocation();
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.token);
-  const expiresAt = useAuthStore((state) => state.expiresAt);
+  const status = useAuthStore((state) => state.status);
 
-  if (user && token && isSessionExpired(expiresAt)) {
-    return <ExpiredSessionRedirect from={location.pathname} />;
-  }
+  useEffect(() => {
+    if (status === 'initializing') void initializeAuth();
+  }, [status]);
+
+  if (status === 'initializing') return <p className="text-center text-text-secondary" role="status">Restoring your session…</p>;
 
   if (!user || !token) {
     return <Navigate to="/auth/login" replace state={{ from: location.pathname, reason: 'authentication-required' }} />;

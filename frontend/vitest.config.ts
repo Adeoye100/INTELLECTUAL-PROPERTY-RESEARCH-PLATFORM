@@ -7,6 +7,8 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/lib/test-setup.ts',
+    // The complete jsdom suite is memory-heavy; serial workers keep CI timing deterministic.
+    maxWorkers: 1,
     testTimeout: 20_000,
   },
 });

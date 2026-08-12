@@ -1,15 +1,15 @@
 # Authentication frontend boundary
 
-The screens and guards in this folder implement frontend states and navigation only. All handlers under `src/lib/mocks/handlers.ts` are development/test mocks and are labeled `MOCK`; they do not provide authentication or authorization.
+The screens and guards in this folder implement frontend states and navigation only. Supabase Auth owns browser session persistence and refresh through the single client in `src/lib/supabase.ts`. The remaining auth-shaped MSW handlers cover application provisioning and invitations only; they do not emulate Supabase authentication or authorization.
 
 Backend dependencies still required:
 
-- secure access/refresh-token issuance, rotation, revocation, and server-side session expiry;
+- Supabase project provider, redirect-URL, email-template, and session-policy configuration;
 - firm-tenant and role authorization on every protected API request;
-- single-use, expiring invitation, password-reset, and email-verification tokens;
+- single-use, expiring application invitation tokens;
 - transactional seat-limit enforcement during invitation acceptance;
 - duplicate-account protection without leaking account existence;
 - password policy, rate limiting, brute-force protection, and security audit events; and
 - authoritative onboarding status derived from stored searches and portfolio records.
 
-Persisted browser state is a convenience layer. A modified role, expiry, verification flag, or onboarding record must never grant backend access.
+The Zustand state is an in-memory rendering projection of the Supabase session. Supabase persists the actual browser session, and every protected backend request remains responsible for resolving the authoritative local firm and role.

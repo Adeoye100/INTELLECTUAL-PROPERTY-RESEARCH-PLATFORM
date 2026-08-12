@@ -1,20 +1,5 @@
 import { forbidden, unauthorized } from '../errors.js';
 
-export function createAuthenticate(tokenService) {
-  return async function authenticate(request, _response, next) {
-    const authorization = request.get('authorization');
-    const match = authorization?.match(/^Bearer\s+(.+)$/i);
-    if (!match) return next(unauthorized());
-
-    try {
-      request.auth = await tokenService.verifyAccessToken(match[1]);
-      return next();
-    } catch {
-      return next(unauthorized('Access token is invalid or expired.'));
-    }
-  };
-}
-
 export function createSupabaseAuthenticate(verifier, logger = console) {
   if (!verifier || typeof verifier.verifyAccessToken !== 'function') {
     throw new TypeError('createSupabaseAuthenticate needs a Supabase token verifier.');

@@ -14,16 +14,6 @@ export function createAuthRouter(authService) {
   router.post('/invitations/:token/accept', async (request, response) => {
     response.status(201).json(await authService.acceptInvitation(request.params.token, request.body));
   });
-  router.post('/login', async (request, response) => {
-    response.json(await authService.login(request.body));
-  });
-  router.post('/refresh', async (request, response) => {
-    response.json(await authService.refresh(request.body));
-  });
-  router.post('/logout', async (request, response) => {
-    await authService.logout(request.body);
-    response.status(204).end();
-  });
 
   return router;
 }
