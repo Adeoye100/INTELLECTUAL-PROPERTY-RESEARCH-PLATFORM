@@ -44,7 +44,7 @@ erDiagram
 | supabase_user_id | uuid, unique, nullable | canonical link to the verified Supabase Auth user during migration; no cross-database FK |
 | firm_id | uuid FK → firms | |
 | email | text, unique | |
-| password_hash | text | |
+| password_hash | text, nullable | legacy local credential only; new Supabase-managed identities leave it null pending column removal |
 | role | enum('admin','attorney','viewer') | enforced at API layer per TRD §3.3 |
 | created_at | timestamptz | |
 | last_login_at | timestamptz | |

@@ -25,7 +25,9 @@ const blockedEmail = `blocked-${suffix}@example.test`;
 const expiredEmail = `expired-${suffix}@example.test`;
 const signupInviteEmail = `signup-invite-${suffix}@example.test`;
 const password = 'integration-password';
-const issuedRefreshTokens = [];
+const adminSupabaseUserId = randomUUID();
+const blockedSupabaseUserId = randomUUID();
+const invitedSupabaseUserId = randomUUID();
 let system;
 let firmId;
 let adminAccessToken;
@@ -45,6 +47,36 @@ const config = {
 
 before(async () => {
   system = await createSystem(config);
+  system.supabaseVerifier.verifyAccessToken = async (token) => {
+    if (token === 'admin-signup-token') {
+      return {
+        userId: adminSupabaseUserId,
+        email: adminEmail,
+        supabaseRole: 'authenticated',
+        sessionId: 'admin-signup-session',
+        claims: {},
+      };
+    }
+    if (token === 'blocked-signup-token') {
+      return {
+        userId: blockedSupabaseUserId,
+        email: blockedEmail,
+        supabaseRole: 'authenticated',
+        sessionId: 'blocked-signup-session',
+        claims: {},
+      };
+    }
+    if (token === 'invited-first-use-token') {
+      return {
+        userId: invitedSupabaseUserId,
+        email: invitedEmail,
+        supabaseRole: 'authenticated',
+        sessionId: 'invited-first-use-session',
+        claims: {},
+      };
+    }
+    throw Object.assign(new Error('invalid test token'), { code: 'TEST_TOKEN_INVALID' });
+  };
   const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
   await runMigrations(system.pool, path.resolve(currentDirectory, '../../migrations'));
   assert.equal((await system.redisClient.ping()), 'PONG');
@@ -80,6 +112,12 @@ describe('auth API with real PostgreSQL and Redis', () => {
         'supabase_user_id',
       ],
     );
+    const passwordHashColumn = await system.pool.query(`
+      SELECT is_nullable
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'password_hash'
+    `);
+    assert.equal(passwordHashColumn.rows[0].is_nullable, 'YES');
 
     const invitationColumns = await system.pool.query(`
       SELECT column_name
@@ -101,38 +139,46 @@ describe('auth API with real PostgreSQL and Redis', () => {
     assert.deepEqual(roles.rows.map(({ enumlabel }) => enumlabel), ['admin', 'attorney', 'viewer']);
   });
 
-  it('keeps new-firm self-serve signup working (provisioning only)', async () => {
-    const signup = await request(system.app).post('/api/v1/auth/signup').send({
-      firmName,
-      email: adminEmail,
-      password,
-    });
-    assert.equal(signup.status, 201);
-    assert.equal(signup.body.user.role, 'admin');
-    assert.equal(signup.body.user.email, adminEmail);
-    assert.ok(!signup.body.accessToken);
-    assert.ok(!signup.body.refreshToken);
-    firmId = signup.body.user.firmId;
-    adminAccessToken = signup.body.user.id; // Store admin ID for invitation test
+  it('provisions and immediately links a new firm from a verified Supabase identity', async () => {
+    const provisioning = await request(system.app)
+      .post('/api/v1/provisioning/firm')
+      .set('Authorization', 'Bearer admin-signup-token')
+      .send({ firmName });
+    assert.equal(provisioning.status, 201);
+    assert.equal(provisioning.body.user.role, 'admin');
+    assert.equal(provisioning.body.user.email, adminEmail);
+    assert.ok(!provisioning.body.accessToken);
+    firmId = provisioning.body.user.firmId;
+    adminAccessToken = provisioning.body.user.id; // Store local Admin ID for invitation test
 
     const stored = await system.pool.query(
-      'SELECT password_hash, last_login_at FROM users WHERE email = $1',
+      'SELECT password_hash, last_login_at, supabase_user_id FROM users WHERE email = $1',
       [adminEmail],
     );
-    assert.notEqual(stored.rows[0].password_hash, password);
-    assert.match(stored.rows[0].password_hash, /^\$argon2id\$/);
+    assert.equal(stored.rows[0].password_hash, null);
     assert.equal(stored.rows[0].last_login_at, null);
+    assert.equal(stored.rows[0].supabase_user_id, adminSupabaseUserId);
+
+    const repeated = await request(system.app)
+      .post('/api/v1/provisioning/firm')
+      .set('Authorization', 'Bearer admin-signup-token')
+      .send({ firmName: 'A different ignored name' });
+    assert.equal(repeated.status, 201);
+    assert.equal(repeated.body.user.firmId, firmId);
+    assert.equal((await system.pool.query(
+      'SELECT count(*)::int AS count FROM firms WHERE id = $1',
+      [firmId],
+    )).rows[0].count, 1);
   });
 
-  it('blocks self-serve signup when the normalized firm name already exists', async () => {
-    const signup = await request(system.app).post('/api/v1/auth/signup').send({
-      firmName: `  ${firmName.toUpperCase()}  `,
-      email: blockedEmail,
-      password,
-    });
-    assert.equal(signup.status, 409);
-    assert.equal(signup.body.code, 'FIRM_ALREADY_EXISTS');
-    assert.match(signup.body.message, /request an invitation/i);
+  it('blocks firm provisioning when the normalized firm name already exists', async () => {
+    const provisioning = await request(system.app)
+      .post('/api/v1/provisioning/firm')
+      .set('Authorization', 'Bearer blocked-signup-token')
+      .send({ firmName: `  ${firmName.toUpperCase()}  ` });
+    assert.equal(provisioning.status, 409);
+    assert.equal(provisioning.body.code, 'FIRM_ALREADY_EXISTS');
+    assert.match(provisioning.body.message, /request an invitation/i);
     assert.equal((await system.pool.query('SELECT 1 FROM users WHERE email = $1', [blockedEmail])).rowCount, 0);
   });
 
@@ -161,27 +207,44 @@ describe('auth API with real PostgreSQL and Redis', () => {
     assert.equal(accepted.body.user.role, 'viewer');
     assert.equal(accepted.body.user.email, invitedEmail);
     assert.ok(!accepted.body.accessToken);
+    assert.equal((await system.pool.query(
+      'SELECT password_hash FROM users WHERE email = $1',
+      [invitedEmail],
+    )).rows[0].password_hash, null);
+
+    const firstUseLink = await request(system.app)
+      .post('/api/v1/provisioning/firm')
+      .set('Authorization', 'Bearer invited-first-use-token')
+      .send({ firmName: 'Must not create a second firm' });
+    assert.equal(firstUseLink.status, 201);
+    assert.equal(firstUseLink.body.user.role, 'viewer');
+    assert.equal(firstUseLink.body.user.firmId, firmId);
+    assert.equal((await system.pool.query(
+      'SELECT supabase_user_id FROM users WHERE email = $1',
+      [invitedEmail],
+    )).rows[0].supabase_user_id, invitedSupabaseUserId);
   });
 
-  it('redeems an invite through signup and ignores any caller-supplied role or firm', async () => {
+  it('ignores caller-supplied role and firm when redeeming an invite', async () => {
     // Again, we'll use the real admin user to bypass RBAC for this test.
     const issued = await system.authService.issueInvitation(
       { userId: adminAccessToken, firmId, role: 'admin' },
       { fullName: 'Invited Attorney', email: signupInviteEmail, role: 'attorney' }
     );
 
-    const signup = await request(system.app).post('/api/v1/auth/signup').send({
-      inviteToken: issued.token,
+    const accepted = await request(system.app)
+      .post(`/api/v1/auth/invitations/${issued.token}/accept`)
+      .send({
       fullName: 'Invited Attorney',
       email: signupInviteEmail.toUpperCase(),
       firmName: 'Caller Controlled Firm',
       role: 'admin',
       password,
     });
-    assert.equal(signup.status, 201);
-    assert.equal(signup.body.user.firmId, firmId);
-    assert.equal(signup.body.user.role, 'attorney');
-    assert.equal(signup.body.firm.name, firmName);
+    assert.equal(accepted.status, 201);
+    assert.equal(accepted.body.user.firmId, firmId);
+    assert.equal(accepted.body.user.role, 'attorney');
+    assert.equal(accepted.body.firm.name, firmName);
   });
 
   it('rejects reuse of an accepted invitation with a clear error', async () => {

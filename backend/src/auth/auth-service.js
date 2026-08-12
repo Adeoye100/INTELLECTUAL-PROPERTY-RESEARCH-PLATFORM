@@ -1,20 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { badRequest, conflict, forbidden, gone, unauthorized } from '../errors.js';
+import { badRequest, conflict, forbidden, gone } from '../errors.js';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ROLES = new Set(['admin', 'attorney', 'viewer']);
 
 const normalizeEmail = (email) => String(email ?? '').trim().toLowerCase();
-const normalizeFirmName = (name) => String(name ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
-const displayFirmName = (name) => String(name ?? '').trim().replace(/\s+/g, ' ');
-
-function validatePassword(password) {
-  if (typeof password !== 'string' || password.length < 8) {
-    throw badRequest('VALIDATION_ERROR', 'Password must be at least 8 characters.', {
-      field: 'password',
-    });
-  }
-}
 
 function publicUser(user) {
   return {
@@ -28,67 +18,12 @@ function publicUser(user) {
 export class AuthService {
   constructor({
     userRepository,
-    passwordHasher,
     tokenService,
     inviteTokenTtlSeconds = 604_800,
   }) {
     this.userRepository = userRepository;
-    this.passwordHasher = passwordHasher;
     this.tokenService = tokenService;
     this.inviteTokenTtlSeconds = inviteTokenTtlSeconds;
-  }
-
-  validateCredentialsInput(input) {
-    const email = normalizeEmail(input?.email);
-    if (!EMAIL_PATTERN.test(email)) {
-      throw badRequest('VALIDATION_ERROR', 'Enter a valid email address.', { field: 'email' });
-    }
-    validatePassword(input?.password);
-    return { email, password: input.password };
-  }
-
-
-  async signup(input) {
-    if (input?.inviteToken !== undefined) {
-      if (typeof input.inviteToken !== 'string' || !input.inviteToken) {
-        throw badRequest('VALIDATION_ERROR', 'Invitation token is required.', { field: 'inviteToken' });
-      }
-      return this.acceptInvitation(input.inviteToken, input);
-    }
-
-    const { email, password } = this.validateCredentialsInput(input);
-    const firmName = displayFirmName(input?.firmName ?? input?.company);
-    const normalizedFirmName = normalizeFirmName(firmName);
-    if (firmName.length < 2) {
-      throw badRequest('VALIDATION_ERROR', 'Firm name is required.', { field: 'firmName' });
-    }
-
-    const passwordHash = await this.passwordHasher.hash(password);
-    let user;
-    try {
-      user = await this.userRepository.createWithFirm({
-        firmName,
-        normalizedFirmName,
-        email,
-        passwordHash,
-      });
-    } catch (error) {
-      if (error?.code === 'FIRM_NAME_EXISTS') {
-        throw conflict(
-          'FIRM_ALREADY_EXISTS',
-          'This firm may already exist. Request an invitation from your firm administrator.',
-        );
-      }
-      if (error?.code === '23505' && error?.constraint === 'users_email_key') {
-        throw conflict('DUPLICATE_ACCOUNT', 'An account already exists for this email address.');
-      }
-      throw error;
-    }
-
-    return {
-      user: publicUser(user),
-      firm: user.firm,
-    };
   }
 
   async issueInvitation(auth, input) {
@@ -139,17 +74,15 @@ export class AuthService {
   }
 
   async acceptInvitation(token, input) {
-    validatePassword(input?.password);
     const claims = await this.verifyInvitation(token);
     const suppliedEmail = input?.email === undefined ? null : normalizeEmail(input.email);
     if (suppliedEmail !== null && suppliedEmail !== claims.email) {
       throw badRequest('VALIDATION_ERROR', 'Email does not match this invitation.', { field: 'email' });
     }
 
-    const passwordHash = await this.passwordHasher.hash(input.password);
     let user;
     try {
-      user = await this.userRepository.acceptInvitation({ ...claims, passwordHash });
+      user = await this.userRepository.acceptInvitation(claims);
     } catch (error) {
       if (error?.code === 'INVITATION_EXPIRED') {
         throw gone('EXPIRED_LINK', 'This invitation has expired. Request a new invitation.');
@@ -211,21 +144,4 @@ export class AuthService {
     }
   }
 
-  async login(input) {
-    const { email, password } = this.validateCredentialsInput(input);
-    const user = await this.userRepository.findByEmail(email);
-    if (!user) {
-      await this.passwordHasher.verifyDummy(password);
-      throw unauthorized('Email or password is incorrect.');
-    }
-
-    const valid = await this.passwordHasher.verify(user.passwordHash, password);
-    if (!valid) throw unauthorized('Email or password is incorrect.');
-
-    user.lastLoginAt = await this.userRepository.recordLogin(user.id);
-    return {
-      user: publicUser(user),
-      firm: user.firm,
-    };
-  }
 }

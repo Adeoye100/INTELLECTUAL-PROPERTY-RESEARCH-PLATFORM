@@ -25,7 +25,10 @@ afterEach(() => {
 describe('EmailVerificationScreen', () => {
   it('exchanges the Supabase confirmation code and focuses the verified state', async () => {
     vi.stubGlobal('fetch', vi.fn()
-      .mockResolvedValueOnce(new Response(null, { status: 403 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        user: { id: 'local-user', firmId: 'firm-1', email: 'confirmed@example.test', role: 'admin' },
+        firm: { id: 'firm-1', name: 'Forge Legal', subscriptionTier: 'free' },
+      }), { status: 201, headers: { 'Content-Type': 'application/json' } }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), {
         status: 200, headers: { 'Content-Type': 'application/json' },
       })));
@@ -35,7 +38,9 @@ describe('EmailVerificationScreen', () => {
           access_token: 'confirmed-token',
           user: {
             id: 'u1', email: 'confirmed@example.test', email_confirmed_at: '2026-08-12T00:00:00Z',
-            app_metadata: {}, user_metadata: { full_name: 'Confirmed User' },
+            app_metadata: {}, user_metadata: {
+              full_name: 'Confirmed User', forge_signup_firm_name: 'Forge Legal',
+            },
           },
         },
       },
@@ -47,6 +52,9 @@ describe('EmailVerificationScreen', () => {
     const status = screen.getByRole('status');
     await waitFor(() => expect(status).toHaveFocus());
     expect(auth.exchangeCodeForSession).toHaveBeenCalledWith('valid-code');
+    expect(fetch).toHaveBeenCalledWith('/api/v1/provisioning/firm', expect.objectContaining({
+      method: 'POST', body: JSON.stringify({ firmName: 'Forge Legal' }),
+    }));
     expect(screen.getByRole('link', { name: 'Continue to the app' })).toHaveAttribute('href', '/app');
   });
 

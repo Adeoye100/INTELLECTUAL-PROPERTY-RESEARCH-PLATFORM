@@ -68,10 +68,46 @@ export class UserRepository {
     return { role: result.rows[0].role, firmId: result.rows[0].firm_id };
   }
 
-  async createWithFirm({ firmName, normalizedFirmName, email, passwordHash }) {
+  async createFirmForSupabaseIdentity({
+    firmName,
+    normalizedFirmName,
+    email,
+    supabaseUserId,
+  }) {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [supabaseUserId]);
+
+      const existingUser = await client.query(
+        `SELECT u.*, f.name AS firm_name, f.subscription_tier
+         FROM users u
+         JOIN firms f ON f.id = u.firm_id
+         WHERE u.supabase_user_id = $1`,
+        [supabaseUserId],
+      );
+      if (existingUser.rowCount) {
+        await client.query('COMMIT');
+        return mapUser(existingUser.rows[0]);
+      }
+
+      const linkedUser = await client.query(
+        `WITH linked AS (
+           UPDATE users
+           SET supabase_user_id = $1
+           WHERE supabase_user_id IS NULL AND email = $2
+           RETURNING *
+         )
+         SELECT linked.*, f.name AS firm_name, f.subscription_tier
+         FROM linked
+         JOIN firms f ON f.id = linked.firm_id`,
+        [supabaseUserId, email],
+      );
+      if (linkedUser.rowCount) {
+        await client.query('COMMIT');
+        return mapUser(linkedUser.rows[0]);
+      }
+
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [normalizedFirmName]);
 
       const firmResult = await client.query(
@@ -90,10 +126,10 @@ export class UserRepository {
       const firm = inserted.rows[0];
 
       const userResult = await client.query(
-        `INSERT INTO users (firm_id, email, password_hash, role)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO users (firm_id, email, password_hash, role, supabase_user_id)
+         VALUES ($1, $2, NULL, $3, $4)
          RETURNING id, firm_id, email, password_hash, role, created_at, last_login_at`,
-        [firm.id, email, passwordHash, 'admin'],
+        [firm.id, email, 'admin', supabaseUserId],
       );
       await client.query('COMMIT');
 
@@ -140,7 +176,7 @@ export class UserRepository {
     return result.rowCount ? mapInvitation(result.rows[0]) : null;
   }
 
-  async acceptInvitation({ id, firmId, email, role, expiresAtSeconds, passwordHash }) {
+  async acceptInvitation({ id, firmId, email, role, expiresAtSeconds }) {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
@@ -170,9 +206,9 @@ export class UserRepository {
 
       const userResult = await client.query(
         `INSERT INTO users (firm_id, email, password_hash, role)
-         VALUES ($1, $2, $3, $4)
+         VALUES ($1, $2, NULL, $3)
          RETURNING id, firm_id, email, password_hash, role, created_at, last_login_at`,
-        [firmId, email, passwordHash, role],
+        [firmId, email, role],
       );
       await client.query('UPDATE firm_invitations SET used_at = now() WHERE id = $1', [id]);
       await client.query('COMMIT');

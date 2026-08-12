@@ -337,13 +337,13 @@ const mockAuthError = (status: number, code: string, message: string) =>
   HttpResponse.json({ code, message, mocked: true }, { status });
 
 export const handlers = [
-  http.post('/api/v1/auth/signup', async ({ request }) => {
-    const body = await request.json() as { email?: string };
-    const email = body.email?.toLowerCase() ?? '';
-    if (email.startsWith('existing')) return mockAuthError(409, 'DUPLICATE_ACCOUNT', 'An account already exists.');
-    if (email.startsWith('network')) return HttpResponse.error();
+  http.post('/api/v1/provisioning/firm', async () => {
     await delay(400);
-    return HttpResponse.json({ accepted: true, verificationRequired: true, mocked: true }, { status: 202 });
+    return HttpResponse.json({
+      user: { id: 'mock-user', firmId: 'mock-firm', email: 'mock@example.test', role: 'admin' },
+      firm: { id: 'mock-firm', name: 'Mock Firm', subscriptionTier: 'free' },
+      mocked: true,
+    }, { status: 201 });
   }),
 
   http.get('/api/v1/auth/invitations/:token', async ({ params }) => {

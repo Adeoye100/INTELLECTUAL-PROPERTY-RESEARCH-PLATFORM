@@ -100,5 +100,6 @@ describe('InviteAcceptanceScreen', () => {
       email: 'viewer-invite@invite.example', password: 'safe-password',
     }));
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual({ fullName: 'Invited User' });
   }, 20_000);
 });

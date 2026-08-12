@@ -35,8 +35,9 @@ production security posture: any deployed cluster must enable authentication,
 TLS, authorization, backups, and appropriate node topology.
 
 All required environment variables and token lifetimes are documented in
-`.env.example`. `JWT_ACCESS_SECRET` must be at least 32 bytes. Firm invitations
-default to seven days and can be configured with `INVITE_TOKEN_TTL_SECONDS`.
+`.env.example`. `JWT_ACCESS_SECRET` currently signs application invitation
+tokens and must be at least 32 bytes. Firm invitations default to seven days and
+can be configured with `INVITE_TOKEN_TTL_SECONDS`.
 
 ## Migrations
 
@@ -145,16 +146,22 @@ The verified real XML structure and sample provenance are recorded in
 
 ## Firm creation and invite-only joining
 
-Self-serve signup reads `firmName`, falling back to the frontend-compatible
-`company` field. It trims leading/trailing whitespace, collapses every run of
-internal whitespace to one space, and lower-cases the result. The repository then
-compares it with the same normalized PostgreSQL expression. A unique expression
-index and transaction-scoped advisory lock make the check race-safe.
+After Supabase creates the identity, self-serve signup sends `firmName` to the
+bearer-protected provisioning endpoint. It trims leading/trailing whitespace,
+collapses every run of internal whitespace to one space, and lower-cases the
+result. The repository then compares it with the same normalized PostgreSQL
+expression. A unique expression index and transaction-scoped advisory lock make
+the check race-safe.
 
-Self-serve signup can only create a new firm, whose first user is `admin`. If the
-normalized name already exists, signup returns `409 FIRM_ALREADY_EXISTS` with a
-message directing the user to request an invitation. A name match never grants a
-role or tenant membership.
+Self-serve provisioning can only create a new firm, whose first user is `admin`.
+The local user is linked to the verified Supabase `sub` in the same transaction
+and no password is sent to or stored by this API. If the normalized name already
+exists, provisioning returns `409 FIRM_ALREADY_EXISTS` with a message directing
+the user to request an invitation. A name match never grants a role or tenant
+membership. Repeating the request for an already-provisioned Supabase identity
+returns that identity's existing membership without creating another firm. If a
+same-email local membership was already created through a valid invitation, the
+endpoint links and returns that membership instead of attempting firm creation.
 
 Joining an existing firm requires an Admin-issued invitation. The signed JWT binds
 the invitation ID, firm ID, normalized email, intended role, and expiry. The
@@ -170,15 +177,14 @@ stack for firm membership and RBAC.
 
 | Method and path | Body | Result |
 |---|---|---|
-| `POST /api/v1/auth/signup` | `{ firmName, email, password }` | `201` user role and firm info (provisioning only) |
-| `POST /api/v1/auth/signup` | `{ inviteToken, fullName?, email?, password }` | `201` invite redemption (provisioning only) |
+| `POST /api/v1/provisioning/firm` | `{ firmName }` plus verified Supabase Bearer token | `201` linked Admin user and firm info |
 | `POST /api/v1/admin/invitations` | `{ fullName, email, role }` plus Bearer token | `201` signed invitation token and info |
 | `GET /api/v1/auth/invitations/:token` | None | `200` invitation details |
-| `POST /api/v1/auth/invitations/:token/accept` | `{ fullName, password }` | `201` user/firm provisioning info |
+| `POST /api/v1/auth/invitations/:token/accept` | `{ fullName }` | `201` user/firm provisioning info |
 
 Identity is verified on every request using the Supabase JWT. Local routes
-provision the firm/user link. Legacy local session management (login/refresh/logout)
-is retired.
+provision the firm/user link. Supabase is the only password and session authority;
+legacy local signup/login/refresh/logout behavior is retired.
 
 ## RBAC demonstration routes
 

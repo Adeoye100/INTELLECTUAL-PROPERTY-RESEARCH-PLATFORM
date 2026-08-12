@@ -5,6 +5,7 @@ export type AuthErrorCode =
   | 'DUPLICATE_ACCOUNT'
   | 'EMAIL_NOT_VERIFIED'
   | 'EXPIRED_LINK'
+  | 'FIRM_ALREADY_EXISTS'
   | 'INVALID_CREDENTIALS'
   | 'NETWORK_ERROR'
   | 'PERMISSION_DENIED'
@@ -50,7 +51,7 @@ export async function authRequest<T>(input: RequestInfo | URL, init?: RequestIni
       throw new AuthApiError('UNKNOWN_ERROR', 'The request could not be completed. Please try again.');
     }
     const knownServerCode = error.serverCode && [
-      'DUPLICATE_ACCOUNT', 'EMAIL_NOT_VERIFIED', 'EXPIRED_LINK', 'INVALID_CREDENTIALS',
+      'DUPLICATE_ACCOUNT', 'EMAIL_NOT_VERIFIED', 'EXPIRED_LINK', 'FIRM_ALREADY_EXISTS', 'INVALID_CREDENTIALS',
       'PERMISSION_DENIED', 'SEAT_LIMIT', 'SESSION_EXPIRED',
     ].includes(error.serverCode) ? error.serverCode as AuthErrorCode : undefined;
     const fallbackCode: AuthErrorCode = error.code === 'NETWORK_ERROR' || error.code === 'TIMEOUT'
@@ -73,6 +74,7 @@ export const authErrorMessage = (error: unknown): string => {
     DUPLICATE_ACCOUNT: 'An account already exists for this email address. Sign in or reset your password instead.',
     EMAIL_NOT_VERIFIED: 'Verify your email address before signing in. You can request another verification email below.',
     EXPIRED_LINK: 'This link has expired or has already been used. Request a new link to continue.',
+    FIRM_ALREADY_EXISTS: 'This firm may already exist. Request an invitation from your firm administrator.',
     INVALID_CREDENTIALS: 'The email address or password is incorrect.',
     NETWORK_ERROR: 'We could not reach the service. Check your connection and try again.',
     PERMISSION_DENIED: 'You do not have permission to complete this action.',
@@ -103,6 +105,9 @@ export function toAuthApiError(error: unknown): AuthApiError {
   }
   if (/invalid[_ ]?credentials|invalid login credentials/.test(detail)) {
     return new AuthApiError('INVALID_CREDENTIALS', candidate.message ?? 'Invalid credentials.', candidate.status);
+  }
+  if (candidate.code === 'FIRM_ALREADY_EXISTS') {
+    return new AuthApiError('FIRM_ALREADY_EXISTS', candidate.message ?? 'This firm may already exist.', candidate.status);
   }
   if (/already[_ ]?(?:registered|exists)|identity_already_exists|user_already_exists/.test(detail)) {
     return new AuthApiError('DUPLICATE_ACCOUNT', candidate.message ?? 'An account already exists.', candidate.status);

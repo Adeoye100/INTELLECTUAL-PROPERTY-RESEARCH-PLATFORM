@@ -75,7 +75,7 @@ export function InviteAcceptanceScreen() {
       await authRequest(`/auth/invitations/${token ?? ''}/accept`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fullName: values.fullName, password: values.password }),
+        body: JSON.stringify({ fullName: values.fullName }),
       });
 
       const credentials = { email: invitation!.email, password: values.password };

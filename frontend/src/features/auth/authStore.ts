@@ -3,6 +3,7 @@ import type { Session, User } from '@supabase/supabase-js';
 import type { UserRole } from '../../types';
 import { supabase } from '../../lib/supabase';
 import { getApiConfig } from '../../lib/api/config';
+import { provisionFirmForSignupSession } from './signupProvisioning';
 
 export interface AuthenticatedUser {
   id: string;
@@ -80,6 +81,7 @@ export async function syncSupabaseSession(
   session: Session,
   roleOverride?: UserRole,
 ): Promise<AuthenticatedUser> {
+  await provisionFirmForSignupSession(session);
   const revision = beginSession(session.access_token);
   const role = roleOverride ?? await resolveRole(session.access_token);
   if (revision !== sessionRevision) throw new Error('A newer authentication state replaced this session.');

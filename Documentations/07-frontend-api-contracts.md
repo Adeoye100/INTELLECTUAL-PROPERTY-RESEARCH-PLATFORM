@@ -27,16 +27,15 @@ exists. MSW fixtures remain isolated-development aids and return mock data only.
 
 ## Candidate endpoint contracts used by the frontend
 
-All entries remain **blocked from frontend live integration** until their shapes
-are reconciled. The four BE-04 auth routes are implemented and real-store tested
-locally, but their current response/refresh transport differs from the earlier
-frontend mock contract and has not been deployed to staging.
+The provisioning and invitation entries below are implemented in the frontend
+and backend. Deployment still requires matching Supabase provider, redirect URL,
+and environment configuration.
 
 | Candidate route | Request shape | Expected response shape | Intended role rule | Unresolved backend contract |
 |---|---|---|---|---|
-| `POST /api/v1/auth/signup` | Implemented: `{ firmName?: string, email, password }` | Implemented: `201` user/firm provisioning info | Public self-serve; first firm user Admin, later normalized-name matches Viewer | Supabase is used for identity; this route only provisions the local user/firm link |
+| `POST /api/v1/provisioning/firm` | Implemented: `{ firmName }` plus verified Supabase Bearer token | Implemented: `201` linked Admin user and firm info | Authenticated Supabase identity with no local membership | First firm user is Admin; normalized-name matches return `409 FIRM_ALREADY_EXISTS`; no password reaches the backend |
 | `GET /api/v1/auth/invitations/:token` | Invitation token in path | `{ email, firmName, role, mocked? }` | Public holder of single-use token | Token format/expiry, disclosure rules, accepted/revoked states |
-| `POST /api/v1/auth/invitations/:token/accept` | `{ fullName, password }` | Provisioning info | Public holder of valid token | Atomic seat allocation, password policy, existing-account handling |
+| `POST /api/v1/auth/invitations/:token/accept` | `{ fullName }` | Provisioning info | Public holder of valid token | Atomic seat allocation and existing-account handling; Supabase owns the password |
 | `POST /api/v1/auth/password-reset` | `{ email }` | `202 { accepted: true }` | Public | Anti-enumeration wording, throttling, delivery guarantees |
 | `GET /api/v1/auth/password-reset/:token` | Reset token in path | `{ valid: true }` | Public holder of token | Whether validation should be a non-mutating POST, token disclosure/caching controls |
 | `POST /api/v1/auth/password-reset/:token` | `{ password }` | `204` | Public holder of valid token | Session revocation, password rules, single-use transaction semantics |

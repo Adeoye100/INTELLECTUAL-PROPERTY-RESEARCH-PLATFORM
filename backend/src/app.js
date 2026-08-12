@@ -2,13 +2,18 @@ import express from 'express';
 import { errorHandler } from './errors.js';
 import { createAuthRouter } from './routes/auth-routes.js';
 import { createProtectedRouter } from './routes/protected-routes.js';
+import { createProvisioningRouter } from './routes/provisioning-routes.js';
 
-export function createApp({ authService, authenticate }) {
+export function createApp({ authService, authenticate, authenticateIdentity, provisioningService }) {
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '16kb' }));
 
   app.use('/api/v1/auth', createAuthRouter(authService));
+  app.use(
+    '/api/v1/provisioning',
+    createProvisioningRouter(authenticateIdentity, provisioningService),
+  );
   app.use('/api/v1', createProtectedRouter(authenticate, authService));
 
   app.use((_request, response) => {

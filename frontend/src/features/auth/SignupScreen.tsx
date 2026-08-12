@@ -6,7 +6,7 @@ import { Check } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/Button';
 import { supabase } from '../../lib/supabase';
-import { AuthApiError, authErrorMessage, authRequest, toAuthApiError } from './authApi';
+import { AuthApiError, authErrorMessage, toAuthApiError } from './authApi';
 import { syncSupabaseSession } from './authStore';
 import { authRedirectUrl, roleHomePath } from './roleRouting';
 
@@ -40,14 +40,6 @@ export const SignupScreen: React.FC = () => {
     setSubmitError(null);
     setErrorCode(null);
     try {
-      // The existing backend transaction remains the only firm/local-user
-      // provisioning path; Supabase remains the sole session authority.
-      await authRequest('/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-
       const { data: authData, error: signupError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
@@ -55,6 +47,7 @@ export const SignupScreen: React.FC = () => {
           data: {
             full_name: data.fullName,
             onboarding_required: true,
+            forge_signup_firm_name: data.company,
           },
           emailRedirectTo: authRedirectUrl('/auth/verify-email'),
         },
@@ -65,7 +58,9 @@ export const SignupScreen: React.FC = () => {
       }
 
       if (authData.session) {
-        const user = await syncSupabaseSession(authData.session, 'admin');
+        // syncSupabaseSession first provisions the firm with this verified
+        // access token, then resolves the newly-created Admin membership.
+        const user = await syncSupabaseSession(authData.session);
         navigate(roleHomePath(user.role), { replace: true });
         return;
       }

@@ -3,8 +3,8 @@ import {
   createResolveRoleAndFirm,
   createSupabaseAuthenticate,
 } from './auth/middleware.js';
-import { passwordHasher } from './auth/password.js';
 import { AuthService } from './auth/auth-service.js';
+import { ProvisioningService } from './auth/provisioning-service.js';
 import { RedisRoleFirmResolver } from './auth/role-firm-resolver.js';
 import { SupabaseAdminUserService } from './auth/supabase-admin-user-service.js';
 import { SupabaseVerifier } from './auth/supabase-verifier.js';
@@ -39,7 +39,6 @@ export async function createSystem(config) {
   const userRepository = new UserRepository(pool);
   const authService = new AuthService({
     userRepository,
-    passwordHasher,
     tokenService,
     inviteTokenTtlSeconds: config.inviteTokenTtlSeconds,
   });
@@ -53,12 +52,15 @@ export async function createSystem(config) {
     createSupabaseAuthenticate(supabaseVerifier),
     createResolveRoleAndFirm(roleFirmResolver),
   ];
+  const authenticateIdentity = createSupabaseAuthenticate(supabaseVerifier);
+  const provisioningService = new ProvisioningService({ userRepository, roleFirmResolver });
 
   return {
-    app: createApp({ authService, authenticate }),
+    app: createApp({ authService, authenticate, authenticateIdentity, provisioningService }),
     pool,
     redisClient,
     authService,
+    provisioningService,
     roleFirmResolver,
     supabaseAdminUserService,
     supabaseVerifier,
