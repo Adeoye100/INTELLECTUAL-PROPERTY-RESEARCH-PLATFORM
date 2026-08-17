@@ -65,7 +65,10 @@ describe('InviteAcceptanceScreen', () => {
       }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ accepted: true }), {
         status: 201, headers: { 'Content-Type': 'application/json' },
-      }));
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        userId: 'supabase-user', email: 'viewer-invite@invite.example', role: 'viewer', firmId: 'firm-1',
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     vi.stubGlobal('fetch', fetchMock);
     auth.signUp.mockResolvedValue({
       data: {
@@ -99,7 +102,7 @@ describe('InviteAcceptanceScreen', () => {
     expect(auth.signUp).toHaveBeenCalledWith(expect.objectContaining({
       email: 'viewer-invite@invite.example', password: 'safe-password',
     }));
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual({ fullName: 'Invited User' });
   }, 20_000);
 });

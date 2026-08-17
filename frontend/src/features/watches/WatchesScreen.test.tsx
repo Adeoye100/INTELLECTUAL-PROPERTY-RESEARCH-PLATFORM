@@ -35,7 +35,7 @@ const renderWatches = () => {
 };
 
 describe('WatchesScreen', () => {
-  beforeEach(() => useAuthStore.getState().setSession('watch-token', { id: 'u1', email: 'attorney@firm.com', fullName: 'Attorney', role: 'attorney' }));
+  beforeEach(() => useAuthStore.getState().setSession('watch-token', { id: 'u1', email: 'attorney@firm.com', fullName: 'Attorney', role: 'attorney', firmId: 'firm-1' }));
   afterEach(() => { act(() => useAuthStore.getState().clearSession()); localStorage.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
   it('renders unread styling, newest-first ordering, filters, and risk navigation', async () => {

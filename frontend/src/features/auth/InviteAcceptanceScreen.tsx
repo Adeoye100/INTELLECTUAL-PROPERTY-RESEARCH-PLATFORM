@@ -101,7 +101,7 @@ export function InviteAcceptanceScreen() {
         navigate(`/auth/verify-email?email=${encodeURIComponent(invitation!.email)}`, { replace: true });
         return;
       }
-      const user = await syncSupabaseSession(authData.session, invitation!.role);
+      const user = await syncSupabaseSession(authData.session);
       navigate(user.onboardingRequired ? '/dashboard' : roleHomePath(user.role), { replace: true });
     } catch (error) {
       setSubmitError(authErrorMessage(toAuthApiError(error)));

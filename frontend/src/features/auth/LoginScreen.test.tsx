@@ -33,8 +33,9 @@ describe('LoginScreen', () => {
   it('supports keyboard sign-in and role-based navigation through Supabase', async () => {
     auth.signInWithPassword.mockResolvedValue({ data: { session, user: session.user }, error: null });
     vi.stubGlobal('fetch', vi.fn()
-      .mockResolvedValueOnce(new Response(null, { status: 403 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), {
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        userId: 'u1', email: 'attorney@example.test', role: 'attorney', firmId: 'firm-1',
+      }), {
         status: 200, headers: { 'Content-Type': 'application/json' },
       })));
     const user = userEvent.setup();
@@ -54,15 +55,15 @@ describe('LoginScreen', () => {
     expect(auth.signInWithPassword).toHaveBeenCalledWith({ email: 'attorney@example.test', password: 'safe-password' });
   }, 20_000);
 
-  it.each(['google', 'github'] as const)('starts %s OAuth with the callback route', async (provider) => {
-    auth.signInWithOAuth.mockResolvedValue({ data: { provider, url: 'https://provider.test' }, error: null });
+  it('starts Google OAuth with the callback route', async () => {
+    auth.signInWithOAuth.mockResolvedValue({ data: { provider: 'google', url: 'https://provider.test' }, error: null });
     const user = userEvent.setup();
     render(<MemoryRouter initialEntries={['/auth/login']}><LoginScreen /></MemoryRouter>);
 
-    await user.click(screen.getByRole('button', { name: provider === 'google' ? 'Google' : 'GitHub' }));
+    await user.click(screen.getByRole('button', { name: 'Google' }));
 
     expect(auth.signInWithOAuth).toHaveBeenCalledWith({
-      provider,
+      provider: 'google',
       options: { redirectTo: expect.stringMatching(/\/auth\/callback\?next=%2Fapp$/) },
     });
   });

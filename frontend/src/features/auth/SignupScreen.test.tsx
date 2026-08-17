@@ -84,7 +84,9 @@ describe('SignupScreen', () => {
         user: { id: 'local-user', firmId: 'firm-1', email: 'ada@example.test', role: 'admin' },
         firm: { id: 'firm-1', name: 'Forge Legal', subscriptionTier: 'free' },
       }, 201))
-      .mockResolvedValueOnce(jsonResponse({ ok: true }));
+      .mockResolvedValueOnce(jsonResponse({
+        userId: '11111111-1111-4111-8111-111111111111', email: 'ada@example.test', role: 'admin', firmId: 'firm-1',
+      }));
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     render(
@@ -103,7 +105,7 @@ describe('SignupScreen', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/provisioning/firm');
     expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('Authorization')).toBe('Bearer verified-signup-token');
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ firmName: 'Forge Legal' });
-    expect(String(fetchMock.mock.calls[1][0])).toContain('/admin/ping');
+    expect(String(fetchMock.mock.calls[1][0])).toContain('/me');
   }, 20_000);
 
   it('reports a conflicting firm without sending the password to the backend', async () => {

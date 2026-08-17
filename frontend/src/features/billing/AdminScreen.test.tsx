@@ -12,6 +12,7 @@ describe('AdminScreen seat management', () => {
       email: 'admin@forgeglobal.com',
       fullName: 'Jane Smith',
       role: 'admin',
+      firmId: 'firm-1',
     });
   });
 

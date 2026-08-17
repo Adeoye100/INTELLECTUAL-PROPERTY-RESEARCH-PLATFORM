@@ -25,6 +25,19 @@ describe('ApiClient', () => {
     expect(init.body).toBe(JSON.stringify({ mark: 'FORGE' }));
   });
 
+  it('preserves an explicit bootstrap bearer token before the auth store has been populated', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(JSON.stringify({ role: 'admin' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+    const client = new ApiClient({ config, fetchImpl, getAccessToken: () => 'stale-token' });
+
+    await client.requestJson('/me', { headers: { Authorization: 'Bearer fresh-token' } });
+
+    const [, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(new Headers(init.headers).get('authorization')).toBe('Bearer fresh-token');
+  });
+
   it('normalizes structured HTTP failures', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       code: 'INVALID_FILTERS',

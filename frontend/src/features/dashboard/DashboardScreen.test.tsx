@@ -26,7 +26,7 @@ describe('DashboardScreen data states', () => {
   beforeEach(() => {
     useAuthStore.getState().setSession('dashboard-token', {
       id: 'dashboard-user', email: 'dashboard@firm.com', fullName: 'Dashboard User',
-      role: 'attorney', onboardingRequired: false,
+      role: 'attorney', firmId: 'firm-1', onboardingRequired: false,
     });
   });
 

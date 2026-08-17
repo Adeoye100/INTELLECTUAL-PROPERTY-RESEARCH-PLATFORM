@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { Session, User } from '@supabase/supabase-js';
 import type { UserRole } from '../../types';
 import { supabase } from '../../lib/supabase';
-import { getApiConfig } from '../../lib/api/config';
+import { getApiClient } from '../../lib/api/client';
 import { provisionFirmForSignupSession } from './signupProvisioning';
 
 export interface AuthenticatedUser {
@@ -10,6 +10,7 @@ export interface AuthenticatedUser {
   email: string;
   fullName: string;
   role: UserRole;
+  firmId: string;
   emailVerified?: boolean;
   onboardingRequired?: boolean;
 }
@@ -24,6 +25,7 @@ interface AuthState {
 
 let sessionRevision = 0;
 let activeAccessToken: string | null = null;
+const sessionSynchronizations = new Map<string, Promise<AuthenticatedUser>>();
 
 const beginSession = (accessToken: string) => {
   if (activeAccessToken !== accessToken) {
@@ -53,22 +55,20 @@ export const useAuthStore = create<AuthState>()((set) => ({
   },
 }));
 
-async function resolveRole(accessToken: string): Promise<UserRole | null> {
-  const baseUrl = getApiConfig().baseUrl;
-  for (const [candidate, path] of [
-    ['admin', '/admin/ping'],
-    ['attorney', '/attorney/ping'],
-    ['viewer', '/viewer/ping'],
-  ] as const) {
-    const response = await fetch(`${baseUrl}${path}`, {
-      headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` },
-      credentials: 'same-origin',
-    });
-    if (response.ok) return candidate;
-    if (response.status === 401) return null;
-    if (response.status !== 403) throw new Error('The service could not load your firm membership.');
-  }
-  return null;
+interface CurrentUserResponse {
+  userId: string;
+  email: string;
+  role: UserRole | null;
+  firmId: string | null;
+}
+
+const isUserRole = (role: unknown): role is UserRole =>
+  role === 'admin' || role === 'attorney' || role === 'viewer';
+
+async function resolveCurrentUser(accessToken: string): Promise<CurrentUserResponse> {
+  return getApiClient().requestJson<CurrentUserResponse>('/me', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
 }
 
 const displayName = (user: User) => {
@@ -77,30 +77,41 @@ const displayName = (user: User) => {
   return user.email?.split('@')[0] || 'Forge user';
 };
 
-export async function syncSupabaseSession(
-  session: Session,
-  roleOverride?: UserRole,
-): Promise<AuthenticatedUser> {
+async function synchronizeSupabaseSession(session: Session): Promise<AuthenticatedUser> {
   await provisionFirmForSignupSession(session);
   const revision = beginSession(session.access_token);
-  const role = roleOverride ?? await resolveRole(session.access_token);
+  const currentUser = await resolveCurrentUser(session.access_token);
   if (revision !== sessionRevision) throw new Error('A newer authentication state replaced this session.');
-  if (!role) {
+  if (!isUserRole(currentUser.role) || typeof currentUser.firmId !== 'string' || !currentUser.firmId) {
     useAuthStore.getState().clearSession();
     await supabase.auth.signOut({ scope: 'local' });
     throw new Error('No firm membership is associated with this account. Request access or ask a firm administrator for an invitation.');
   }
 
   const user: AuthenticatedUser = {
-    id: session.user.id,
-    email: session.user.email ?? '',
+    id: currentUser.userId,
+    email: currentUser.email,
     fullName: displayName(session.user),
-    role,
+    role: currentUser.role,
+    firmId: currentUser.firmId,
     emailVerified: Boolean(session.user.email_confirmed_at),
     onboardingRequired: session.user.user_metadata.onboarding_required === true,
   };
   useAuthStore.setState({ token: session.access_token, user, status: 'authenticated' });
   return user;
+}
+
+export function syncSupabaseSession(session: Session): Promise<AuthenticatedUser> {
+  const existing = sessionSynchronizations.get(session.access_token);
+  if (existing) return existing;
+
+  const synchronization = synchronizeSupabaseSession(session);
+  sessionSynchronizations.set(session.access_token, synchronization);
+  void synchronization.then(
+    () => { sessionSynchronizations.delete(session.access_token); },
+    () => { sessionSynchronizations.delete(session.access_token); },
+  );
+  return synchronization;
 }
 
 let initialization: Promise<void> | null = null;
@@ -116,6 +127,7 @@ export function initializeAuth(): Promise<void> {
         useAuthStore.getState().clearSession();
         return;
       }
+      if (event === 'INITIAL_SESSION') return;
       void syncSupabaseSession(session).catch(() => {
         useAuthStore.getState().clearSession();
       });

@@ -1,4 +1,5 @@
 import express from 'express';
+import { createCorsMiddleware } from './cors.js';
 import { errorHandler } from './errors.js';
 import { createAuthRouter } from './routes/auth-routes.js';
 import { createProtectedRouter } from './routes/protected-routes.js';
@@ -7,6 +8,7 @@ import { createProvisioningRouter } from './routes/provisioning-routes.js';
 export function createApp({ authService, authenticate, authenticateIdentity, provisioningService }) {
   const app = express();
   app.disable('x-powered-by');
+  app.use(createCorsMiddleware());
   app.use(express.json({ limit: '16kb' }));
 
   app.use('/api/v1/auth', createAuthRouter(authService));

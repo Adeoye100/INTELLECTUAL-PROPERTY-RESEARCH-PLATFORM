@@ -33,7 +33,7 @@ const renderPortfolio = () => {
 };
 
 describe('PortfolioScreen', () => {
-  beforeEach(() => useAuthStore.getState().setSession('portfolio-token', { id: 'u1', email: 'attorney@firm.com', fullName: 'Attorney', role: 'attorney' }));
+  beforeEach(() => useAuthStore.getState().setSession('portfolio-token', { id: 'u1', email: 'attorney@firm.com', fullName: 'Attorney', role: 'attorney', firmId: 'firm-1' }));
   afterEach(() => { act(() => useAuthStore.getState().clearSession()); localStorage.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
   it('filters the table and creates a watch in one click', async () => {

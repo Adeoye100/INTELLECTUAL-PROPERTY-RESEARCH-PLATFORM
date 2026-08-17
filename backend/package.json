@@ -5,7 +5,7 @@
   "description": "Express API for the Intellectual Property Research Platform",
   "main": "src/server.js",
   "scripts": {
-    "dev": "node --watch src/server.js",
+    "dev": "node --env-file=.env --watch src/server.js",
     "start": "node src/server.js",
     "migrate": "node src/db/migrate.js",
     "indices:elasticsearch": "node scripts/create-elasticsearch-indices.js",
@@ -24,7 +24,7 @@
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
-      "version": "^11.15.1",
+      "version": "11.15.1",
       "onFail": "download"
     }
   },

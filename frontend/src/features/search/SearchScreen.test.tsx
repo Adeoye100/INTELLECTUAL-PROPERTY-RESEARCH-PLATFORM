@@ -37,7 +37,7 @@ const renderSearch = (initialEntry = '/search') => {
 describe('SearchScreen', () => {
   beforeEach(() => {
     useAuthStore.getState().setSession('test-token', {
-      id: 'search-user', email: 'search@firm.com', fullName: 'Search User', role: 'attorney',
+      id: 'search-user', email: 'search@firm.com', fullName: 'Search User', role: 'attorney', firmId: 'firm-1',
     });
   });
 

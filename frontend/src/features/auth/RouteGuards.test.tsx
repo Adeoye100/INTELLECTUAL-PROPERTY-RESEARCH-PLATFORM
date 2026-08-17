@@ -12,6 +12,7 @@ const setRole = (role: UserRole) => {
     email: `${role}@forgeglobal.com`,
     fullName: `${role} user`,
     role,
+    firmId: 'firm-1',
   });
 };
 

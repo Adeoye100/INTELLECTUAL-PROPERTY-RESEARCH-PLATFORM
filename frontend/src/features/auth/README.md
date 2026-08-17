@@ -1,6 +1,6 @@
 # Authentication frontend boundary
 
-The screens and guards in this folder implement frontend states and navigation only. Supabase Auth owns browser session persistence, password credentials, and refresh through the single client in `src/lib/supabase.ts`. Self-serve signup provisions the local firm membership through authenticated `POST /provisioning/firm` once Supabase returns a session (immediately or after email confirmation). The remaining auth-shaped MSW handlers cover application provisioning and invitations only; they do not emulate Supabase authentication or authorization.
+The screens and guards in this folder implement frontend states and navigation only. Supabase Auth owns browser session persistence, password credentials, refresh, and Google OAuth through the single client in `src/lib/supabase.ts`. Each Supabase session is resolved once through the centralized API client's authenticated `GET /me`; its role and firm are never inferred from browser-visible Supabase metadata. Self-serve signup provisions the local firm membership through authenticated `POST /provisioning/firm` once Supabase returns a session (immediately or after email confirmation). The remaining auth-shaped MSW handlers cover application provisioning and invitations only; they do not emulate Supabase authentication or authorization.
 
 Backend dependencies still required:
 

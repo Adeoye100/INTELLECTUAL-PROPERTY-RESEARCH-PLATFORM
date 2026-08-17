@@ -33,7 +33,7 @@ export const LoginScreen: React.FC = () => {
   const location = useLocation();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<AuthApiError['code'] | null>(null);
-  const [oauthProvider, setOauthProvider] = useState<'google' | 'github' | null>(null);
+  const [isGoogleRedirecting, setIsGoogleRedirecting] = useState(false);
   const errorRef = useRef<HTMLDivElement>(null);
   const locationState = location.state as LoginLocationState | null;
   const {
@@ -68,16 +68,16 @@ export const LoginScreen: React.FC = () => {
     }
   };
 
-  const signInWithOAuth = async (provider: 'google' | 'github') => {
+  const signInWithGoogle = async () => {
     setSubmitError(null);
     setErrorCode(null);
-    setOauthProvider(provider);
+    setIsGoogleRedirecting(true);
     try {
       const next = safeAppRedirect(locationState?.from, '/app');
       const callback = new URL(authRedirectUrl('/auth/callback'));
       callback.searchParams.set('next', next);
       const { error } = await supabase.auth.signInWithOAuth({
-        provider,
+        provider: 'google',
         options: { redirectTo: callback.toString() },
       });
       if (error) throw error;
@@ -85,7 +85,7 @@ export const LoginScreen: React.FC = () => {
       const authError = toAuthApiError(error);
       setSubmitError(authErrorMessage(authError));
       setErrorCode(authError.code);
-      setOauthProvider(null);
+      setIsGoogleRedirecting(false);
     }
   };
 
@@ -155,14 +155,10 @@ export const LoginScreen: React.FC = () => {
         <div className="relative flex justify-center text-xs uppercase"><span className="bg-surface-card px-2 text-text-secondary">Or continue with</span></div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Button type="button" variant="outline" disabled={Boolean(oauthProvider)} onClick={() => void signInWithOAuth('google')}>
+      <div>
+        <Button type="button" variant="outline" className="w-full" disabled={isGoogleRedirecting} onClick={() => void signInWithGoogle()}>
           <span className="mr-2 font-bold" aria-hidden="true">G</span>
-          {oauthProvider === 'google' ? 'Redirecting…' : 'Google'}
-        </Button>
-        <Button type="button" variant="outline" disabled={Boolean(oauthProvider)} onClick={() => void signInWithOAuth('github')}>
-          <span className="mr-2 font-mono font-bold" aria-hidden="true">&lt;/&gt;</span>
-          {oauthProvider === 'github' ? 'Redirecting…' : 'GitHub'}
+          {isGoogleRedirecting ? 'Redirecting…' : 'Google'}
         </Button>
       </div>
 

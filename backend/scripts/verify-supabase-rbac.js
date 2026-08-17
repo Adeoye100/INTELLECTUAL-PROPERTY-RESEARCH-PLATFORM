@@ -14,9 +14,6 @@ const token = process.env.SUPABASE_TEST_ACCESS_TOKEN?.trim();
 if (!token) throw new Error('Missing required environment variable: SUPABASE_TEST_ACCESS_TOKEN');
 
 const config = loadConfig(process.env);
-if (config.protectedAuthMode !== 'supabase') {
-  throw new Error('PROTECTED_AUTH_MODE must be supabase for live RBAC verification.');
-}
 
 const pool = createPool(config.databaseUrl, config.databaseSsl);
 const redisClient = createClient({ url: config.redisUrl });

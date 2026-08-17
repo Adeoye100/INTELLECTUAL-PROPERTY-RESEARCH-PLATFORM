@@ -26,7 +26,7 @@ const renderFlow = (initialEntry = '/dashboard') => {
 describe('FE-06 onboarding flow', () => {
   beforeEach(() => {
     useAuthStore.getState().setSession('new-user-token', {
-      id: 'new-user', email: 'new@firm.com', fullName: 'New Attorney', role: 'attorney',
+      id: 'new-user', email: 'new@firm.com', fullName: 'New Attorney', role: 'attorney', firmId: 'firm-1',
       emailVerified: true, onboardingRequired: true,
     });
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {

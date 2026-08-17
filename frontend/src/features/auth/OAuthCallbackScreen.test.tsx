@@ -15,7 +15,9 @@ afterEach(() => {
 
 describe('OAuthCallbackScreen', () => {
   it('exchanges the PKCE code and routes the user into the app', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      userId: 'u1', email: 'admin@example.test', role: 'admin', firmId: 'firm-1',
+    }), {
       status: 200, headers: { 'Content-Type': 'application/json' },
     })));
     auth.exchangeCodeForSession.mockResolvedValue({

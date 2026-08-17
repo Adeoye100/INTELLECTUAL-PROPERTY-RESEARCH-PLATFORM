@@ -23,6 +23,12 @@ pnpm test
 pnpm start
 ```
 
+For API development, `pnpm dev` from the repository root delegates to the
+backend, and `pnpm dev` from `backend/` loads `backend/.env` through Node's
+`--env-file` support before starting the watcher. Keep production configuration
+in the deployment secret manager; `pnpm start` intentionally expects its
+environment to be supplied by that runtime.
+
 The Compose initialization creates both `iprp` and disposable `iprp_test`
 databases. Integration tests require `TEST_DATABASE_URL`, `TEST_REDIS_URL`, and
 `TEST_ELASTICSEARCH_URL` and fail instead of silently substituting in-memory
@@ -178,6 +184,7 @@ stack for firm membership and RBAC.
 | Method and path | Body | Result |
 |---|---|---|
 | `POST /api/v1/provisioning/firm` | `{ firmName }` plus verified Supabase Bearer token | `201` linked Admin user and firm info |
+| `GET /api/v1/me` | Verified Supabase Bearer token | `200` `{ userId, email, role, firmId }` |
 | `POST /api/v1/admin/invitations` | `{ fullName, email, role }` plus Bearer token | `201` signed invitation token and info |
 | `GET /api/v1/auth/invitations/:token` | None | `200` invitation details |
 | `POST /api/v1/auth/invitations/:token/accept` | `{ fullName }` | `201` user/firm provisioning info |
@@ -186,6 +193,14 @@ Identity is verified on every request using the Supabase JWT. Local routes
 provision the firm/user link. Supabase is the only password and session authority;
 legacy local signup/login/refresh/logout behavior is retired.
 
+## Local browser CORS
+
+The API allows the local Vite origin `http://localhost:5173` only. Its preflight
+response permits `Authorization` and `Content-Type` request headers and the
+`OPTIONS` method. Other origins receive no CORS grant. Browser authentication
+uses the Supabase access token in the Authorization header; cross-origin cookies
+are not enabled.
+
 ## RBAC demonstration routes
 
 Every route verifies the bearer JWT before applying its explicit role list:
@@ -193,6 +208,7 @@ Every route verifies the bearer JWT before applying its explicit role list:
 - `GET /api/v1/admin/ping`: Admin
 - `GET /api/v1/attorney/ping`: Admin or Attorney
 - `GET /api/v1/viewer/ping`: Admin, Attorney, or Viewer
+- `GET /api/v1/firms/:firmId/ping`: current authenticated firm only
 
 Authenticated users outside a route's list receive `403`; absent or invalid
 authentication receives `401`.

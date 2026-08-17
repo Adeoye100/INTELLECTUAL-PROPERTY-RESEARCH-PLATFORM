@@ -170,7 +170,9 @@ export class ApiClient {
     const token = this.getAccessToken();
     const headers = new Headers(options.headers);
     if (!headers.has('Accept')) headers.set('Accept', 'application/json');
-    if (token) headers.set('Authorization', `Bearer ${token}`);
+    // Bootstrap requests such as GET /me run before the Zustand projection is
+    // populated, so callers may supply the freshly issued Supabase token.
+    if (token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`);
     if (options.body !== undefined) headers.set('Content-Type', 'application/json');
 
     try {
@@ -183,7 +185,7 @@ export class ApiClient {
       });
 
       if (!response.ok) {
-        if (response.status === 401 && token) this.onUnauthorized();
+        if (response.status === 401 && (token || headers.has('Authorization'))) this.onUnauthorized();
         const payload = await readErrorPayload(response);
         throw new ApiError({
           code: codeForStatus(response.status),

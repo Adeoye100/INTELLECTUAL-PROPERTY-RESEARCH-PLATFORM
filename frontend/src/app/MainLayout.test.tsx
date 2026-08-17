@@ -9,7 +9,7 @@ afterEach(() => useAuthStore.getState().clearSession());
 
 describe('MainLayout', () => {
   it('provides keyboard landmarks and tablet/desktop shell breakpoints', async () => {
-    useAuthStore.getState().setSession('token', { id: 'u1', email: 'user@example.test', fullName: 'Case User', role: 'attorney' });
+    useAuthStore.getState().setSession('token', { id: 'u1', email: 'user@example.test', fullName: 'Case User', role: 'attorney', firmId: 'firm-1' });
     const user = userEvent.setup();
     const { container } = render(
       <MemoryRouter initialEntries={['/dashboard']}>

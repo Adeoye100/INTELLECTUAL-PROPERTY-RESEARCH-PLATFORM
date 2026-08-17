@@ -1,4 +1,9 @@
 {
   "private": true,
+  "scripts": {
+    "dev": "pnpm --dir backend dev",
+    "dev:backend": "pnpm --dir backend dev",
+    "dev:frontend": "pnpm --dir frontend dev"
+  },
   "packageManager": "pnpm@11.15.1"
 }

@@ -31,6 +31,7 @@ const setMockRole = (role: 'admin' | 'attorney' | 'viewer') => {
     email: 'risk-detail@firm.com',
     fullName: 'Risk Detail User',
     role,
+    firmId: 'firm-1',
   });
 };
 
