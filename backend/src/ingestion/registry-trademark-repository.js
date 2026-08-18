@@ -83,6 +83,7 @@ export class RegistryTrademarkRepository {
         status,
         filing_date,
         source_registry,
+        source_reference_id,
         updated_at
       FROM registry_trademarks
       WHERE elasticsearch_synced_at IS NULL

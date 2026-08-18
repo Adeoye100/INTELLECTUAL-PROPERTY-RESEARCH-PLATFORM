@@ -10,11 +10,16 @@ import { TRADEMARKS_COMPOSITE_INDEX } from '../search/elasticsearch-indices.js';
  * @property {string} status
  * @property {string|Date|null} [filing_date]
  * @property {string} source_registry
+ * @property {string} source_reference_id
  * @property {number[]} [similarity_vector]
  */
 
 /** @param {PostgresTrademarkRecord} row */
 export function toCompositeTrademarkDocument(row) {
+  if (typeof row.source_reference_id !== 'string' || !row.source_reference_id.trim()) {
+    throw new TypeError('A trademark projection requires a non-empty source_reference_id.');
+  }
+
   const document = {
     mark_text: row.mark_text,
     owner: row.owner ?? null,
@@ -23,6 +28,7 @@ export function toCompositeTrademarkDocument(row) {
     status: row.status,
     filing_date: row.filing_date ?? null,
     source_registry: row.source_registry,
+    source_reference_id: row.source_reference_id,
   };
   if (row.similarity_vector !== undefined) {
     document.similarity_vector = row.similarity_vector;

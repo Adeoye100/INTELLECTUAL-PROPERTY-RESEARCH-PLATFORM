@@ -42,6 +42,7 @@ export const indexDefinitions = Object.freeze({
         status: { type: 'keyword' },
         filing_date: { type: 'date' },
         source_registry: { type: 'keyword' },
+        source_reference_id: { type: 'keyword' },
         similarity_vector: {
           type: 'dense_vector',
           dims: SIMILARITY_VECTOR_DIMS,

@@ -21,7 +21,7 @@ describe('Elasticsearch index management', () => {
     const composite = indexDefinitions[TRADEMARKS_COMPOSITE_INDEX];
     assert.deepEqual(Object.keys(composite.mappings.properties), [
       'mark_text', 'owner', 'jurisdiction', 'nice_classes', 'status',
-      'filing_date', 'source_registry', 'similarity_vector',
+      'filing_date', 'source_registry', 'source_reference_id', 'similarity_vector',
     ]);
     assert.equal(composite.mappings.properties.mark_text.analyzer, 'standard');
     assert.deepEqual(composite.mappings.properties.mark_text.fields.phonetic, {
@@ -35,6 +35,7 @@ describe('Elasticsearch index management', () => {
     assert.deepEqual(composite.mappings.properties.similarity_vector, {
       type: 'dense_vector', dims: SIMILARITY_VECTOR_DIMS, index: false,
     });
+    assert.deepEqual(composite.mappings.properties.source_reference_id, { type: 'keyword' });
 
     const officeActions = indexDefinitions[OFFICE_ACTIONS_INDEX];
     assert.deepEqual(officeActions.mappings.properties, {

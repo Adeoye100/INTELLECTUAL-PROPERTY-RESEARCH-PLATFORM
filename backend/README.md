@@ -117,10 +117,15 @@ USPTO serial number as `source_reference_id`. Unchanged replays do not update th
 row or create projection work.
 
 The Elasticsearch projector is the only component that writes to the
-`trademarks_composite` index. `sync:elasticsearch` selects new/changed Postgres
-rows, submits them through that projector, and marks the exact projected row
-version only after the bulk request succeeds. The registry adapter never receives
-an Elasticsearch client.
+`trademarks_composite` index. New projections contain both `source_registry` and
+the real registry `source_reference_id`; PostgreSQL remains the attributed source
+of truth. Existing Elasticsearch documents do not gain this field automatically.
+Before enabling the BE-09 search endpoint, the development/staging composite
+index must be rebuilt or fully reprojected from PostgreSQL. Production index
+deletion/recreation must not be automated casually. `sync:elasticsearch` selects
+new/changed Postgres rows, submits them through that projector, and marks the
+exact projected row version only after the bulk request succeeds. The registry
+adapter never receives an Elasticsearch client.
 
 These are manual commands for now. No `node-cron` scheduler was placed in the API
 process, and no Redis queue library was introduced merely for this ticket. The

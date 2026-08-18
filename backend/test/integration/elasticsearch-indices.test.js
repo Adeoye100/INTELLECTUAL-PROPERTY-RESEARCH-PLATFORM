@@ -55,6 +55,7 @@ describe('Elasticsearch composite indices', () => {
     assert.equal(properties.similarity_vector.type, 'dense_vector');
     assert.equal(properties.similarity_vector.dims, SIMILARITY_VECTOR_DIMS);
     assert.equal(properties.similarity_vector.index, false);
+    assert.equal(properties.source_reference_id.type, 'keyword');
 
     const officeMappings = await elasticsearch(`/${OFFICE_ACTIONS_INDEX}/_mapping`);
     const officeProperties = officeMappings[OFFICE_ACTIONS_INDEX].mappings.properties;
@@ -76,6 +77,7 @@ describe('Elasticsearch composite indices', () => {
         status: 'filed',
         filing_date: '2026-08-08',
         source_registry: 'TEST',
+        source_reference_id: 'TEST-PHONETIC-1',
       }),
     });
 
@@ -97,6 +99,7 @@ describe('Elasticsearch composite indices', () => {
       status: 'registered',
       filing_date: '2025-11-14',
       source_registry: 'NIPO',
+      source_reference_id: 'NIPO-REFERENCE-1',
     }, { baseUrl });
 
     const stored = await elasticsearch(`/${TRADEMARKS_COMPOSITE_INDEX}/_doc/${projectedDocumentId}`);
@@ -108,6 +111,7 @@ describe('Elasticsearch composite indices', () => {
       status: 'registered',
       filing_date: '2025-11-14',
       source_registry: 'NIPO',
+      source_reference_id: 'NIPO-REFERENCE-1',
     });
   });
 });

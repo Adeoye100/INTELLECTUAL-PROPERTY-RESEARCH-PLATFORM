@@ -44,6 +44,7 @@ describe('registry ingestion boundaries', () => {
       status: 'registered',
       filing_date: '2023-06-12',
       source_registry: 'USPTO',
+      source_reference_id: 'USPTO-12345',
       updated_at: '2026-01-05T05:29:00.000Z',
     };
     const repositoryCalls = [];
@@ -83,6 +84,7 @@ describe('registry ingestion boundaries', () => {
       status: 'filed',
       filing_date: '2026-08-08',
       source_registry: 'NIPO',
+      source_reference_id: 'NIPO-98765',
       updated_at: '2026-08-08T10:00:00.000Z',
     };
 
@@ -106,7 +108,65 @@ describe('registry ingestion boundaries', () => {
         status: 'filed',
         filing_date: '2026-08-08',
         source_registry: 'NIPO',
+        source_reference_id: 'NIPO-98765',
       },
     ]);
+  });
+
+  it('projects the actual registry reference and never substitutes the PostgreSQL UUID', async () => {
+    let request;
+    const row = {
+      id: '34db3bd4-b9f4-4907-83c6-b79f25a19af7',
+      mark_text: 'REFERENCE TEST',
+      owner: 'Example Owner',
+      jurisdiction: 'US',
+      nice_classes: [42],
+      status: 'filed',
+      filing_date: '2026-08-08',
+      source_registry: 'USPTO',
+      source_reference_id: 'serial-123456',
+    };
+
+    await projectToElasticsearch(row, {
+      baseUrl: 'http://elasticsearch.test:9200',
+      fetchImpl: async (url, options) => {
+        request = { url, options };
+        return { ok: true, json: async () => ({ errors: false, items: [] }) };
+      },
+    });
+
+    const [, document] = request.options.body.trim().split('\n').map(JSON.parse);
+    assert.equal(document.source_registry, 'USPTO');
+    assert.equal(document.source_reference_id, 'serial-123456');
+    assert.notEqual(document.source_reference_id, row.id);
+    assert.equal(Object.hasOwn(document, 'riskScore'), false);
+    assert.equal(Object.hasOwn(document, 'candidateRef'), false);
+  });
+
+  it('rejects missing, empty, and whitespace-only registry references before fetching', async () => {
+    for (const sourceReferenceId of [undefined, '', '   ']) {
+      let fetched = false;
+      await assert.rejects(
+        projectToElasticsearch({
+          id: '34db3bd4-b9f4-4907-83c6-b79f25a19af7',
+          mark_text: 'INVALID REFERENCE',
+          owner: null,
+          jurisdiction: 'US',
+          nice_classes: [],
+          status: 'filed',
+          filing_date: null,
+          source_registry: 'USPTO',
+          source_reference_id: sourceReferenceId,
+        }, {
+          baseUrl: 'http://elasticsearch.test:9200',
+          fetchImpl: async () => {
+            fetched = true;
+            return { ok: true, json: async () => ({ errors: false, items: [] }) };
+          },
+        }),
+        /non-empty source_reference_id/,
+      );
+      assert.equal(fetched, false);
+    }
   });
 });
