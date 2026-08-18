@@ -3,7 +3,10 @@ import { requireRole } from '../auth/middleware.js';
 import { parseSearchQuery } from '../search/search-query.js';
 
 export function createSearchRouter(authenticate, searchService) {
-  if (typeof authenticate !== 'function') {
+  const validAuthenticate = typeof authenticate === 'function'
+    || (Array.isArray(authenticate) && authenticate.length > 0
+      && authenticate.every((middleware) => typeof middleware === 'function'));
+  if (!validAuthenticate) {
     throw new TypeError('createSearchRouter needs an authentication middleware.');
   }
   if (!searchService || typeof searchService.search !== 'function') {

@@ -51,6 +51,42 @@ as a single node with security disabled and port `9200` exposed. This is not a
 production security posture: any deployed cluster must enable authentication,
 TLS, authorization, backups, and appropriate node topology.
 
+### Feature-gated search activation
+
+The API search route is disabled by default. Its runtime settings are:
+
+```dotenv
+SEARCH_ENABLED=false
+ELASTICSEARCH_URL=http://127.0.0.1:9200
+SEARCH_SOURCE_REGISTRIES=USPTO
+SEARCH_SOURCE_TIMEOUT_MS=3000
+SEARCH_MAX_RESULTS=50
+```
+
+`SEARCH_SOURCE_REGISTRIES` is a comma-separated allow-list of registries that
+are genuinely projected into `trademarks_composite`; it is not derived from
+frontend filters. Registry names are trimmed, uppercased, and deduplicated.
+When `SEARCH_ENABLED=false`, Elasticsearch settings are not required and
+`GET /api/v1/search` returns 404.
+
+Activate only after all of the following:
+
+1. Confirm PostgreSQL contains attributed registry records.
+2. Rebuild or fully reproject the development/staging composite index so every document contains `source_reference_id`.
+3. Verify the configured registries genuinely exist in the index.
+4. Set:
+
+   ```dotenv
+   SEARCH_ENABLED=true
+   ```
+
+5. Restart the API.
+6. Test with a real Supabase user.
+7. Confirm correct-role access succeeds.
+8. Confirm invalid authentication returns 401.
+9. Confirm one failed registry produces a partial response.
+10. Keep production disabled until staging verification passes.
+
 All required environment variables and token lifetimes are documented in
 `.env.example`. `JWT_ACCESS_SECRET` currently signs application invitation
 tokens and must be at least 32 bytes. Firm invitations default to seven days and

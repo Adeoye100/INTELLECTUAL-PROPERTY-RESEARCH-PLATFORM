@@ -15,6 +15,80 @@ function positiveInteger(env, name, fallback) {
 
 const SUPABASE_VERIFICATION_MODES = new Set(['jwks', 'auth-server']);
 const SUPABASE_ASYMMETRIC_ALGORITHMS = new Set(['ES256', 'RS256']);
+const SEARCH_REGISTRY_NAME = /^[A-Z0-9_-]+$/;
+const MIN_SEARCH_TIMEOUT_MS = 100;
+const MAX_SEARCH_TIMEOUT_MS = 60_000;
+
+function searchEnabled(env) {
+  const value = env.SEARCH_ENABLED?.trim() || 'false';
+  if (value !== 'true' && value !== 'false') {
+    throw new Error('SEARCH_ENABLED must be either true or false.');
+  }
+  return value === 'true';
+}
+
+function elasticsearchSearchUrl(env) {
+  const raw = required(env, 'ELASTICSEARCH_URL');
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error('ELASTICSEARCH_URL must be a valid HTTP(S) URL.');
+  }
+  if (!['http:', 'https:'].includes(url.protocol)) {
+    throw new Error('ELASTICSEARCH_URL must use HTTP or HTTPS.');
+  }
+  if (url.username || url.password || url.search || url.hash) {
+    throw new Error('ELASTICSEARCH_URL must not contain credentials, a query, or a fragment.');
+  }
+  url.pathname = url.pathname.replace(/\/+$/, '');
+  return url.toString().replace(/\/$/, '');
+}
+
+function searchRegistries(env) {
+  const raw = required(env, 'SEARCH_SOURCE_REGISTRIES');
+  const registries = raw.split(',').map((registry) => registry.trim().toUpperCase());
+  if (registries.length === 0 || registries.some((registry) => !SEARCH_REGISTRY_NAME.test(registry))) {
+    throw new Error('SEARCH_SOURCE_REGISTRIES must be a comma-separated list of registry names using A-Z, 0-9, underscore, or hyphen.');
+  }
+  const uniqueRegistries = [...new Set(registries)];
+  if (uniqueRegistries.length > 20) {
+    throw new Error('SEARCH_SOURCE_REGISTRIES may contain no more than 20 registries.');
+  }
+  return uniqueRegistries;
+}
+
+function boundedPositiveInteger(env, name, fallback, minimum, maximum) {
+  const value = positiveInteger(env, name, fallback);
+  if (value < minimum || value > maximum) {
+    throw new Error(`${name} must be between ${minimum} and ${maximum}.`);
+  }
+  return value;
+}
+
+function loadSearchConfig(env) {
+  const enabled = searchEnabled(env);
+  if (!enabled) {
+    return {
+      searchEnabled: false,
+      elasticsearchUrl: undefined,
+      searchSourceRegistries: [],
+      searchSourceTimeoutMs: boundedPositiveInteger(
+        env, 'SEARCH_SOURCE_TIMEOUT_MS', 3_000, MIN_SEARCH_TIMEOUT_MS, MAX_SEARCH_TIMEOUT_MS,
+      ),
+      searchMaxResults: boundedPositiveInteger(env, 'SEARCH_MAX_RESULTS', 50, 1, 100),
+    };
+  }
+  return {
+    searchEnabled: true,
+    elasticsearchUrl: elasticsearchSearchUrl(env),
+    searchSourceRegistries: searchRegistries(env),
+    searchSourceTimeoutMs: boundedPositiveInteger(
+      env, 'SEARCH_SOURCE_TIMEOUT_MS', 3_000, MIN_SEARCH_TIMEOUT_MS, MAX_SEARCH_TIMEOUT_MS,
+    ),
+    searchMaxResults: boundedPositiveInteger(env, 'SEARCH_MAX_RESULTS', 50, 1, 100),
+  };
+}
 
 function supabaseUrl(env) {
   const raw = required(env, 'SUPABASE_URL');
@@ -97,6 +171,7 @@ export function loadConfig(env = process.env) {
     jwtAccessSecret,
     inviteTokenTtlSeconds: positiveInteger(env, 'INVITE_TOKEN_TTL_SECONDS', 604_800),
     ...supabaseConfig,
+    ...loadSearchConfig(env),
   };
 }
 

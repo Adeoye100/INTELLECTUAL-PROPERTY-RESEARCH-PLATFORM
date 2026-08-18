@@ -12,8 +12,10 @@ import { TokenService } from './auth/token-service.js';
 import { UserRepository } from './auth/user-repository.js';
 import { createPool } from './db/pool.js';
 import { createApp } from './app.js';
+import { createSearchRuntime } from './search/search-runtime.js';
 
 export async function createSystem(config) {
+  const { searchSources, searchService } = createSearchRuntime(config);
   const supabaseVerifier = new SupabaseVerifier({
     supabaseUrl: config.supabaseUrl,
     publishableKey: config.supabasePublishableKey,
@@ -56,7 +58,9 @@ export async function createSystem(config) {
   const provisioningService = new ProvisioningService({ userRepository, roleFirmResolver });
 
   return {
-    app: createApp({ authService, authenticate, authenticateIdentity, provisioningService }),
+    app: createApp({
+      authService, authenticate, authenticateIdentity, provisioningService, searchService,
+    }),
     pool,
     redisClient,
     authService,
@@ -64,6 +68,8 @@ export async function createSystem(config) {
     roleFirmResolver,
     supabaseAdminUserService,
     supabaseVerifier,
+    searchSources,
+    searchService,
     async close() {
       await Promise.allSettled([redisClient.quit(), pool.end()]);
     },
