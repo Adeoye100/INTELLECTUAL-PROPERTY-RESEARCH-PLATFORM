@@ -78,8 +78,9 @@ const displayName = (user: User) => {
 };
 
 async function synchronizeSupabaseSession(session: Session): Promise<AuthenticatedUser> {
-  await provisionFirmForSignupSession(session);
   const revision = beginSession(session.access_token);
+  await provisionFirmForSignupSession(session);
+  if (revision !== sessionRevision) throw new Error('A newer authentication state replaced this session.');
   const currentUser = await resolveCurrentUser(session.access_token);
   if (revision !== sessionRevision) throw new Error('A newer authentication state replaced this session.');
   if (!isUserRole(currentUser.role) || typeof currentUser.firmId !== 'string' || !currentUser.firmId) {

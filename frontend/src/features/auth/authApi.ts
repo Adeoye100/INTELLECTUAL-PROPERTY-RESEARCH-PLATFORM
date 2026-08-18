@@ -115,6 +115,9 @@ export function toAuthApiError(error: unknown): AuthApiError {
   if (/expired|otp_expired|flow_state_not_found/.test(detail)) {
     return new AuthApiError('EXPIRED_LINK', candidate.message ?? 'The link has expired.', candidate.status);
   }
+  if (candidate.status === 401) {
+    return new AuthApiError('SESSION_EXPIRED', candidate.message ?? 'Your session expired. Sign in again.', candidate.status);
+  }
   return new AuthApiError(
     'UNKNOWN_ERROR',
     candidate.message || 'The request could not be completed. Please try again.',

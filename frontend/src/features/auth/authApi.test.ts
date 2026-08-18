@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { authRequest } from './authApi';
+import { authRequest, toAuthApiError } from './authApi';
 
 const auth = vi.hoisted(() => ({ signOut: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { auth } }));
@@ -18,5 +18,12 @@ describe('authRequest logout', () => {
 
     expect(auth.signOut).toHaveBeenCalledOnce();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('maps a protected API 401 to the session-expired state', () => {
+    expect(toAuthApiError({ status: 401, message: 'Access token is invalid or expired.' })).toMatchObject({
+      code: 'SESSION_EXPIRED',
+      status: 401,
+    });
   });
 });

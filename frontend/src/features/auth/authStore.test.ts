@@ -62,4 +62,16 @@ describe('syncSupabaseSession', () => {
 
     await expect(Promise.all([first, second])).resolves.toHaveLength(2);
   });
+
+  it('does not restore a session after that session has been cleared', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const synchronization = syncSupabaseSession(session as never);
+    useAuthStore.getState().clearSession();
+
+    await expect(synchronization).rejects.toThrow('A newer authentication state replaced this session.');
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().status).toBe('unauthenticated');
+  });
 });

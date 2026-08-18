@@ -8,6 +8,17 @@ logging.
 It also contains the BE-07/BE-08 USPTO registry adapters and the explicitly
 Postgres-first trademark ingestion/projection commands described below.
 
+## Federated search core (BE-09A)
+
+`FederatedSearchService` is an infrastructure-independent orchestration core;
+it does not add an HTTP route or call Elasticsearch or external registries. Give
+it one or more sources shaped as `{ sourceName: 'USPTO', search: async (query) => [] }`.
+Its `search(query)` runs every source concurrently and returns
+`{ results, sourceStatuses, partial, requestId }`. Source failures and invalid
+non-array outputs are isolated as `unavailable`, while healthy source results
+and their registry attribution are returned in configured-source order. Risk
+scores are intentionally not calculated here; that remains BE-10 work.
+
 ## Local services and configuration
 
 The documented local assumption is Docker Compose with PostgreSQL 16, Redis 7,
