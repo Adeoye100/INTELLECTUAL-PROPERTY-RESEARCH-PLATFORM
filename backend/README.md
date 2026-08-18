@@ -8,6 +8,28 @@ logging.
 It also contains the BE-07/BE-08 USPTO registry adapters and the explicitly
 Postgres-first trademark ingestion/projection commands described below.
 
+## BE-10A similarity primitives
+
+`backend/src/risk/similarity.js` contains pure, deterministic signals for later
+risk methodology work. Mark normalization applies Unicode NFD decomposition,
+removes combining marks, uppercases, replaces punctuation and symbols with
+spaces, collapses whitespace, trims, and rejects empty or over-200-character
+results. Visual similarity is `1 - Levenshtein distance / maximum normalized
+length`, rounded to the nearest integer with `Math.round` and bounded to 0–100.
+
+Phonetic similarity uses documented Standard American Soundex groups
+(`BFPV=1`, `CGJKQSXZ=2`, `DT=3`, `L=4`, `MN=5`, `R=6`); vowels reset adjacent
+codes while H/W preserve adjacency. Multiword marks are tokenized, Soundex
+codes are matched order-independently as a multiset, and the score is matched
+tokens divided by the larger token count, rounded with `Math.round`. Soundex is
+an initial phonetic signal; a later methodology version may replace it with
+Double Metaphone after evidence-based evaluation. Nice-class overlap is the
+deduplicated intersection divided by the deduplicated union, multiplied by 100
+and rounded with `Math.round`.
+
+**BE-10A primitives — no composite risk methodology yet.** These signals support
+legal research but are not themselves legal conclusions.
+
 ## Federated search core (BE-09A)
 
 `FederatedSearchService` is an infrastructure-independent orchestration core;
