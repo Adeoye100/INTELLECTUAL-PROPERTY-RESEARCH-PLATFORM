@@ -4,6 +4,7 @@ import request from 'supertest';
 import { describe, it } from 'node:test';
 import { createSearchRouter } from '../../src/routes/search-routes.js';
 import { errorHandler, unauthorized } from '../../src/errors.js';
+import { RiskEnrichmentError } from '../../src/risk/risk-enriched-search-service.js';
 
 const identities = {
   'admin-token': { userId: 'admin-1', role: 'admin', firmId: 'firm-1' },
@@ -30,22 +31,48 @@ function testApp(searchService, calls = []) {
   return app;
 }
 
+function riskAnalysisFor(hit) {
+  return {
+    candidateRecordId: hit.recordId,
+    candidateSource: hit.sourceRegistry,
+    candidateRef: hit.sourceReferenceId,
+    phoneticScore: 100,
+    visualScore: 100,
+    conceptualScore: null,
+    classOverlap: true,
+    classOverlapScore: 100,
+    compositeScore: 100,
+    compositeRating: 'high',
+    methodology: {
+      version: 'confusion-risk-v1.0.0-provisional',
+      description: 'Synthetic test research signal.',
+      sourceAttribution: [hit.sourceRegistry],
+    },
+    matchedMarkRefs: [
+      { type: 'Visual', evidence: 'Synthetic visual evidence: 100/100.', score: 100 },
+      { type: 'Phonetic', evidence: 'Synthetic phonetic evidence: 100/100.', score: 100 },
+      { type: 'Class', evidence: 'Synthetic class evidence: 9, 42 (100/100).', score: 100 },
+    ],
+  };
+}
+
 function successfulSearch() {
+  const hit = {
+    recordId: 'es-id-1',
+    markText: 'NIMBL',
+    sourceRegistry: 'USPTO',
+    sourceReferenceId: 'USPTO-123',
+    owner: null,
+    jurisdiction: 'US',
+    niceClasses: [9, 42],
+    filingDate: null,
+    status: 'registered',
+    relevanceScore: 99,
+  };
   return {
     async search() {
       return {
-        results: [{
-          recordId: 'es-id-1',
-          markText: 'NIMBL',
-          sourceRegistry: 'USPTO',
-          sourceReferenceId: 'USPTO-123',
-          owner: null,
-          jurisdiction: 'US',
-          niceClasses: [9, 42],
-          filingDate: null,
-          status: 'registered',
-          relevanceScore: 99,
-        }],
+        results: [{ ...hit, riskAnalysis: riskAnalysisFor(hit) }],
         sourceStatuses: [
           { source: 'USPTO', status: 'complete', resultCount: 1 },
           { source: 'EUIPO', status: 'unavailable', resultCount: 0 },
@@ -117,7 +144,9 @@ describe('GET /api/v1/search boundary', () => {
       results: [{
         id: 'es-id-1', searchId: 'request-1', candidateMarkText: 'NIMBL', candidateSource: 'USPTO',
         candidateRef: 'USPTO-123', owner: null, jurisdiction: 'US', niceClasses: [9, 42],
-        filingDate: null, status: 'registered',
+        filingDate: null, status: 'registered', riskAnalysis: riskAnalysisFor({
+          recordId: 'es-id-1', sourceRegistry: 'USPTO', sourceReferenceId: 'USPTO-123',
+        }),
       }],
       sourceStatuses: [
         { source: 'USPTO', status: 'complete', resultCount: 1 },
@@ -126,8 +155,24 @@ describe('GET /api/v1/search boundary', () => {
       partial: true,
       requestId: 'request-1',
     });
+    assert.equal(response.body.results[0].riskAnalysis.methodology.version, 'confusion-risk-v1.0.0-provisional');
+    assert.equal(response.body.results[0].riskAnalysis.conceptualScore, null);
+    assert.deepEqual(response.body.results[0].riskAnalysis.matchedMarkRefs.map(({ type }) => type), ['Visual', 'Phonetic', 'Class']);
     assert.equal(JSON.stringify(response.body).includes('riskScore'), false);
     assert.equal(JSON.stringify(response.body).includes('relevanceScore'), false);
+    assert.equal(JSON.stringify(response.body).includes('risk_score_id'), false);
+    assert.equal(JSON.stringify(response.body).includes('riskScoreId'), false);
+  });
+
+  it('returns the stable risk-enrichment failure without changing source partial state', async () => {
+    const response = await request(testApp({
+      async search() { throw new RiskEnrichmentError(); },
+    })).get('/api/v1/search?mark=NIMBL').set('Authorization', 'Bearer admin-token');
+    assert.equal(response.status, 500);
+    assert.deepEqual(response.body, {
+      code: 'RISK_ENRICHMENT_FAILED', message: 'Risk evidence could not be calculated.',
+    });
+    assert.equal(Object.hasOwn(response.body, 'partial'), false);
   });
 
   it('passes service failures to the normalized error handler without exposing internals', async () => {

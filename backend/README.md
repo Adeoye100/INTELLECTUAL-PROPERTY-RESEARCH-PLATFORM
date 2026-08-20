@@ -27,8 +27,68 @@ Double Metaphone after evidence-based evaluation. Nice-class overlap is the
 deduplicated intersection divided by the deduplicated union, multiplied by 100
 and rounded with `Math.round`.
 
-**BE-10A primitives — no composite risk methodology yet.** These signals support
-legal research but are not themselves legal conclusions.
+These primitives support the BE-10B composite methodology below and are not
+themselves legal conclusions.
+
+## BE-10B provisional confusion-risk methodology
+
+`backend/src/risk/confusion-risk.js` provides the pure, infrastructure-free
+`confusion-risk-v1.0.0-provisional` methodology. It is a transparent research
+signal, not a legal determination. Its frozen component weights are visual
+similarity **0.4**, phonetic similarity **0.4**, and Nice-class overlap **0.2**.
+The composite is calculated as `visual × 0.4 + phonetic × 0.4 + class-overlap ×
+0.2`, then rounded once with `Math.round` after the complete weighted total.
+
+Ratings are deterministic: **Low** is 0–49, **Medium** is 50–74, and **High**
+is 75–100. Conceptual scoring is unsupported and is always returned as `null`;
+it does not contribute to the composite.
+
+Every score includes ordered supporting evidence for Visual, Phonetic, and
+Class signals. Each entry contains a label, explanatory text, and its numeric
+0–100 score. Class evidence lists sorted intersecting Nice classes, or states
+explicitly that no overlap exists. The result also preserves the candidate's
+registry name and genuine external registry reference; it never substitutes an
+internal record ID or treats Elasticsearch relevance as risk evidence.
+
+These are provisional engineering defaults pending expert calibration and
+staging evidence. Any change to the weights or thresholds requires a new
+methodology version; they must never change silently under the same version.
+
+## BE-10C/D risk-enriched search integration
+
+`backend/src/risk/risk-enriched-search-service.js` is a pure decorator over a
+federated search service. It passes the submitted query to that service once,
+then enriches every returned candidate with the complete BE-10B methodology,
+component scores, provenance, and Visual/Phonetic/Class evidence. A candidate
+is never returned with a risk rating unless its complete evidence is present.
+
+The decorator ranks enriched results by composite rating (**High**, then
+**Medium**, then **Low**), composite score descending, Elasticsearch relevance
+descending (with `null` last), source registry code-point order, and source
+reference code-point order. Elasticsearch relevance is retained only as an
+internal search-ranking tie-breaker; it neither supplies nor changes a legal-
+risk signal.
+
+Source statuses, `partial`, and `requestId` are passed through unchanged, and
+their result counts continue to describe source responses rather than the
+post-enrichment ranking. Invalid candidate/scoring data fails closed with the
+safe `RISK_ENRICHMENT_FAILED` code; it is not recast as a registry outage and
+no query, mark, registry reference, token, or complete error is logged.
+
+When `SEARCH_ENABLED=true`, the runtime wraps `FederatedSearchService` with this
+decorator and exposes the enriched service to the authenticated search route.
+The API returns transient `riskAnalysis` evidence—not `riskScore`—for every
+candidate, while omitting Elasticsearch `relevanceScore`, persistence IDs, and
+any legal conclusion. The decorator and API projection are code-complete; they
+make no construction-time network calls.
+
+Before BE-10 can be treated as operationally ready, complete these gates:
+
+1. Rebuild or fully reproject Elasticsearch documents so they contain genuine `source_reference_id` values.
+2. Run authenticated staging searches with attributed registry data.
+3. Test a controlled registry failure and verify source statuses/partial responses remain accurate.
+4. Reconcile frontend nullable fields and the new transient `riskAnalysis` contract before live frontend integration.
+5. Obtain domain/legal review before removing the methodology's provisional label or changing its versioned defaults.
 
 ## Federated search core (BE-09A)
 
@@ -39,7 +99,8 @@ Its `search(query)` runs every source concurrently and returns
 `{ results, sourceStatuses, partial, requestId }`. Source failures and invalid
 non-array outputs are isolated as `unavailable`, while healthy source results
 and their registry attribution are returned in configured-source order. Risk
-scores are intentionally not calculated here; that remains BE-10 work.
+analysis is deliberately calculated only by the BE-10 decorator around this
+service, never by the federated orchestration core itself.
 
 ## Local services and configuration
 

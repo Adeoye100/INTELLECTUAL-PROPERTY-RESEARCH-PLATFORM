@@ -15,7 +15,7 @@ import { createApp } from './app.js';
 import { createSearchRuntime } from './search/search-runtime.js';
 
 export async function createSystem(config) {
-  const { searchSources, searchService } = createSearchRuntime(config);
+  const { searchSources, federatedSearchService, searchService } = createSearchRuntime(config);
   const supabaseVerifier = new SupabaseVerifier({
     supabaseUrl: config.supabaseUrl,
     publishableKey: config.supabasePublishableKey,
@@ -69,6 +69,7 @@ export async function createSystem(config) {
     supabaseAdminUserService,
     supabaseVerifier,
     searchSources,
+    federatedSearchService,
     searchService,
     async close() {
       await Promise.allSettled([redisClient.quit(), pool.end()]);

@@ -32,7 +32,24 @@ describe('application search mounting', () => {
     const app = createTestApp({
       async search() {
         return {
-          results: [{ recordId: '1', markText: 'NIMBL', sourceRegistry: 'USPTO', sourceReferenceId: '123', owner: null, jurisdiction: 'US', niceClasses: [9], filingDate: null, status: 'registered' }],
+          results: [{
+            recordId: '1', markText: 'NIMBL', sourceRegistry: 'USPTO', sourceReferenceId: '123',
+            owner: null, jurisdiction: 'US', niceClasses: [9], filingDate: null, status: 'registered',
+            riskAnalysis: {
+              candidateRecordId: '1', candidateSource: 'USPTO', candidateRef: '123',
+              phoneticScore: 100, visualScore: 100, conceptualScore: null, classOverlap: true,
+              classOverlapScore: 100, compositeScore: 100, compositeRating: 'high',
+              methodology: {
+                version: 'confusion-risk-v1.0.0-provisional', description: 'Synthetic test research signal.',
+                sourceAttribution: ['USPTO'],
+              },
+              matchedMarkRefs: [
+                { type: 'Visual', evidence: 'Synthetic visual evidence: 100/100.', score: 100 },
+                { type: 'Phonetic', evidence: 'Synthetic phonetic evidence: 100/100.', score: 100 },
+                { type: 'Class', evidence: 'Synthetic class evidence: 9 (100/100).', score: 100 },
+              ],
+            },
+          }],
           sourceStatuses: [{ source: 'USPTO', status: 'complete', resultCount: 1 }, { source: 'EUIPO', status: 'unavailable', resultCount: 0 }],
           partial: true,
           requestId: 'request-1',
