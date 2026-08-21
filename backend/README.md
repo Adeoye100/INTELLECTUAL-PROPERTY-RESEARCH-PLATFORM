@@ -336,6 +336,202 @@ response permits `Authorization` and `Content-Type` request headers and the
 uses the Supabase access token in the Authorization header; cross-origin cookies
 are not enabled.
 
+## Portfolio Marks API (BE-11)
+
+`/api/v1/portfolio-marks` is the canonical Portfolio Marks API. The older
+`/api/v1/portfolio` paths listed in early frontend planning are not implemented
+and must not be used as an alternate write path.
+
+Every request requires a verified Supabase Bearer token and a resolved local
+firm membership. The server derives `firmId` only from that membership; request
+bodies and queries cannot select a firm. All record reads, changes, and deletes
+are constrained by that firm, and a missing or another firm's ID returns the
+same `404 PORTFOLIO_MARK_NOT_FOUND` response.
+
+| Method and path | Roles | Result |
+|---|---|---|
+| `POST /api/v1/portfolio-marks` | Admin, Attorney | `201` PortfolioMark |
+| `GET /api/v1/portfolio-marks` | Admin, Attorney, Viewer | `200` paginated portfolio marks |
+| `GET /api/v1/portfolio-marks/:id` | Admin, Attorney, Viewer | `200` PortfolioMark |
+| `PATCH /api/v1/portfolio-marks/:id` | Admin, Attorney | `200` PortfolioMark |
+| `DELETE /api/v1/portfolio-marks/:id` | Admin, Attorney | `204` |
+
+Create requires this JSON object (the three date fields may be omitted or be
+`null`):
+
+```json
+{
+  "markText": "FORGE GLOBAL",
+  "jurisdiction": "US",
+  "sourceRegistry": "USPTO",
+  "registryReference": "12345678",
+  "niceClasses": [9, 42],
+  "status": "registered",
+  "filingDate": "2020-01-02",
+  "registrationDate": null,
+  "renewalDate": null
+}
+```
+
+`PATCH` accepts a non-empty subset of the same mutable fields. It rejects
+unknown fields and immutable/server-managed values including `id`, `firmId`,
+`firm_id`, `ownerUserId`, `owner_user_id`, `createdAt`, and timestamps. Mark
+text is at most 200 characters; jurisdiction is an up-to-8-character ISO
+country/region code; source registry and registry reference are at most 100 and
+200 characters respectively; Nice classes are unique integers 1–45; and status
+is one of `pending`, `filed`, `registered`, `abandoned`, `expired`, or
+`cancelled`. The registry reference must be a real registry registration or
+application reference supplied by the caller; the API never invents one.
+
+A `PortfolioMark` response is:
+
+```json
+{
+  "id": "uuid",
+  "firmId": "uuid",
+  "ownerUserId": "uuid-or-null",
+  "markText": "FORGE GLOBAL",
+  "jurisdiction": "US",
+  "sourceRegistry": "USPTO",
+  "registryReference": "12345678",
+  "niceClasses": [9, 42],
+  "status": "registered",
+  "filingDate": "2020-01-02-or-null",
+  "registrationDate": "2021-03-01-or-null",
+  "renewalDate": "2031-03-01-or-null",
+  "createdAt": "ISO-8601 timestamp",
+  "updatedAt": "ISO-8601 timestamp"
+}
+```
+
+The list response is `{ "items": [PortfolioMark], "pagination": { "page":
+1, "pageSize": 25, "total": 1, "totalPages": 1 } }`. Supported filters are
+`status`, `jurisdiction`, `sourceRegistry`, exact `registryReference`,
+`niceClass`, `renewalAfter`, and `renewalBefore`; dates use `YYYY-MM-DD`.
+`page` defaults to 1 and is capped at 100,000; `pageSize` defaults to 25 and is
+capped at 100. Results are always `created_at DESC, id DESC`, so pagination has
+deterministic ordering.
+
+Stable errors use `VALIDATION_ERROR` (400), `UNAUTHORIZED` (401), `FORBIDDEN`
+(403), `PORTFOLIO_MARK_NOT_FOUND` (404), `PORTFOLIO_MARK_CONFLICT` (409 for a
+duplicate firm/source-registry/registry-reference), and `INTERNAL_ERROR` (500).
+Responses never expose database errors or tenant-existence details.
+
+The schema migration is `006_create_portfolio_marks.sql`; do not run it
+automatically. Apply it only to the intended database with:
+
+```sh
+DATABASE_URL='postgresql://USER:PASSWORD@HOST:5432/DATABASE' pnpm migrate
+```
+
+Deletion is currently a transactional hard delete because the authoritative
+schema has no retention or soft-delete policy. Before production activation,
+BE-16 must capture successful create, update, and delete actions in the
+redacted audit log. Portfolio Marks do not yet create risks, watches, alerts,
+or exports automatically.
+
+## Watch API and polling worker (BE-12)
+
+`/api/v1/watches` is the canonical, firm-scoped polling-watch API. All requests
+derive the firm only from verified server-side membership. Clients cannot provide
+`firmId`/`firm_id`, and every object read, update, and delete includes that firm.
+Missing and cross-firm watches both return `404 WATCH_NOT_FOUND`; an inaccessible
+referenced mark returns `404 PORTFOLIO_MARK_NOT_FOUND`.
+
+| Method and path | Roles | Result |
+|---|---|---|
+| `POST /api/v1/watches` | Admin, Attorney | `201` Watch |
+| `GET /api/v1/watches` | Admin, Attorney, Viewer | `200` paginated watches |
+| `GET /api/v1/watches/:id` | Admin, Attorney, Viewer | `200` Watch |
+| `PATCH /api/v1/watches/:id` | Admin, Attorney | `200` Watch |
+| `DELETE /api/v1/watches/:id` | Admin, Attorney | `204` |
+
+Create requires `{ "portfolioMarkId": "uuid" }`; it may also include
+`state` (`enabled` or `paused`) and `pollIntervalMinutes` (integer 5–43,200).
+The default polling interval is `WATCH_POLL_INTERVAL_MINUTES`. A new enabled
+watch is due immediately; a paused watch has `nextPollAt: null`. `PATCH` accepts
+a non-empty subset of only `state` and `pollIntervalMinutes`; enabling schedules
+the next occurrence immediately and pausing clears `nextPollAt`. All server
+metadata, IDs, firm IDs, poll timestamps/status, and error code are immutable.
+
+The Watch response is:
+
+```json
+{
+  "id": "uuid",
+  "firmId": "uuid",
+  "portfolioMarkId": "uuid",
+  "ownerUserId": "uuid-or-null",
+  "state": "enabled",
+  "pollIntervalMinutes": 1440,
+  "nextPollAt": "ISO-8601 timestamp-or-null",
+  "lastPolledAt": null,
+  "lastPollStatus": null,
+  "lastErrorCode": null,
+  "createdAt": "ISO-8601 timestamp",
+  "updatedAt": "ISO-8601 timestamp"
+}
+```
+
+Lists return `{ "items": [Watch], "pagination": { "page": 1, "pageSize":
+25, "total": 1, "totalPages": 1 } }`, ordered `created_at DESC, id DESC`.
+The only filters are `state` and `portfolioMarkId`. Page defaults to 1 and caps
+at 100,000; page size defaults to 25 and caps at 100.
+
+Stable API errors include `VALIDATION_ERROR` (400), `UNAUTHORIZED` (401),
+`FORBIDDEN` (403), `WATCH_NOT_FOUND` (404), `PORTFOLIO_MARK_NOT_FOUND` (404),
+`WATCH_CONFLICT` (409 for a duplicate enabled watch), and `INTERNAL_ERROR`
+(500). SQL, Redis errors, mark text, credentials, and tenant details do not
+leave the service.
+
+The worker owns the exact Redis list `queue:watch_ingest`. Its version-1 message
+contains only `{ version, jobId, watchId, firmId, portfolioMarkId, scheduledFor,
+attempt }`; `jobId` is a deterministic SHA-256-derived value from the watch ID
+and scheduled occurrence. Redis TTL-backed deduplication and processing locks
+make delivery at-least-once and processor work idempotent. Jobs contain no token,
+user data, mark text, credentials, or search results.
+
+The scheduler selects a bounded due batch of enabled watches (`next_poll_at <=
+now`) under PostgreSQL row locks, enqueues each occurrence independently, and
+advances `next_poll_at` only after an enqueue or confirmed duplicate enqueue.
+One enqueue failure does not stop the batch. The processor reloads the watch and
+current mark under the job's firm, skips deleted/paused/stale/duplicate jobs,
+calls risk-enriched search exactly once for a valid job, and returns its
+request ID, source statuses, partial state, results, and evidence only as an
+internal polling outcome. A federated partial response is recorded as
+`partial`, not a worker failure. No alerts or risk-score IDs are created or
+persisted; that is BE-13's boundary.
+
+Watch runtime settings are strict and have safe defaults:
+
+```dotenv
+WATCH_ENABLED=false
+WATCH_SCHEDULER_INTERVAL_MS=60000
+WATCH_POLL_INTERVAL_MINUTES=1440
+WATCH_SCHEDULER_BATCH_SIZE=50
+```
+
+`WATCH_ENABLED=true` requires the existing `SEARCH_ENABLED=true` search runtime.
+Disabled mode constructs no watch scheduler/processor runtime and makes no watch
+Redis calls. The HTTP server never starts the scheduler. Run it separately:
+
+```sh
+pnpm watch:worker
+```
+
+The worker stops accepting new work before releasing Redis and PostgreSQL on
+SIGINT/SIGTERM. Apply the additive migration only to the intended database; it
+is not run automatically:
+
+```sh
+DATABASE_URL='postgresql://USER:PASSWORD@HOST:5432/DATABASE' pnpm migrate
+```
+
+Before production sign-off, BE-16 must record redacted successful Watch
+mutations. Retryable search/database/queue failures are returned with stable
+internal codes for deployment-queue retry policy; invalid, missing, stale, and
+duplicate jobs are terminal skips.
+
 ## RBAC demonstration routes
 
 Every route verifies the bearer JWT before applying its explicit role list:

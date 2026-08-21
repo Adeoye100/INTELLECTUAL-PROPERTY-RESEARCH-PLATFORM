@@ -27,6 +27,28 @@ function searchEnabled(env) {
   return value === 'true';
 }
 
+function watchEnabled(env) {
+  const value = env.WATCH_ENABLED?.trim() || 'false';
+  if (value !== 'true' && value !== 'false') throw new Error('WATCH_ENABLED must be either true or false.');
+  return value === 'true';
+}
+
+function loadWatchConfig(env) {
+  const enabled = watchEnabled(env);
+  return {
+    watchEnabled: enabled,
+    watchSchedulerIntervalMs: boundedPositiveInteger(
+      env, 'WATCH_SCHEDULER_INTERVAL_MS', 60_000, 1_000, 3_600_000,
+    ),
+    watchPollIntervalMinutes: boundedPositiveInteger(
+      env, 'WATCH_POLL_INTERVAL_MINUTES', 1_440, 5, 43_200,
+    ),
+    watchSchedulerBatchSize: boundedPositiveInteger(
+      env, 'WATCH_SCHEDULER_BATCH_SIZE', 50, 1, 100,
+    ),
+  };
+}
+
 function elasticsearchSearchUrl(env) {
   const raw = required(env, 'ELASTICSEARCH_URL');
   let url;
@@ -162,6 +184,11 @@ export function loadConfig(env = process.env) {
   if (!supabaseConfig.supabaseSecretKey) {
     throw new Error('Missing required environment variable: SUPABASE_SECRET_KEY');
   }
+  const searchConfig = loadSearchConfig(env);
+  const watchConfig = loadWatchConfig(env);
+  if (watchConfig.watchEnabled && !searchConfig.searchEnabled) {
+    throw new Error('WATCH_ENABLED requires SEARCH_ENABLED=true.');
+  }
 
   return {
     port: positiveInteger(env, 'PORT', 3000),
@@ -171,7 +198,8 @@ export function loadConfig(env = process.env) {
     jwtAccessSecret,
     inviteTokenTtlSeconds: positiveInteger(env, 'INVITE_TOKEN_TTL_SECONDS', 604_800),
     ...supabaseConfig,
-    ...loadSearchConfig(env),
+    ...searchConfig,
+    ...watchConfig,
   };
 }
 

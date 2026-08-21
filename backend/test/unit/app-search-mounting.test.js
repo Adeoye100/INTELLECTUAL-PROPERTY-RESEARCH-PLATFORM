@@ -4,7 +4,7 @@ import request from 'supertest';
 import { createApp } from '../../src/app.js';
 import { unauthorized } from '../../src/errors.js';
 
-function createTestApp(searchService = null) {
+function createTestApp(searchService = null, portfolioMarkService = null, watchService = null) {
   const authenticate = (request, _response, next) => {
     if (request.get('authorization') !== 'Bearer admin-token') return next(unauthorized());
     request.auth = { userId: 'user-1', email: 'admin@example.test', role: 'admin', firmId: 'firm-1' };
@@ -14,6 +14,8 @@ function createTestApp(searchService = null) {
     authenticate,
     authenticateIdentity: authenticate,
     searchService,
+    portfolioMarkService,
+    watchService,
     authService: { async invitationDetails() {}, async acceptInvitation() {}, async issueInvitation() {} },
     provisioningService: { async provisionFirm() {} },
   });
@@ -63,5 +65,34 @@ describe('application search mounting', () => {
     assert.equal(response.body.results[0].candidateRef, '123');
     assert.deepEqual(response.body.sourceStatuses, [{ source: 'USPTO', status: 'complete', resultCount: 1 }, { source: 'EUIPO', status: 'unavailable', resultCount: 0 }]);
     assert.equal(response.body.partial, true);
+  });
+
+  it('mounts canonical portfolio marks before the application 404 handler', async () => {
+    const app = createTestApp(null, {
+      async listPortfolioMarks() {
+        return { items: [], pagination: { page: 1, pageSize: 25, total: 0, totalPages: 0 } };
+      },
+      async createPortfolioMark() {},
+      async getPortfolioMark() {},
+      async updatePortfolioMark() {},
+      async deletePortfolioMark() {},
+    });
+    const response = await request(app)
+      .get('/api/v1/portfolio-marks')
+      .set('Authorization', 'Bearer admin-token');
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body.pagination, { page: 1, pageSize: 25, total: 0, totalPages: 0 });
+  });
+
+  it('mounts canonical watches before the application 404 handler', async () => {
+    const app = createTestApp(null, null, {
+      defaultPollIntervalMinutes: 60,
+      async listWatches() {
+        return { items: [], pagination: { page: 1, pageSize: 25, total: 0, totalPages: 0 } };
+      },
+      async createWatch() {}, async getWatch() {}, async updateWatch() {}, async deleteWatch() {},
+    });
+    const response = await request(app).get('/api/v1/watches').set('Authorization', 'Bearer admin-token');
+    assert.equal(response.status, 200);
   });
 });

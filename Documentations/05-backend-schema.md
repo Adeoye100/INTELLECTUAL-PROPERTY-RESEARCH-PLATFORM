@@ -54,24 +54,38 @@ erDiagram
 |---|---|---|
 | id | uuid PK | |
 | firm_id | uuid FK | |
-| owner_user_id | uuid FK → users | |
-| mark_text | text | |
+| owner_user_id | uuid FK → users, nullable | creating user when a linked local user is available |
+| mark_text | varchar(200) | |
 | jurisdiction | text | ISO country/region code |
 | nice_classes | int[] | Nice Classification classes |
-| status | text | e.g. filed/registered/abandoned |
-| filing_date | date | |
-| renewal_date | date | drives deadline flags in UI |
-| source_registry | text | attribution, per TRD §3.4 |
+| status | text | pending/filed/registered/abandoned/expired/cancelled |
+| filing_date | date, nullable | |
+| registration_date | date, nullable | |
+| renewal_date | date, nullable | drives deadline flags in UI when specified |
+| source_registry | varchar(100) | attribution, per TRD §3.4 |
+| registry_reference | varchar(200) | genuine registry registration/application reference |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
 
 ### `watches`
 | Column | Type | Notes |
 |---|---|---|
 | id | uuid PK | |
-| portfolio_mark_id | uuid FK | |
-| user_id | uuid FK | owner of the watch config |
-| alert_channel | text | email / in-app / (future: sms) |
-| alert_mode | text | real-time / digest |
-| active | boolean | |
+| firm_id | uuid FK → firms | tenant boundary; participates in composite portfolio-mark FK |
+| portfolio_mark_id | uuid FK → portfolio_marks | must belong to `firm_id` |
+| owner_user_id | uuid FK → users, nullable | creating user when a linked local user is available |
+| state | enum-like text | `enabled` or `paused` |
+| poll_interval_minutes | integer | 5–43,200 minutes; copied into each watch at creation |
+| next_poll_at | timestamptz, nullable | enabled due-watch selector; paused watches set this to null |
+| last_polled_at | timestamptz, nullable | |
+| last_poll_status | text, nullable | `completed`, `partial`, or `failed` |
+| last_error_code | text, nullable | sanitized stable internal code only |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
+
+An enabled watch is unique per `(firm_id, portfolio_mark_id)`. BE-12 polling
+does not create alerts, subscriptions, or risk-score rows; those remain later
+boundaries.
 
 ### `alerts`
 | Column | Type | Notes |

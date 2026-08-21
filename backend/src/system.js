@@ -12,7 +12,12 @@ import { TokenService } from './auth/token-service.js';
 import { UserRepository } from './auth/user-repository.js';
 import { createPool } from './db/pool.js';
 import { createApp } from './app.js';
+import { PortfolioMarkRepository } from './portfolio/portfolio-mark-repository.js';
+import { PortfolioMarkService } from './portfolio/portfolio-mark-service.js';
 import { createSearchRuntime } from './search/search-runtime.js';
+import { WatchRepository } from './watch/watch-repository.js';
+import { WatchService } from './watch/watch-service.js';
+import { createWatchRuntime } from './watch/watch-runtime.js';
 
 export async function createSystem(config) {
   const { searchSources, federatedSearchService, searchService } = createSearchRuntime(config);
@@ -56,15 +61,35 @@ export async function createSystem(config) {
   ];
   const authenticateIdentity = createSupabaseAuthenticate(supabaseVerifier);
   const provisioningService = new ProvisioningService({ userRepository, roleFirmResolver });
+  const portfolioMarkRepository = new PortfolioMarkRepository(pool);
+  const portfolioMarkService = new PortfolioMarkService({ repository: portfolioMarkRepository });
+  const watchRepository = new WatchRepository(pool);
+  const watchService = new WatchService({
+    repository: watchRepository, defaultPollIntervalMinutes: config.watchPollIntervalMinutes,
+  });
+  const watchRuntime = createWatchRuntime({
+    config, redisClient, watchRepository, searchService,
+  });
 
   return {
     app: createApp({
-      authService, authenticate, authenticateIdentity, provisioningService, searchService,
+      authService,
+      authenticate,
+      authenticateIdentity,
+      provisioningService,
+      searchService,
+      portfolioMarkService,
+      watchService,
     }),
     pool,
     redisClient,
     authService,
     provisioningService,
+    portfolioMarkRepository,
+    portfolioMarkService,
+    watchRepository,
+    watchService,
+    watchRuntime,
     roleFirmResolver,
     supabaseAdminUserService,
     supabaseVerifier,

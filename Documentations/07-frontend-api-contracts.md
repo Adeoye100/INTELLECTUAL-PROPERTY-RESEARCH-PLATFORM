@@ -44,15 +44,19 @@ and environment configuration.
 | `GET /api/v1/dashboard/summary` | No body; candidate `scenario` query exists only in MSW | `DashboardSummary` | Admin, Attorney, Viewer within firm | Aggregate definitions, time zone/range, freshness, partial-section identifiers |
 | `GET /api/v1/search` | Query: `mark`, repeated `jurisdiction`, comma-separated `class`, `status`, `owner`, `filedFrom`, `filedTo`; `resultId` is rejected by the authenticated search boundary (snapshot retrieval remains BE-19) | `SearchResponse` with `results`, per-source statuses, `partial?`, `requestId?`; every result includes transient `riskAnalysis` with BE-10B component scores, `conceptualScore: null`, methodology, provenance, and Visual/Phonetic/Class evidence. `owner` and `filingDate` may be `null` when the registry has no value. Elasticsearch `relevanceScore`, persistent risk IDs, and legal conclusions are not exposed. | Admin, Attorney, Viewer; usage limits server-enforced | GET vs search-job POST, pagination, progressive polling/streaming, canonical result-detail route, source timeout semantics, query limits; frontend `SearchResult` currently types nullable fields and the new `riskAnalysis` contract differently and requires reconciliation before live integration |
 | `POST /api/v1/portfolio/import` | `{ searchResultId: string }` | `201 PortfolioMark` | Admin, Attorney | Idempotency, source snapshot, ownership/firm selection, renewal derivation |
-| `GET /api/v1/portfolio` | No body | `PortfolioMark[]` | Admin, Attorney, Viewer within firm | Pagination, filters/sort, field nullability, registry freshness |
-| `POST /api/v1/portfolio` | `{ markText, jurisdiction, niceClasses: number[], renewalDate }` | `201 PortfolioMark` | Admin, Attorney | Required legal owner/source fields, duplicate policy, date rules, audit event |
-| `GET /api/v1/portfolio/:markId` | Mark ID in path | `PortfolioMarkDetail` including `statusHistory[]` | Admin, Attorney, Viewer in same firm | Not-found vs cross-tenant non-disclosure, history pagination/provenance |
+| `GET /api/v1/portfolio-marks` | Implemented canonical list; see BE-11 contract below | `200 { items, pagination }` | Admin, Attorney, Viewer within firm | Frontend must migrate old `/portfolio` mock calls before live use |
+| `POST /api/v1/portfolio-marks` | Implemented canonical create; see BE-11 contract below | `201 PortfolioMark` | Admin, Attorney | BE-16 audit event required before production activation |
+| `GET /api/v1/portfolio-marks/:id` | UUID path parameter | `200 PortfolioMark` | Admin, Attorney, Viewer in same firm | No status-history endpoint in BE-11 |
+| `PATCH /api/v1/portfolio-marks/:id` | Non-empty mutable-field subset | `200 PortfolioMark` | Admin, Attorney | BE-16 audit event required before production activation |
+| `DELETE /api/v1/portfolio-marks/:id` | UUID path parameter | `204` | Admin, Attorney | Transactional hard delete pending a documented retention policy |
 | `GET /api/v1/portfolio/:markId/attachments` | Mark ID in path | `PortfolioAttachment[]` | Admin, Attorney, Viewer in same firm | Storage metadata, malware state, pagination, retention |
 | `GET /api/v1/portfolio/:markId/attachments/:attachmentId/download` | IDs in path | Current mock shape `{ downloadUrl, fileName, mocked? }` | Admin, Attorney, Viewer in same firm | Direct authenticated blob vs short-lived URL, content-type/disposition, URL TTL, download audit; current frontend fixture is not a live contract |
-| `POST /api/v1/portfolio/:markId/watch` | `{ alertChannel: 'email' \| 'in-app', alertMode: 'real-time' \| 'digest', active: boolean }` | `200/201 WatchSummary` | Admin, Attorney | Duplicate behavior and whether this convenience route exists alongside `POST /watches` |
-| `GET /api/v1/watches` | No body | `WatchSummary[]` | Admin, Attorney, Viewer within firm | Pagination, ownership scope, delivery health/status fields |
-| `POST /api/v1/watches` | `WatchUpsertRequest` | `201 WatchSummary` | Admin, Attorney | Limits, scheduling transaction, duplicate policy, audit event |
-| `PATCH /api/v1/watches/:watchId` | Current frontend sends full `WatchUpsertRequest` | `WatchSummary` | Admin, Attorney | PATCH partial-vs-full semantics, optimistic concurrency, ownership scope |
+| `POST /api/v1/portfolio/:markId/watch` | Not implemented; no convenience alias | — | — | Canonical BE-12 route is `/api/v1/watches` |
+| `GET /api/v1/watches` | Implemented; see BE-12 contract below | `200 { items, pagination }` | Admin, Attorney, Viewer within firm | Frontend contract migration remains separate work |
+| `POST /api/v1/watches` | Implemented; see BE-12 contract below | `201 Watch` | Admin, Attorney | BE-16 audit event required before production activation |
+| `PATCH /api/v1/watches/:id` | Non-empty state/interval subset | `200 Watch` | Admin, Attorney | No alert policy is configured here |
+| `GET /api/v1/watches/:id` | UUID path parameter | `200 Watch` | Admin, Attorney, Viewer within firm | Implemented BE-12 |
+| `DELETE /api/v1/watches/:id` | UUID path parameter | `204` | Admin, Attorney | Transactional hard delete; BE-16 audit gate applies |
 | `GET /api/v1/alerts` | Query: `read`, `severity`, `source`, `dateFrom`, `dateTo` | `Alert[]` | Admin, Attorney, Viewer within allowed watch scope | Pagination, cursor/order, date semantics/time zone, retention |
 | `PATCH /api/v1/alerts/:alertId` | `{ read: boolean }` | `Alert` | Authenticated user allowed to view alert | Whether read state is per-user, concurrency, bulk-read endpoint |
 | `GET /api/v1/office-actions/search` | Query: `markText`, `niceClass` | `OfficeActionRef[]` | Admin, Attorney, Viewer | Licensed source, pagination, citation fields, filters, result provenance |
@@ -63,6 +67,160 @@ and environment configuration.
 | `POST /api/v1/reports/pdf` | `PdfReportRequest`: one of search-results context, risk-detail context, or portfolio-summary context | Required frontend target: direct non-empty `application/pdf` blob with `Content-Disposition` filename | Authenticated user authorized for every referenced firm/matter/search/result/mark; Viewer export permission unresolved | Route existence, accepted IDs, synchronous vs job model, filename encoding, size/time limits, error model |
 
 Type definitions referenced above live in `frontend/src/types/index.ts`; PDF request variants live in `frontend/src/components/PdfExport.tsx`. These are frontend expectations, not an authoritative schema.
+
+## BE-11 implemented Portfolio Marks contract
+
+`/api/v1/portfolio-marks` is the canonical Portfolio Marks route family. The
+earlier `/api/v1/portfolio` entries were planning/mock candidates and are not a
+parallel backend endpoint. All five routes require `Authorization: Bearer
+<access-token>` and use application/json where a body is present.
+
+| Role | List/Get | Create/Update/Delete |
+|---|---:|---:|
+| Admin | Yes | Yes |
+| Attorney | Yes | Yes |
+| Viewer | Yes | No |
+
+The server derives the firm solely from the verified server-side membership.
+Clients must not send `firmId` or `firm_id`; those fields are rejected as
+unknown. Every object query includes that derived firm. A missing ID and an ID
+owned by a different firm both return `404 PORTFOLIO_MARK_NOT_FOUND`.
+
+Create (`POST`) requires:
+
+```json
+{
+  "markText": "FORGE GLOBAL",
+  "jurisdiction": "US",
+  "sourceRegistry": "USPTO",
+  "registryReference": "12345678",
+  "niceClasses": [9, 42],
+  "status": "registered",
+  "filingDate": "2020-01-02",
+  "registrationDate": null,
+  "renewalDate": null
+}
+```
+
+`markText`, `jurisdiction`, `sourceRegistry`, `registryReference`,
+`niceClasses`, and `status` are required. The dates may be omitted or `null`;
+when supplied they are real `YYYY-MM-DD` calendar dates. Nice classes are
+unique integer values from 1 through 45. Status is one of `pending`, `filed`,
+`registered`, `abandoned`, `expired`, or `cancelled`. `registryReference` is a
+genuine registry registration/application reference supplied by the client; the
+API never creates a replacement reference.
+
+`PATCH` accepts a non-empty subset of those fields. It rejects unknown fields
+and server-managed identifiers, firm IDs, creator IDs, and timestamps. A
+successful create/get/update response is:
+
+```json
+{
+  "id": "uuid",
+  "firmId": "uuid",
+  "ownerUserId": "uuid-or-null",
+  "markText": "FORGE GLOBAL",
+  "jurisdiction": "US",
+  "sourceRegistry": "USPTO",
+  "registryReference": "12345678",
+  "niceClasses": [9, 42],
+  "status": "registered",
+  "filingDate": "2020-01-02-or-null",
+  "registrationDate": "2021-03-01-or-null",
+  "renewalDate": "2031-03-01-or-null",
+  "createdAt": "ISO-8601 timestamp",
+  "updatedAt": "ISO-8601 timestamp"
+}
+```
+
+The list response is `{ items: PortfolioMark[], pagination: { page, pageSize,
+total, totalPages } }`. It defaults to `page=1` and `pageSize=25`, caps page at
+100,000 and page size at 100, and orders records by newest creation timestamp
+then descending ID. Supported filters are `status`, `jurisdiction`,
+`sourceRegistry`, exact `registryReference`, `niceClass`, `renewalAfter`, and
+`renewalBefore` (the date filters use `YYYY-MM-DD`).
+
+Stable errors are `VALIDATION_ERROR` (400), `UNAUTHORIZED` (401), `FORBIDDEN`
+(403), `PORTFOLIO_MARK_NOT_FOUND` (404), `PORTFOLIO_MARK_CONFLICT` (409), and
+`INTERNAL_ERROR` (500). The conflict is the same firm's duplicate
+`sourceRegistry`/`registryReference`; SQL and tenant details are not exposed.
+
+Deletion is a transactional hard delete because the schema specifies no
+soft-delete or retention policy. BE-16 must add redacted audit entries for
+successful Portfolio Mark mutations before production activation. This ticket
+does not connect marks to risk analyses, watches, alerts, or exports.
+
+The migration is `backend/migrations/006_create_portfolio_marks.sql`. It is not
+run automatically; apply it to the intended database with `DATABASE_URL=... pnpm
+--dir backend migrate`.
+
+## BE-12 implemented Watch contract
+
+`/api/v1/watches` is the sole canonical Watch API; `/portfolio/:markId/watch`
+is not implemented as a parallel convenience route. Every request uses the
+authenticated server-side firm membership, never a client-provided `firmId` or
+`firm_id`. Object operations always scope by that firm. Missing/cross-firm
+watches return `404 WATCH_NOT_FOUND`; inaccessible requested marks return
+`404 PORTFOLIO_MARK_NOT_FOUND`.
+
+| Role | List/Get | Create/Update/Delete |
+|---|---:|---:|
+| Admin | Yes | Yes |
+| Attorney | Yes | Yes |
+| Viewer | Yes | No |
+
+Create body is `{ "portfolioMarkId": "uuid", "state": "enabled",
+"pollIntervalMinutes": 1440 }`; only `portfolioMarkId` is required. State is
+`enabled` or `paused`, interval is an integer 5–43,200, and the server default
+is `WATCH_POLL_INTERVAL_MINUTES`. New enabled watches are due immediately;
+paused watches have a null `nextPollAt`. PATCH accepts a non-empty subset of
+`state` and `pollIntervalMinutes` only. IDs, firm/owner fields, poll metadata,
+and timestamps are immutable.
+
+```json
+{
+  "id": "uuid",
+  "firmId": "uuid",
+  "portfolioMarkId": "uuid",
+  "ownerUserId": "uuid-or-null",
+  "state": "enabled",
+  "pollIntervalMinutes": 1440,
+  "nextPollAt": "ISO-8601-or-null",
+  "lastPolledAt": null,
+  "lastPollStatus": null,
+  "lastErrorCode": null,
+  "createdAt": "ISO-8601",
+  "updatedAt": "ISO-8601"
+}
+```
+
+List shape is `{ items: Watch[], pagination: { page, pageSize, total,
+totalPages } }`, newest first (`created_at DESC, id DESC`), default page 1 and
+page size 25, maximum page 100,000 and page size 100. `state` and
+`portfolioMarkId` are the only filters.
+
+Errors are `VALIDATION_ERROR` (400), `UNAUTHORIZED` (401), `FORBIDDEN` (403),
+`WATCH_NOT_FOUND`/`PORTFOLIO_MARK_NOT_FOUND` (404), `WATCH_CONFLICT` (409 for a
+duplicate enabled watch), and `INTERNAL_ERROR` (500). Database, Redis, tenant,
+credential, and mark-text details never appear in errors.
+
+The polling worker is separate from HTTP and uses `queue:watch_ingest`. Its
+versioned, at-least-once job is `{ version: 1, jobId, watchId, firmId,
+portfolioMarkId, scheduledFor, attempt }`; deterministic IDs plus Redis
+deduplication and processing locks make duplicate delivery safe. The scheduler
+only enqueues enabled due watches and advances their schedule only after success.
+Processor outcomes retain search request ID, source status, partial state,
+results, and risk evidence internally. Partial search is a completed partial
+poll. BE-13 may consume these outcomes later; BE-12 creates no alerts or
+risk-score records.
+
+`WATCH_ENABLED=false` is the default. The other strict settings are
+`WATCH_SCHEDULER_INTERVAL_MS=60000`, `WATCH_POLL_INTERVAL_MINUTES=1440`, and
+`WATCH_SCHEDULER_BATCH_SIZE=50`. When enabled, run the separate worker with
+`pnpm --dir backend watch:worker`; it requires the existing search runtime.
+Migration `007_create_watches.sql` is not automatic; use `DATABASE_URL=... pnpm
+--dir backend migrate` deliberately. BE-16 redacted audit logging remains a
+production gate for Watch mutations.
 
 ## Required contracts with no candidate route
 
