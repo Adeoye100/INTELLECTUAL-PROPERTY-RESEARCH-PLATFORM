@@ -1,8 +1,13 @@
 import { Router } from 'express';
 import { requireFirm, requireRole } from '../auth/middleware.js';
+import { createAuthIpRateLimit, resolveTrustedClientAddress } from '../auth/auth-rate-limiter.js';
+import { validateInvitationIssue } from '../auth/auth-route-validation.js';
 
-export function createProtectedRouter(authenticate, authService) {
+export function createProtectedRouter(authenticate, authService, { authRateLimiter = null } = {}) {
   const router = Router();
+  const invitationIpLimit = createAuthIpRateLimit({
+    limiter: authRateLimiter, policyName: 'recoveryIp', failClosed: true,
+  });
 
   router.get('/me', authenticate, (request, response) => {
     const { userId, email, role, firmId } = request.auth;
@@ -16,6 +21,9 @@ export function createProtectedRouter(authenticate, authService) {
 
   router.post(
     '/admin/invitations',
+    resolveTrustedClientAddress,
+    invitationIpLimit,
+    validateInvitationIssue,
     authenticate,
     requireRole(['admin']),
     async (request, response) => {

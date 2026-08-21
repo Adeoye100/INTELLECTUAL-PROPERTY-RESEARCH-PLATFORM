@@ -255,12 +255,13 @@ describe('watch routes and feature configuration', () => {
   });
 
   it('strictly loads disabled defaults and constructs no watch runtime', () => {
-    const config = loadConfig({ SUPABASE_URL: 'https://project.supabase.co', SUPABASE_SECRET_KEY: 'secret', SUPABASE_JWT_VERIFICATION_MODE: 'jwks', SUPABASE_JWT_ALGORITHMS: 'ES256', DATABASE_URL: 'postgres://example', REDIS_URL: 'redis://example', JWT_ACCESS_SECRET: 'unit-test-secret-that-is-at-least-32-bytes' });
+    const environment = { SUPABASE_URL: 'https://project.supabase.co', SUPABASE_SECRET_KEY: 'secret', SUPABASE_JWT_VERIFICATION_MODE: 'jwks', SUPABASE_JWT_ALGORITHMS: 'ES256', DATABASE_URL: 'postgres://example', REDIS_URL: 'redis://example', JWT_ACCESS_SECRET: 'unit-test-secret-that-is-at-least-32-bytes', AUTH_RATE_LIMIT_KEY_SECRET: 'separate-auth-rate-limit-test-secret-32b' };
+    const config = loadConfig(environment);
     assert.equal(config.watchEnabled, false);
     assert.equal(config.watchSchedulerIntervalMs, 60_000);
     assert.equal(createWatchRuntime({ config }), null);
-    assert.throws(() => loadConfig({ SUPABASE_URL: 'https://project.supabase.co', SUPABASE_SECRET_KEY: 'secret', SUPABASE_JWT_VERIFICATION_MODE: 'jwks', SUPABASE_JWT_ALGORITHMS: 'ES256', DATABASE_URL: 'postgres://example', REDIS_URL: 'redis://example', JWT_ACCESS_SECRET: 'unit-test-secret-that-is-at-least-32-bytes', WATCH_ENABLED: 'yes' }), /WATCH_ENABLED/);
-    assert.throws(() => loadConfig({ SUPABASE_URL: 'https://project.supabase.co', SUPABASE_SECRET_KEY: 'secret', SUPABASE_JWT_VERIFICATION_MODE: 'jwks', SUPABASE_JWT_ALGORITHMS: 'ES256', DATABASE_URL: 'postgres://example', REDIS_URL: 'redis://example', JWT_ACCESS_SECRET: 'unit-test-secret-that-is-at-least-32-bytes', WATCH_ENABLED: 'true' }), /requires SEARCH_ENABLED/);
-    assert.throws(() => loadConfig({ SUPABASE_URL: 'https://project.supabase.co', SUPABASE_SECRET_KEY: 'secret', SUPABASE_JWT_VERIFICATION_MODE: 'jwks', SUPABASE_JWT_ALGORITHMS: 'ES256', DATABASE_URL: 'postgres://example', REDIS_URL: 'redis://example', JWT_ACCESS_SECRET: 'unit-test-secret-that-is-at-least-32-bytes', WATCH_SCHEDULER_BATCH_SIZE: '101' }), /WATCH_SCHEDULER_BATCH_SIZE/);
+    assert.throws(() => loadConfig({ ...environment, WATCH_ENABLED: 'yes' }), /WATCH_ENABLED/);
+    assert.throws(() => loadConfig({ ...environment, WATCH_ENABLED: 'true' }), /requires SEARCH_ENABLED/);
+    assert.throws(() => loadConfig({ ...environment, WATCH_SCHEDULER_BATCH_SIZE: '101' }), /WATCH_SCHEDULER_BATCH_SIZE/);
   });
 });

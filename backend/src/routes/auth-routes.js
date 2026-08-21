@@ -1,14 +1,19 @@
 import { Router } from 'express';
+import { createAuthIpRateLimit, resolveTrustedClientAddress } from '../auth/auth-rate-limiter.js';
+import { validateInvitationAcceptance } from '../auth/auth-route-validation.js';
 
-export function createAuthRouter(authService) {
+export function createAuthRouter(authService, { authRateLimiter = null } = {}) {
   const router = Router();
+  const recoveryIpLimit = createAuthIpRateLimit({
+    limiter: authRateLimiter, policyName: 'recoveryIp', failClosed: true,
+  });
 
-  // BE-15 rate limiting belongs immediately before these public invitation
-  // handlers. BE-16 audit events belong after successful redemption.
-  router.get('/invitations/:token', async (request, response) => {
+  // Invitation links are public and receive the recovery policy IP limit.
+  // BE-16 audit events belong after successful redemption.
+  router.get('/invitations/:token', resolveTrustedClientAddress, recoveryIpLimit, async (request, response) => {
     response.json(await authService.invitationDetails(request.params.token));
   });
-  router.post('/invitations/:token/accept', async (request, response) => {
+  router.post('/invitations/:token/accept', resolveTrustedClientAddress, recoveryIpLimit, validateInvitationAcceptance, async (request, response) => {
     response.status(201).json(await authService.acceptInvitation(request.params.token, request.body));
   });
 

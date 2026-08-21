@@ -33,6 +33,61 @@ function watchEnabled(env) {
   return value === 'true';
 }
 
+function strictBoolean(env, name, fallback) {
+  const value = env[name] === undefined ? String(fallback) : env[name].trim();
+  if (value !== 'true' && value !== 'false') throw new Error(`${name} must be either true or false.`);
+  return value === 'true';
+}
+
+function nonNegativeBoundedInteger(env, name, fallback, maximum) {
+  const raw = env[name] ?? String(fallback);
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < 0 || value > maximum) {
+    throw new Error(`${name} must be an integer between 0 and ${maximum}.`);
+  }
+  return value;
+}
+
+function loadAuthRateLimitConfig(env, jwtAccessSecret, supabaseSecretKey) {
+  const authRateLimitEnabled = strictBoolean(env, 'AUTH_RATE_LIMIT_ENABLED', true);
+  const trustProxyHops = nonNegativeBoundedInteger(env, 'TRUST_PROXY_HOPS', 0, 10);
+  if (!authRateLimitEnabled) {
+    const environment = env.NODE_ENV?.trim();
+    if (!['development', 'test'].includes(environment)) {
+      throw new Error('AUTH_RATE_LIMIT_ENABLED may be false only in development or test environments.');
+    }
+    return { authRateLimitEnabled, trustProxyHops, authRateLimitKeySecret: undefined, authRateLimitPolicies: undefined };
+  }
+
+  const authRateLimitKeySecret = required(env, 'AUTH_RATE_LIMIT_KEY_SECRET');
+  if (Buffer.byteLength(authRateLimitKeySecret, 'utf8') < 32) {
+    throw new Error('AUTH_RATE_LIMIT_KEY_SECRET must contain at least 32 bytes.');
+  }
+  if ([jwtAccessSecret, supabaseSecretKey].includes(authRateLimitKeySecret)) {
+    throw new Error('AUTH_RATE_LIMIT_KEY_SECRET must be separate from authentication secrets.');
+  }
+  const loginLimit = boundedPositiveInteger(env, 'AUTH_LOGIN_IP_LIMIT', 20, 1, 10_000);
+  const loginIdentityLimit = boundedPositiveInteger(env, 'AUTH_LOGIN_IDENTITY_LIMIT', 5, 1, 10_000);
+  const loginWindowSeconds = boundedPositiveInteger(env, 'AUTH_LOGIN_WINDOW_SECONDS', 900, 1, 86_400);
+  const recoveryLimit = boundedPositiveInteger(env, 'AUTH_RECOVERY_LIMIT', 5, 1, 10_000);
+  const recoveryWindowSeconds = boundedPositiveInteger(env, 'AUTH_RECOVERY_WINDOW_SECONDS', 3_600, 1, 86_400);
+  const refreshLimit = boundedPositiveInteger(env, 'AUTH_REFRESH_LIMIT', 30, 1, 10_000);
+  const refreshWindowSeconds = boundedPositiveInteger(env, 'AUTH_REFRESH_WINDOW_SECONDS', 300, 1, 86_400);
+  return {
+    authRateLimitEnabled,
+    trustProxyHops,
+    authRateLimitKeySecret,
+    authRateLimitPolicies: {
+      loginIp: { limit: loginLimit, windowSeconds: loginWindowSeconds },
+      loginIdentity: { limit: loginIdentityLimit, windowSeconds: loginWindowSeconds },
+      recoveryIp: { limit: recoveryLimit, windowSeconds: recoveryWindowSeconds },
+      recoveryIdentity: { limit: recoveryLimit, windowSeconds: recoveryWindowSeconds },
+      refreshSession: { limit: refreshLimit, windowSeconds: refreshWindowSeconds },
+      logoutIp: { limit: 60, windowSeconds: 60 },
+    },
+  };
+}
+
 function loadWatchConfig(env) {
   const enabled = watchEnabled(env);
   return {
@@ -189,6 +244,9 @@ export function loadConfig(env = process.env) {
   if (watchConfig.watchEnabled && !searchConfig.searchEnabled) {
     throw new Error('WATCH_ENABLED requires SEARCH_ENABLED=true.');
   }
+  const authRateLimitConfig = loadAuthRateLimitConfig(
+    env, jwtAccessSecret, supabaseConfig.supabaseSecretKey,
+  );
 
   return {
     port: positiveInteger(env, 'PORT', 3000),
@@ -200,6 +258,7 @@ export function loadConfig(env = process.env) {
     ...supabaseConfig,
     ...searchConfig,
     ...watchConfig,
+    ...authRateLimitConfig,
   };
 }
 

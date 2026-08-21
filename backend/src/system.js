@@ -10,6 +10,7 @@ import { SupabaseAdminUserService } from './auth/supabase-admin-user-service.js'
 import { SupabaseVerifier } from './auth/supabase-verifier.js';
 import { TokenService } from './auth/token-service.js';
 import { UserRepository } from './auth/user-repository.js';
+import { RedisAuthRateLimiter } from './auth/auth-rate-limiter.js';
 import { createPool } from './db/pool.js';
 import { createApp } from './app.js';
 import { PortfolioMarkRepository } from './portfolio/portfolio-mark-repository.js';
@@ -41,6 +42,14 @@ export async function createSystem(config) {
     console.error('Redis client error', { name: error.name, code: error.code ?? 'UNKNOWN' });
   });
   await redisClient.connect();
+
+  const authRateLimiter = config.authRateLimitEnabled
+    ? new RedisAuthRateLimiter({
+      redisClient,
+      secret: config.authRateLimitKeySecret,
+      policies: config.authRateLimitPolicies,
+    })
+    : null;
 
   const tokenService = new TokenService({
     secret: config.jwtAccessSecret,
@@ -88,9 +97,12 @@ export async function createSystem(config) {
       portfolioMarkService,
       watchService,
       alertService,
+      authRateLimiter,
+      trustProxyHops: config.trustProxyHops,
     }),
     pool,
     redisClient,
+    authRateLimiter,
     authService,
     provisioningService,
     portfolioMarkRepository,

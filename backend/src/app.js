@@ -14,18 +14,24 @@ export function createApp({
   portfolioMarkService = null,
   watchService = null,
   alertService = null,
+  authRateLimiter = null,
+  trustProxyHops = 0,
 }) {
+  if (!Number.isSafeInteger(trustProxyHops) || trustProxyHops < 0 || trustProxyHops > 10) {
+    throw new Error('trustProxyHops must be an integer between 0 and 10.');
+  }
   const app = express();
   app.disable('x-powered-by');
+  app.set('trust proxy', trustProxyHops);
   app.use(createCorsMiddleware());
   app.use(express.json({ limit: '16kb' }));
 
-  app.use('/api/v1/auth', createAuthRouter(authService));
+  app.use('/api/v1/auth', createAuthRouter(authService, { authRateLimiter }));
   app.use(
     '/api/v1/provisioning',
-    createProvisioningRouter(authenticateIdentity, provisioningService),
+    createProvisioningRouter(authenticateIdentity, provisioningService, { authRateLimiter }),
   );
-  app.use('/api/v1', createProtectedRouter(authenticate, authService));
+  app.use('/api/v1', createProtectedRouter(authenticate, authService, { authRateLimiter }));
   if (searchService) {
     app.use('/api/v1', createSearchRouter(authenticate, searchService));
   }

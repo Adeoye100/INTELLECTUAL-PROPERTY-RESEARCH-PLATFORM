@@ -15,6 +15,7 @@ function applicationEnvironment(overrides = {}) {
     DATABASE_URL: 'postgresql://localhost/iprp',
     REDIS_URL: 'redis://localhost:6379',
     JWT_ACCESS_SECRET: 'unit-test-secret-that-is-at-least-32-bytes',
+    AUTH_RATE_LIMIT_KEY_SECRET: 'separate-auth-rate-limit-test-secret-32b',
     ...overrides,
   };
 }
@@ -73,6 +74,7 @@ describe('Supabase configuration', () => {
       DATABASE_URL: 'postgresql://localhost/iprp',
       REDIS_URL: 'redis://localhost:6379',
       JWT_ACCESS_SECRET: 'unit-test-secret-that-is-at-least-32-bytes',
+      AUTH_RATE_LIMIT_KEY_SECRET: 'separate-auth-rate-limit-test-secret-32b',
     };
     assert.throws(() => loadConfig(environment), /SUPABASE_SECRET_KEY/);
   });
@@ -145,5 +147,42 @@ describe('search configuration', () => {
     ]) {
       assert.throws(() => loadConfig(applicationEnvironment({ ...base, ...overrides }), /must be/));
     }
+  });
+});
+
+describe('authentication rate-limit configuration', () => {
+  it('loads the versioned default policies and direct-connection proxy default', () => {
+    const config = loadConfig(applicationEnvironment());
+    assert.equal(config.authRateLimitEnabled, true);
+    assert.equal(config.trustProxyHops, 0);
+    assert.deepEqual(config.authRateLimitPolicies.loginIp, { limit: 20, windowSeconds: 900 });
+    assert.deepEqual(config.authRateLimitPolicies.loginIdentity, { limit: 5, windowSeconds: 900 });
+    assert.deepEqual(config.authRateLimitPolicies.recoveryIp, { limit: 5, windowSeconds: 3600 });
+    assert.deepEqual(config.authRateLimitPolicies.refreshSession, { limit: 30, windowSeconds: 300 });
+  });
+
+  it('rejects missing, weak, reused, invalid, and unsafe limiter configuration', () => {
+    for (const overrides of [
+      { AUTH_RATE_LIMIT_KEY_SECRET: undefined },
+      { AUTH_RATE_LIMIT_KEY_SECRET: 'too-short' },
+      { AUTH_RATE_LIMIT_KEY_SECRET: 'unit-test-secret-that-is-at-least-32-bytes' },
+      { AUTH_RATE_LIMIT_ENABLED: 'yes' },
+      { AUTH_LOGIN_IP_LIMIT: '0' },
+      { AUTH_LOGIN_WINDOW_SECONDS: '86401' },
+      { TRUST_PROXY_HOPS: '-1' },
+      { TRUST_PROXY_HOPS: '11' },
+    ]) {
+      assert.throws(() => loadConfig(applicationEnvironment(overrides)));
+    }
+  });
+
+  it('allows an explicitly disabled limiter only in development or test', () => {
+    const disabled = loadConfig(applicationEnvironment({
+      NODE_ENV: 'test', AUTH_RATE_LIMIT_ENABLED: 'false', AUTH_RATE_LIMIT_KEY_SECRET: undefined,
+    }));
+    assert.equal(disabled.authRateLimitEnabled, false);
+    assert.throws(() => loadConfig(applicationEnvironment({
+      AUTH_RATE_LIMIT_ENABLED: 'false', AUTH_RATE_LIMIT_KEY_SECRET: undefined,
+    })), /only in development or test/);
   });
 });

@@ -21,7 +21,7 @@ exists. MSW fixtures remain isolated-development aids and return mock data only.
 - Protected requests send `Authorization: Bearer <access-token>`, `Accept: application/json`, and JSON bodies with `Content-Type: application/json`.
 - The client times out ordinary requests after 15 seconds and PDF generation after 30 seconds. The backend must make idempotency/retry guarantees explicit for mutations before automatic mutation retries are added.
 - A `401` received while an access token is present clears the client session and navigates to sign-in. The refresh-token endpoint, rotation contract, cookie policy, and race handling are unresolved.
-- Expected error shape is `{ code?: string, message?: string, details?: unknown, requestId?: string }`. The frontend normalizes 400/409/422, 401, 403, 404, 5xx, network, timeout, cancellation, invalid JSON, and invalid content types. The authoritative error-code catalog is unresolved.
+- Expected error shape is `{ code?: string, message?: string, details?: unknown, requestId?: string }`, except an authentication rate-limit rejection which is `{ error: { code, message } }`. The frontend normalizes 400/409/422, 401, 403, 404, 429, 5xx, network, timeout, cancellation, invalid JSON, and invalid content types. The authoritative error-code catalog is unresolved.
 - Successful JSON responses must use `application/json` or a `+json` media type. Successful empty responses use `204`.
 - Tenant authorization, role authorization, object-level authorization, rate limits, pagination, sorting, filtering limits, audit behavior, and idempotency remain backend-owned even where the UI hides an action.
 
@@ -259,6 +259,44 @@ mutations; BE-13 sends no notifications.
 Migration `007_create_watches.sql` is not automatic; use `DATABASE_URL=... pnpm
 --dir backend migrate` deliberately. BE-16 redacted audit logging remains a
 production gate for Watch mutations.
+
+## BE-15 authentication rate-limit contract
+
+The backend owns `POST /api/v1/provisioning/firm`, public invitation lookup and
+redemption under `/api/v1/auth/invitations/:token`, and Admin invitation
+issuance. These flows use `auth-rate-limit-policy-v1`, a distributed Redis
+limiter. `GET /api/v1/me` is authenticated but is not covered by this auth
+limiter. There are no backend login, registration-password, recovery/resend,
+refresh, logout, or session-revocation endpoints to call.
+
+Browser sign-in, password recovery/resend, token refresh, and logout go directly
+to Supabase Auth. Those requests do not traverse Express and therefore require
+Supabase/platform-side rate-limiting and brute-force protections at deployment.
+The client must not infer account or session existence from recovery responses.
+
+Policy values are `loginIp` 20 / 900 seconds, `loginIdentity` 5 / 900,
+`recoveryIp`/`recoveryIdentity` 5 / 3,600, `refreshSession` 30 / 300, and
+`logoutIp` 60 / 60. A `429` has `Retry-After`, `RateLimit-Limit`,
+`RateLimit-Remaining`, and delta-seconds `RateLimit-Reset` headers and exactly:
+
+```json
+{
+  "error": {
+    "code": "AUTH_RATE_LIMITED",
+    "message": "Too many authentication attempts. Try again later."
+  }
+}
+```
+
+Sensitive auth flows fail closed with `503 AUTH_RATE_LIMIT_UNAVAILABLE` if Redis
+is unavailable. A future backend logout/revocation route must remain available
+with a sanitized warning under the `logoutIp` policy. Keys use only
+`auth-limit:v1:{policy}:{hmac}` with an HMAC-SHA256 identifier; IPs, emails,
+tokens, and session IDs are neither exposed nor stored as raw Redis key data.
+`TRUST_PROXY_HOPS=0` is the direct-connection default; production must configure
+the exact trusted reverse-proxy hop count so untrusted `X-Forwarded-For` values
+are ignored. BE-15 needs no migration. BE-14 remains deferred and BE-16 audit
+logging is still required before production-sensitive auth mutations sign off.
 
 ## Required contracts with no candidate route
 

@@ -2,8 +2,7 @@
 
 This service implements the `/api/v1` authentication foundation on the locked
 Node.js + Express, PostgreSQL, and Redis stack. It intentionally does not contain
-business APIs, password-reset/email-verification logic, rate limiting, or audit
-logging.
+business APIs, password-reset/email-verification logic, or audit logging.
 
 It also contains the BE-07/BE-08 USPTO registry adapters and the explicitly
 Postgres-first trademark ingestion/projection commands described below.
@@ -648,12 +647,77 @@ membership lookup followed by a Redis cache hit, and checks an allowed route
 returns `200` while a disallowed route returns `403`. It prints no token, email,
 firm ID, secret key, or complete claims payload.
 
-## Deferred security hooks
+## BE-15 authentication rate limiting
 
-- **BE-15:** Redis-backed IP/account rate limiting belongs immediately before the
-  public auth handlers, including invitation lookup/redemption, in
-  `src/routes/auth-routes.js`.
-- **BE-16:** redacted audit events belong after successful auth state changes and,
-  specifically, after invitation issuance and redemption. The hook points are
-  marked in `src/auth/auth-service.js`; the error handler intentionally logs no
-  request body or password.
+`auth-rate-limit-policy-v1` is a Redis-backed, atomic limiter shared by API
+instances. It applies to every backend-owned sensitive authentication flow:
+public invitation lookup/redemption, authenticated firm provisioning, and Admin
+invitation issuance. `GET /api/v1/me` and ordinary authenticated application
+routes are intentionally not limited by this policy. This backend does not own
+login, password recovery/resend, refresh-token, logout, or session-revocation
+endpoints: the browser calls Supabase directly for those flows. Express cannot
+intercept those browser-to-Supabase requests, so the equivalent platform-side
+Supabase Auth protection remains a deployment requirement.
+
+The policies are: `loginIp` 20 / 900 seconds, `loginIdentity` 5 / 900,
+`recoveryIp` and `recoveryIdentity` 5 / 3,600, `refreshSession` 30 / 300, and
+`logoutIp` 60 / 60. IP policies count all requests. Future backend credential
+handlers must increment identity counters only after failed authentication and
+clear that identity counter after success. Recovery must keep an identical
+response regardless of account existence; refresh may only use a server-side
+opaque session ID, never a complete bearer token.
+
+Redis keys have the fixed format `auth-limit:v1:{policy}:{hmac}`. The final
+component is HMAC-SHA256 using `AUTH_RATE_LIMIT_KEY_SECRET`; raw IPs, emails,
+session IDs, tokens, and credentials are never stored in keys or logs. Each key
+expires with its policy window. The Lua increment/expiry operation makes
+concurrent decisions atomic. This is at-least-once operational protection, not
+a substitute for account security monitoring; monitor only policy/code/count
+aggregates and sanitized Redis availability signals.
+
+Rate-limited requests return `429` with `Retry-After`, `RateLimit-Limit`,
+`RateLimit-Remaining`, and delta-seconds `RateLimit-Reset` headers plus:
+
+```json
+{
+  "error": {
+    "code": "AUTH_RATE_LIMITED",
+    "message": "Too many authentication attempts. Try again later."
+  }
+}
+```
+
+Redis unavailability fails closed with `503 AUTH_RATE_LIMIT_UNAVAILABLE` for
+login, registration/invitation, recovery, and refresh flows. A future
+backend-owned logout/session-revocation route must use the supplied open-mode
+`logoutIp` limiter: it remains available while emitting only a sanitized
+operational warning. There is no in-memory fallback.
+
+Configure the limiter separately from JWT, Supabase, and database secrets:
+
+```dotenv
+AUTH_RATE_LIMIT_ENABLED=true
+AUTH_RATE_LIMIT_KEY_SECRET=at-least-32-bytes-of-a-separate-secret
+AUTH_LOGIN_IP_LIMIT=20
+AUTH_LOGIN_IDENTITY_LIMIT=5
+AUTH_LOGIN_WINDOW_SECONDS=900
+AUTH_RECOVERY_LIMIT=5
+AUTH_RECOVERY_WINDOW_SECONDS=3600
+AUTH_REFRESH_LIMIT=30
+AUTH_REFRESH_WINDOW_SECONDS=300
+TRUST_PROXY_HOPS=0
+```
+
+All numeric values are bounded and booleans are strict. The limiter can be
+disabled only with `NODE_ENV=development` or `NODE_ENV=test`; production must
+provide the separate 32-byte minimum key secret. `TRUST_PROXY_HOPS=0` is the
+safe direct-connection default and ignores arbitrary `X-Forwarded-For` values.
+For a deployed reverse-proxy chain, set it to the exact number of trusted hops
+(for example, `1` for one terminating proxy), never `app.set('trust proxy',
+true)`. Construction performs no Redis operation; the existing system Redis
+client lifecycle is reused. BE-15 has no database migration.
+
+BE-14 billing remains deferred. **BE-16** must add redacted audit events after
+successful auth state changes and, specifically, after invitation issuance and
+redemption. The hook points are marked in `src/auth/auth-service.js`; the error
+handler intentionally logs no request body or password.

@@ -2,6 +2,16 @@
 
 The browser uses Supabase for email/password sessions and Google OAuth only. Application role and firm membership always come from the backend's authenticated `GET /api/v1/me` request, never from Supabase metadata.
 
+## BE-15 platform-side brute-force protection
+
+Browser login, signup, password recovery/resend, refresh, and logout call
+Supabase Auth directly. They cannot be intercepted by Express middleware, so
+configure and verify Supabase/platform-side abuse protection, rate limits, and
+monitoring for the deployed project. The backend's separate
+`auth-rate-limit-policy-v1` covers only backend-owned invitation and firm
+provisioning endpoints. Do not send raw emails, access tokens, refresh tokens,
+or full IP addresses to application logs when monitoring either boundary.
+
 ## Required Supabase Dashboard configuration
 
 In **Authentication → Providers**, enable:
