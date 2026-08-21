@@ -4,7 +4,7 @@ import request from 'supertest';
 import { createApp } from '../../src/app.js';
 import { unauthorized } from '../../src/errors.js';
 
-function createTestApp(searchService = null, portfolioMarkService = null, watchService = null) {
+function createTestApp(searchService = null, portfolioMarkService = null, watchService = null, alertService = null) {
   const authenticate = (request, _response, next) => {
     if (request.get('authorization') !== 'Bearer admin-token') return next(unauthorized());
     request.auth = { userId: 'user-1', email: 'admin@example.test', role: 'admin', firmId: 'firm-1' };
@@ -16,6 +16,7 @@ function createTestApp(searchService = null, portfolioMarkService = null, watchS
     searchService,
     portfolioMarkService,
     watchService,
+    alertService,
     authService: { async invitationDetails() {}, async acceptInvitation() {}, async issueInvitation() {} },
     provisioningService: { async provisionFirm() {} },
   });
@@ -93,6 +94,15 @@ describe('application search mounting', () => {
       async createWatch() {}, async getWatch() {}, async updateWatch() {}, async deleteWatch() {},
     });
     const response = await request(app).get('/api/v1/watches').set('Authorization', 'Bearer admin-token');
+    assert.equal(response.status, 200);
+  });
+
+  it('mounts canonical alerts before the application 404 handler', async () => {
+    const app = createTestApp(null, null, null, {
+      async listAlerts() { return { items: [], pagination: { page: 1, pageSize: 25, total: 0, totalPages: 0 } }; },
+      async getAlert() {}, async transitionAlert() {},
+    });
+    const response = await request(app).get('/api/v1/alerts').set('Authorization', 'Bearer admin-token');
     assert.equal(response.status, 200);
   });
 });

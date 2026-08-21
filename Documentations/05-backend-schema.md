@@ -91,11 +91,17 @@ boundaries.
 | Column | Type | Notes |
 |---|---|---|
 | id | uuid PK | |
-| watch_id | uuid FK | |
-| matched_filing_ref | text | external registry reference |
-| risk_score_id | uuid FK → risk_scores | |
-| read | boolean | |
+| firm_id | uuid FK → firms | tenant boundary |
+| watch_id | uuid FK → watches | same firm |
+| portfolio_mark_id | uuid FK → portfolio_marks | same firm |
+| risk_score_id | uuid FK → risk_scores, non-null | exact immutable evidence snapshot; one alert per score |
+| severity | text | `medium` or `high` |
+| status | text | `unread`, `read`, or `dismissed` |
+| policy_version | text | `watch-alert-policy-v1.0.0` |
 | created_at | timestamptz | |
+| read_at | timestamptz, nullable | set only for `read` status |
+| dismissed_at | timestamptz, nullable | set only for `dismissed` status |
+| updated_at | timestamptz | |
 
 ### `searches`
 | Column | Type | Notes |
@@ -119,13 +125,30 @@ boundaries.
 | Column | Type | Notes |
 |---|---|---|
 | id | uuid PK | |
-| search_result_id | uuid FK, nullable | |
-| alert_id | uuid FK, nullable | |
-| phonetic_score | numeric | |
-| visual_score | numeric | |
-| class_overlap | boolean | |
-| composite_rating | enum('low','medium','high') | |
-| matched_mark_refs | jsonb | evidence shown in UI per PRD §5.2 |
+| firm_id | uuid FK → firms | tenant boundary |
+| watch_id | uuid FK → watches | same firm |
+| portfolio_mark_id | uuid FK → portfolio_marks | same firm |
+| candidate_source | text | attributed registry source |
+| candidate_registry_reference | text | genuine external registry reference; never Elasticsearch ID |
+| candidate_mark_text | text | immutable observed candidate text |
+| visual_score | numeric | 0–100 |
+| phonetic_score | numeric | 0–100 |
+| class_overlap_score | numeric | 0–100 |
+| composite_score | numeric | 0–100 |
+| conceptual_score | numeric, nullable | currently always null |
+| composite_rating | text | `low`, `medium`, or `high` |
+| methodology_version | text | BE-10 risk methodology version |
+| matched_mark_refs | jsonb | immutable complete evidence |
+| source_request_id | text | source-search trace identifier |
+| source_statuses | jsonb | per-source completion/unavailability trace |
+| source_partial | boolean | whether the observed poll was partial |
+| observed_at | timestamptz | poll observation time |
+| fingerprint | sha256 text | deterministic idempotency key within watch scope |
+| created_at | timestamptz | |
+
+Risk scores are immutable watch-poll evidence. The alert policy is separately
+versioned and can reference a risk score, but never changes the BE-10 scoring
+methodology.
 
 ### `office_action_refs`
 | Column | Type | Notes |

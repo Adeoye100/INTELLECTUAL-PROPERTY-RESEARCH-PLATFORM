@@ -23,7 +23,7 @@ function searchQuery(mark) {
 }
 
 export class WatchIngestProcessor {
-  constructor({ repository, queue, searchService, clock = () => new Date() }) {
+  constructor({ repository, queue, searchService, alertGenerationService = null, clock = () => new Date() }) {
     if (!repository || typeof repository.loadForProcessing !== 'function' || typeof repository.recordPollOutcome !== 'function') {
       throw new TypeError('WatchIngestProcessor needs a watch repository.');
     }
@@ -33,10 +33,14 @@ export class WatchIngestProcessor {
     if (!searchService || typeof searchService.search !== 'function') {
       throw new TypeError('WatchIngestProcessor needs a risk-enriched search service.');
     }
+    if (alertGenerationService && typeof alertGenerationService.generateAlertsForWatchPoll !== 'function') {
+      throw new TypeError('WatchIngestProcessor needs a valid alert generation service.');
+    }
     if (typeof clock !== 'function') throw new TypeError('WatchIngestProcessor needs a clock.');
     this.repository = repository;
     this.queue = queue;
     this.searchService = searchService;
+    this.alertGenerationService = alertGenerationService;
     this.clock = clock;
   }
 
@@ -62,6 +66,24 @@ export class WatchIngestProcessor {
       try {
         const response = await this.searchService.search(searchQuery(portfolioMark));
         const pollStatus = response.partial ? 'partial' : 'completed';
+        let alerts = null;
+        if (this.alertGenerationService) {
+          try {
+            alerts = await this.alertGenerationService.generateAlertsForWatchPoll({
+              firmId: valid.firmId, watchId: valid.watchId, portfolioMarkId: valid.portfolioMarkId,
+              requestId: response.requestId, polledAt: nowIso(this.clock), results: response.results,
+              sourceStatuses: response.sourceStatuses, partial: response.partial === true,
+            });
+          } catch {
+            try {
+              await this.repository.recordPollOutcome({
+                firmId: valid.firmId, watchId: valid.watchId, polledAt: nowIso(this.clock),
+                status: 'failed', errorCode: 'ALERT_PERSISTENCE_FAILED',
+              });
+            } catch { return { outcome: 'failed', code: 'WATCH_POLL_UPDATE_FAILED', retryable: valid.attempt < MAX_ATTEMPTS }; }
+            return { outcome: 'failed', code: 'ALERT_PERSISTENCE_FAILED', retryable: valid.attempt < MAX_ATTEMPTS };
+          }
+        }
         try {
           await this.repository.recordPollOutcome({
             firmId: valid.firmId, watchId: valid.watchId, polledAt: nowIso(this.clock),
@@ -75,6 +97,7 @@ export class WatchIngestProcessor {
           polling: {
             requestId: response.requestId, partial: response.partial === true,
             sourceStatuses: response.sourceStatuses, results: response.results,
+            alerts,
           },
         };
       } catch {

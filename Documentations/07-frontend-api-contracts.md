@@ -57,8 +57,9 @@ and environment configuration.
 | `PATCH /api/v1/watches/:id` | Non-empty state/interval subset | `200 Watch` | Admin, Attorney | No alert policy is configured here |
 | `GET /api/v1/watches/:id` | UUID path parameter | `200 Watch` | Admin, Attorney, Viewer within firm | Implemented BE-12 |
 | `DELETE /api/v1/watches/:id` | UUID path parameter | `204` | Admin, Attorney | Transactional hard delete; BE-16 audit gate applies |
-| `GET /api/v1/alerts` | Query: `read`, `severity`, `source`, `dateFrom`, `dateTo` | `Alert[]` | Admin, Attorney, Viewer within allowed watch scope | Pagination, cursor/order, date semantics/time zone, retention |
-| `PATCH /api/v1/alerts/:alertId` | `{ read: boolean }` | `Alert` | Authenticated user allowed to view alert | Whether read state is per-user, concurrency, bulk-read endpoint |
+| `GET /api/v1/alerts` | Implemented canonical list; see BE-13 contract below | `200 { items, pagination }` | Admin, Attorney, Viewer within firm | No outbound delivery behavior in BE-13 |
+| `GET /api/v1/alerts/:id` | UUID path parameter | `200 Alert` | Admin, Attorney, Viewer within firm | Implemented BE-13 |
+| `PATCH /api/v1/alerts/:id` | `{ action: 'read' \| 'dismiss' }` | `200 Alert` | Admin, Attorney | Strict state transitions only |
 | `GET /api/v1/office-actions/search` | Query: `markText`, `niceClass` | `OfficeActionRef[]` | Admin, Attorney, Viewer | Licensed source, pagination, citation fields, filters, result provenance |
 | `POST /api/v1/office-actions/link` | `{ officeActionId, portfolioMarkId }` | `{ success, message, linkedOfficeActionId, linkedPortfolioMarkId }` | Admin, Attorney | Canonical resource model, duplicate/unlink behavior, audit event |
 | `GET /api/v1/matters` | No body | `Matter[]` | Admin, Attorney, Viewer within firm | Entire route; frontend currently uses local storage instead of this mock handler |
@@ -211,8 +212,45 @@ deduplication and processing locks make duplicate delivery safe. The scheduler
 only enqueues enabled due watches and advances their schedule only after success.
 Processor outcomes retain search request ID, source status, partial state,
 results, and risk evidence internally. Partial search is a completed partial
-poll. BE-13 may consume these outcomes later; BE-12 creates no alerts or
-risk-score records.
+poll. BE-13 persists immutable evidence and alerts from this outcome without
+adding outbound notifications.
+
+## BE-13 implemented Alert contract
+
+`GET /api/v1/alerts`, `GET /api/v1/alerts/:id`, and `PATCH /api/v1/alerts/:id`
+are the canonical firm-scoped alert routes. Admin and Attorney may read, mark
+read, or dismiss; Viewer may only list/get. Firm comes exclusively from server
+membership. Every query/mutation scopes by it, and missing/cross-firm records
+return `404 ALERT_NOT_FOUND`.
+
+The list response is `{ items: Alert[], pagination: { page, pageSize, total,
+totalPages } }`, ordered newest first. Filters: `status` (`unread`, `read`,
+`dismissed`), `severity` (`medium`, `high`), `watchId`, `portfolioMarkId`, and
+`createdFrom`/`createdTo` (`YYYY-MM-DD`). Pagination defaults to page 1 and 25
+items, bounded by 100,000 and 100.
+
+Each Alert includes IDs, severity/status/policy/timestamps, and a `riskScore`
+with attributed candidate source, genuine registry reference, candidate text,
+Visual/Phonetic/Class/Composite scores, nullable `conceptualScore`, rating,
+methodology version, evidence, source request ID, and observation time. API
+responses omit fingerprints, Elasticsearch relevance, candidate internal IDs,
+SQL fields, and legal conclusions.
+
+PATCH is exactly `{ "action": "read" }` for `unread → read` or
+`{ "action": "dismiss" }` for `unread/read → dismissed`; invalid inputs are
+400 and invalid transitions are `409 ALERT_STATE_CONFLICT`.
+
+Risk fingerprints are canonical SHA-256 values scoped to firm/watch. Identical
+replays return existing snapshot/alert records; materially changed complete
+evidence may create a new snapshot. Policy `watch-alert-policy-v1.0.0` emits
+High/Medium alerts only; Low, invalid, unattributed, and unavailable-source
+entries do not generate alerts. Partial sources can still yield valid alerts.
+
+The worker writes evidence/alerts before successful poll state and returns a
+retryable persistence failure if that transaction fails. Migration
+`008_create_risk_scores_and_alerts.sql` is manual: `DATABASE_URL=... pnpm --dir
+backend migrate`. BE-16 audit logging is required before production alert-state
+mutations; BE-13 sends no notifications.
 
 `WATCH_ENABLED=false` is the default. The other strict settings are
 `WATCH_SCHEDULER_INTERVAL_MS=60000`, `WATCH_POLL_INTERVAL_MINUTES=1440`, and

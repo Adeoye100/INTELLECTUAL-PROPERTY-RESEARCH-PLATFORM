@@ -7,11 +7,13 @@ import { createProvisioningRouter } from './routes/provisioning-routes.js';
 import { createSearchRouter } from './routes/search-routes.js';
 import { createPortfolioMarkRouter } from './routes/portfolio-mark-routes.js';
 import { createWatchRouter } from './routes/watch-routes.js';
+import { createAlertRouter } from './routes/alert-routes.js';
 
 export function createApp({
   authService, authenticate, authenticateIdentity, provisioningService, searchService = null,
   portfolioMarkService = null,
   watchService = null,
+  alertService = null,
 }) {
   const app = express();
   app.disable('x-powered-by');
@@ -32,6 +34,9 @@ export function createApp({
   }
   if (watchService) {
     app.use('/api/v1', createWatchRouter(authenticate, watchService));
+  }
+  if (alertService) {
+    app.use('/api/v1', createAlertRouter(authenticate, alertService));
   }
 
   app.use((_request, response) => {

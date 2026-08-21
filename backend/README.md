@@ -532,6 +532,53 @@ mutations. Retryable search/database/queue failures are returned with stable
 internal codes for deployment-queue retry policy; invalid, missing, stale, and
 duplicate jobs are terminal skips.
 
+## Alert evidence and API (BE-13)
+
+Every watch-poll candidate with complete attributed BE-10 evidence is persisted
+as immutable risk-score evidence. A canonical SHA-256 fingerprint includes the
+firm/watch/mark scope, genuine candidate source/reference, candidate text,
+scores, methodology version, and evidence. Object-key and result ordering cannot
+change it; `(firm_id, watch_id, fingerprint)` makes replay idempotent. Changed
+evidence creates a new snapshot.
+
+The independent `watch-alert-policy-v1.0.0` creates High alerts for High risk,
+Medium alerts for Medium risk, and no alert for Low risk. Invalid, incomplete,
+unattributed, or unavailable-source entries fail closed. Partial source responses
+may persist valid returned entries, but unavailable sources never create alerts.
+Each alert references one non-null persisted `riskScoreId` in the same database
+transaction; no outbound notification is sent.
+
+| Method and path | Roles | Result |
+|---|---|---|
+| `GET /api/v1/alerts` | Admin, Attorney, Viewer | `200` paginated alerts |
+| `GET /api/v1/alerts/:id` | Admin, Attorney, Viewer | `200` Alert |
+| `PATCH /api/v1/alerts/:id` | Admin, Attorney | `200` Alert |
+
+Alert object access derives and scopes by verified firm membership. Missing and
+cross-firm records both return `404 ALERT_NOT_FOUND`. Lists support `status`,
+`severity`, `watchId`, `portfolioMarkId`, `createdFrom`, and `createdTo`, use
+newest-first deterministic ordering, and use the standard bounded pagination.
+
+PATCH is exactly `{ "action": "read" }` (`unread → read`) or
+`{ "action": "dismiss" }` (`unread/read → dismissed`). An invalid transition
+returns `409 ALERT_STATE_CONFLICT`; Viewers cannot mutate, and there is no alert
+deletion endpoint. Responses include attached candidate/evidence scores but omit
+fingerprints, Elasticsearch relevance, internal candidate IDs, SQL fields, and
+legal conclusions.
+
+The enabled watch worker persists BE-13 evidence before recording a completed or
+partial poll. Persistence failure records retryable `ALERT_PERSISTENCE_FAILED`;
+replay safety comes from database uniqueness. Apply the additive migration only
+to the intended database—it is not run automatically:
+
+```sh
+DATABASE_URL='postgresql://USER:PASSWORD@HOST:5432/DATABASE' pnpm migrate
+```
+
+BE-16 must add redacted audit logging for alert read/dismiss actions before
+production sign-off. Email, push, and other outbound notification delivery are
+not part of BE-13.
+
 ## RBAC demonstration routes
 
 Every route verifies the bearer JWT before applying its explicit role list:

@@ -18,6 +18,9 @@ import { createSearchRuntime } from './search/search-runtime.js';
 import { WatchRepository } from './watch/watch-repository.js';
 import { WatchService } from './watch/watch-service.js';
 import { createWatchRuntime } from './watch/watch-runtime.js';
+import { AlertRepository } from './alerts/alert-repository.js';
+import { AlertGenerationService } from './alerts/alert-generation-service.js';
+import { AlertService } from './alerts/alert-service.js';
 
 export async function createSystem(config) {
   const { searchSources, federatedSearchService, searchService } = createSearchRuntime(config);
@@ -67,8 +70,12 @@ export async function createSystem(config) {
   const watchService = new WatchService({
     repository: watchRepository, defaultPollIntervalMinutes: config.watchPollIntervalMinutes,
   });
+  const alertRepository = new AlertRepository(pool);
+  const alertService = new AlertService({ repository: alertRepository });
+  const alertGenerationService = config.watchEnabled
+    ? new AlertGenerationService({ repository: alertRepository }) : null;
   const watchRuntime = createWatchRuntime({
-    config, redisClient, watchRepository, searchService,
+    config, redisClient, watchRepository, searchService, alertGenerationService,
   });
 
   return {
@@ -80,6 +87,7 @@ export async function createSystem(config) {
       searchService,
       portfolioMarkService,
       watchService,
+      alertService,
     }),
     pool,
     redisClient,
@@ -90,6 +98,9 @@ export async function createSystem(config) {
     watchRepository,
     watchService,
     watchRuntime,
+    alertRepository,
+    alertService,
+    alertGenerationService,
     roleFirmResolver,
     supabaseAdminUserService,
     supabaseVerifier,

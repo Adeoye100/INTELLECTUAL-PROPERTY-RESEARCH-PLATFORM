@@ -4,6 +4,8 @@ import { createPool } from '../db/pool.js';
 import { createSearchRuntime } from '../search/search-runtime.js';
 import { WatchRepository } from './watch-repository.js';
 import { createWatchRuntime } from './watch-runtime.js';
+import { AlertRepository } from '../alerts/alert-repository.js';
+import { AlertGenerationService } from '../alerts/alert-generation-service.js';
 
 const config = loadConfig();
 if (!config.watchEnabled) {
@@ -16,8 +18,10 @@ if (!config.watchEnabled) {
   });
   await redisClient.connect();
   const { searchService } = createSearchRuntime(config);
+  const watchRepository = new WatchRepository(pool);
   const runtime = createWatchRuntime({
-    config, redisClient, watchRepository: new WatchRepository(pool), searchService,
+    config, redisClient, watchRepository, searchService,
+    alertGenerationService: new AlertGenerationService({ repository: new AlertRepository(pool) }),
   });
   runtime.worker.start();
   console.log('Watch worker started.');
