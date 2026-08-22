@@ -3,11 +3,12 @@
 ## Status and evidence
 
 Originally inspected on 2026-08-05 when `backend/` contained only `package.json`.
-BE-03/BE-04/BE-05 now add an Express auth implementation, raw PostgreSQL
-migration, Redis-backed refresh sessions, RBAC middleware, and real-store
-integration tests. This is repository implementation evidence only: no staging
-deployment is claimed, and the auth response contract still needs reconciliation
-with the frontend before FE-21 can call it live.
+The current backend adds Express routes, PostgreSQL migrations, Redis-backed
+rate limiting/queues, RBAC middleware, and injected-store tests. Supabase Auth
+is now the password, refresh-token, and browser-session authority; the backend
+does not expose a competing refresh-session endpoint. This is repository
+implementation evidence only: no staging deployment is claimed, and frontend
+contract reconciliation is still required before FE-21 calls routes live.
 
 The paths below are the existing frontend/MSW contract candidates, consistently
 rooted at the documented `/api/v1` base path. Unless an entry explicitly records
@@ -20,7 +21,7 @@ exists. MSW fixtures remain isolated-development aids and return mock data only.
 - `VITE_API_MODE` defaults to `live`. Only an explicit `VITE_API_MODE=mock` in a Vite development build starts MSW; non-development builds reject mock mode.
 - Protected requests send `Authorization: Bearer <access-token>`, `Accept: application/json`, and JSON bodies with `Content-Type: application/json`.
 - The client times out ordinary requests after 15 seconds and PDF generation after 30 seconds. The backend must make idempotency/retry guarantees explicit for mutations before automatic mutation retries are added.
-- A `401` received while an access token is present clears the client session and navigates to sign-in. The refresh-token endpoint, rotation contract, cookie policy, and race handling are unresolved.
+- A `401` received while an access token is present clears the client session and navigates to sign-in. Browser sign-in, refresh, recovery, and logout use the configured Supabase client directly; there is deliberately no backend refresh-token, rotation, or cookie endpoint. Supabase configuration and real-token behavior remain staging gates.
 - Expected error shape is `{ code?: string, message?: string, details?: unknown, requestId?: string }`, except an authentication rate-limit rejection which is `{ error: { code, message } }`. The frontend normalizes 400/409/422, 401, 403, 404, 429, 5xx, network, timeout, cancellation, invalid JSON, and invalid content types. The authoritative error-code catalog is unresolved.
 - Successful JSON responses must use `application/json` or a `+json` media type. Successful empty responses use `204`.
 - Tenant authorization, role authorization, object-level authorization, rate limits, pagination, sorting, filtering limits, audit behavior, and idempotency remain backend-owned even where the UI hides an action.
@@ -397,3 +398,23 @@ The remaining operational gates are controlled migration application, database
 permission/backup review, exact reverse-proxy trust configuration, audit-write
 monitoring, and a retention/archive policy. They are deployment gates, not
 additional BE-16 implementation work.
+
+## BE-17 Phase 2 backend exit reconciliation
+
+The traceable backend exit matrix is
+[`08-phase2-backend-exit-check.md`](08-phase2-backend-exit-check.md). It treats
+the candidate rows above as frontend planning evidence unless a later canonical
+backend contract marks a route implemented. It confirms the mounted,
+non-deferred Phase 2 API surface with application-level route and authorization
+tests; no frontend code was changed for that check.
+
+BE-17 is **code-complete, staging verification pending**. Its opt-in smoke
+runner requires a named non-local `STAGING_API_URL`, separate read/Admin test
+tokens, bounded timeout, and explicit mutation consent. It defaults to GET
+requests and deletes only the UUID returned by a same-run, uniquely labelled
+portfolio-mark create. The no-network `pnpm --dir backend phase2:readiness`
+command reports configuration gates for PostgreSQL, Redis, Supabase, required
+secrets, search, and the watch worker.
+
+BE-14 subscription/billing remains **Deferred by explicit decision**. It is not
+represented as a completed backend route or a Phase 2 staging pass.

@@ -14,9 +14,11 @@
     "sync:elasticsearch": "node src/ingestion/run-elasticsearch-sync.js",
     "verify:supabase-token": "node --env-file=.env scripts/verify-supabase-token.js",
     "verify:supabase-rbac": "node --env-file=.env scripts/verify-supabase-rbac.js",
+    "phase2:readiness": "node scripts/phase2-readiness.js",
     "test": "pnpm test:unit && pnpm test:integration",
     "test:unit": "node --test test/unit/*.test.js",
     "test:integration": "node --env-file=.env --test --test-concurrency=1 test/integration/*.test.js",
+    "test:staging-smoke": "node scripts/staging-smoke-test.js",
     "check": "node scripts/check-source.js"
   },
   "keywords": [],

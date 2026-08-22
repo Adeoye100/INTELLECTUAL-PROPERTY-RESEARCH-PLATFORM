@@ -29,6 +29,23 @@ erDiagram
 
 ## 2. PostgreSQL Tables (System of Record)
 
+### Migration reconciliation (BE-17)
+
+`backend/migrations/` is executed lexically through `001`–`009`; there are no
+duplicate numeric prefixes. The foreign-key sequence is ordered as follows:
+firms/users (`001`) precede registry data (`002`), invitations (`003`), identity
+linking (`004`–`005`), portfolio marks (`006`), watches (`007`), risk/alerts
+(`008`), and audit logs (`009`). Migrations `006`–`009` use additive,
+repeat-safe DDL and no migration deletes data. Migrations `004` and `005` are
+historical non-destructive `ALTER TABLE` compatibility steps rather than new
+table creation.
+
+No database was contacted during the BE-17 exit check. In the absence of
+external migration-run evidence, `006_create_portfolio_marks.sql` through
+`009_create_audit_logs.sql` must be treated as unapplied. Apply them only
+through the controlled deployment migration process; this document does not
+claim a local, staging, or production schema state.
+
 ### `firms`
 | Column | Type | Notes |
 |---|---|---|

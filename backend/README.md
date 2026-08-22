@@ -825,3 +825,59 @@ Operational deployment gates only:
    retention/archive policy.
 5. When BE-20 is deployed, wire every export lifecycle transition to
    `ExportAuditService` before enabling generation.
+
+## BE-17 Phase 2 backend exit check
+
+BE-17 is **code-complete, staging verification pending**. The traceable route,
+authorization, migration, and security matrix is in
+[`../Documentations/08-phase2-backend-exit-check.md`](../Documentations/08-phase2-backend-exit-check.md).
+It uses the canonical backend contracts rather than frontend/mock candidate
+routes and explicitly records BE-14 billing as deferred.
+
+The application-level `phase2-route-inventory.test.js` sends requests through
+`createApp` with injected fakes. It verifies every mounted non-deferred Phase 2
+HTTP method reaches its route before the terminal 404 handler and confirms that
+enabled search is available. The same test file covers unauthenticated,
+Admin, Attorney, Viewer, Admin-only audit/role, and cross-firm paths. Existing
+service tests remain the evidence for transaction boundaries, IDOR concealment,
+queue validation, audit immutability, and rate-limit fail-closed behavior.
+
+Run the no-network deployment-configuration check with:
+
+```bash
+pnpm --dir backend phase2:readiness
+```
+
+It reuses `loadConfig` without opening clients or starting services. A gated
+result is a deployment gate, not a unit-test failure. Phase 2 staging needs a
+valid PostgreSQL URL, Redis URL, Supabase configuration, required JWT and
+rate-limit secrets, `SEARCH_ENABLED=true` plus bounded Elasticsearch registry
+settings, and `WATCH_ENABLED=true` so the worker path is created.
+
+The opt-in staging runner is never included in normal tests or CI:
+
+```bash
+STAGING_API_URL=https://api.staging.example.test/api/v1 \
+STAGING_ACCESS_TOKEN=... \
+STAGING_ADMIN_ACCESS_TOKEN=... \
+pnpm --dir backend test:staging-smoke
+```
+
+It rejects localhost and production-looking hosts unless
+`STAGING_SMOKE_ALLOW_UNSAFE_URL=true` is deliberately supplied. It does not
+print credentials, cookies, complete response bodies, or request bodies; it
+uses a 5-second bounded default timeout (15 seconds maximum) and rejects HTTP
+redirects so a bearer token is never forwarded to an unexpected host. Default checks
+are authenticated GETs. Mutation coverage additionally requires both
+`STAGING_SMOKE_ALLOW_MUTATIONS=true` and `STAGING_MUTATION_ACCESS_TOKEN`; it
+creates a uniquely labelled portfolio mark and only patches/deletes the UUID
+returned by that same create response; a missing or malformed UUID fails the
+smoke check without attempting cleanup. It never runs migrations, billing,
+role-demotion, index deletion, or infrastructure operations.
+
+For a fully complete Phase 2 exit, apply `006`–`009` to disposable staging,
+verify real Supabase tokens, PostgreSQL, Redis, Elasticsearch and enabled watch
+worker paths, demonstrate a controlled partial registry failure, run every
+non-deferred endpoint smoke check, and formally accept or complete the separate
+BE-14 billing exception. BE-14 remains **Deferred by explicit decision** here;
+no billing route was added.
