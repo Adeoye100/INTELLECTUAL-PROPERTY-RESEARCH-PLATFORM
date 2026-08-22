@@ -4,7 +4,8 @@ import { UUID_PATTERN } from './watch-validation.js';
 export const WATCH_INGEST_QUEUE = 'queue:watch_ingest';
 const DEDUPE_TTL_SECONDS = 172_800;
 const LOCK_TTL_MS = 300_000;
-const MAX_ATTEMPTS = 3;
+export const WATCH_MAX_ATTEMPTS = 3;
+export const MAX_WATCH_QUEUE_JOB_BYTES = 1024;
 
 export class WatchQueueError extends Error {
   constructor(code = 'WATCH_QUEUE_UNAVAILABLE') {
@@ -34,7 +35,7 @@ export function validateWatchJob(job) {
     || !UUID_PATTERN.test(job.firmId ?? '')
     || !UUID_PATTERN.test(job.portfolioMarkId ?? '')
     || !validIso(job.scheduledFor)
-    || !Number.isSafeInteger(job.attempt) || job.attempt < 0 || job.attempt > MAX_ATTEMPTS
+    || !Number.isSafeInteger(job.attempt) || job.attempt < 0 || job.attempt >= WATCH_MAX_ATTEMPTS
     || job.jobId !== deterministicWatchJobId(job.watchId, job.scheduledFor)) {
     throw new WatchQueueError('WATCH_JOB_INVALID');
   }
@@ -52,6 +53,10 @@ export class RedisWatchIngestQueue {
       || typeof redisClient.rPop !== 'function' || typeof redisClient.del !== 'function'
       || typeof redisClient.eval !== 'function') {
       throw new TypeError('RedisWatchIngestQueue needs a Redis client.');
+    }
+    if (!Number.isSafeInteger(dedupeTtlSeconds) || dedupeTtlSeconds < 60 || dedupeTtlSeconds > 604_800
+      || !Number.isSafeInteger(lockTtlMs) || lockTtlMs < 1_000 || lockTtlMs > 3_600_000) {
+      throw new TypeError('RedisWatchIngestQueue needs bounded TTL configuration.');
     }
     this.redisClient = redisClient;
     this.dedupeTtlSeconds = dedupeTtlSeconds;
@@ -85,7 +90,12 @@ export class RedisWatchIngestQueue {
     let serialized;
     try { serialized = await this.redisClient.rPop(WATCH_INGEST_QUEUE); } catch { throw new WatchQueueError(); }
     if (serialized === null) return null;
-    try { return validateWatchJob(JSON.parse(serialized)); } catch { throw new WatchQueueError('WATCH_JOB_INVALID'); }
+    try {
+      if (typeof serialized !== 'string' || Buffer.byteLength(serialized, 'utf8') > MAX_WATCH_QUEUE_JOB_BYTES) {
+        throw new Error('oversized');
+      }
+      return validateWatchJob(JSON.parse(serialized));
+    } catch { throw new WatchQueueError('WATCH_JOB_INVALID'); }
   }
 
   async acquireProcessingLock(jobId) {

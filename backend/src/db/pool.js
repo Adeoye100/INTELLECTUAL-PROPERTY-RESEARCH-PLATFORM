@@ -12,7 +12,9 @@ export function createPool(connectionString, ssl = false) {
 
   if (ssl) {
     options.ssl = {
-      rejectUnauthorized: false,
+      // A deployment must provide a trusted CA chain. Disabling verification
+      // would make database credentials and tenant data MITM-susceptible.
+      rejectUnauthorized: true,
     };
   }
 

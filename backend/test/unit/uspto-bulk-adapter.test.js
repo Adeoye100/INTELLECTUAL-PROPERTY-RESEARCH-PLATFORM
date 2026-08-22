@@ -85,6 +85,22 @@ describe('USPTO Bulk XML adapter', () => {
     ]);
   });
 
+  it('does not follow a cross-origin archive URL discovered in an upstream listing', async () => {
+    const calls = [];
+    const adapter = new UsptoBulkXmlAdapter({
+      listingUrl: 'https://registry.example.test/listing',
+      fetchImpl: async (url) => {
+        calls.push(url);
+        return { ok: true, text: async () => '<a href="https://unexpected.example.test/apc260105.zip">archive</a>' };
+      },
+    });
+    await assert.rejects(
+      adapter.discoverUpdates(new Date('2026-01-05T00:00:00.000Z')),
+      /contained no apcYYMMDD.zip links/,
+    );
+    assert.deepEqual(calls, ['https://registry.example.test/listing']);
+  });
+
   it('honestly rejects per-record status lookup', async () => {
     const adapter = new UsptoBulkXmlAdapter();
     await assert.rejects(

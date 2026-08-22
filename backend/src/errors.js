@@ -32,6 +32,13 @@ export function errorHandler(error, _request, response, _next) {
     });
   }
 
+  if (error?.type === 'entity.too.large' || error?.status === 413) {
+    return response.status(413).json({
+      code: 'REQUEST_BODY_TOO_LARGE',
+      message: 'Request body exceeds the configured limit.',
+    });
+  }
+
   // Request bodies and error objects are deliberately not logged here. The
   // production logger added with BE-16 must use an explicit secret-redaction
   // policy before receiving any request context.

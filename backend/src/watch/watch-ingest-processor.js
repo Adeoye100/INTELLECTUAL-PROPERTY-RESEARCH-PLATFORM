@@ -1,6 +1,4 @@
-import { WatchQueueError, validateWatchJob } from './watch-ingest-queue.js';
-
-const MAX_ATTEMPTS = 3;
+import { WATCH_MAX_ATTEMPTS, WatchQueueError, validateWatchJob } from './watch-ingest-queue.js';
 
 function nowIso(clock) {
   const now = clock();
@@ -55,7 +53,7 @@ export class WatchIngestProcessor {
       try {
         loaded = await this.repository.loadForProcessing({ firmId: valid.firmId, watchId: valid.watchId });
       } catch {
-        return { outcome: 'failed', code: 'WATCH_DATABASE_UNAVAILABLE', retryable: valid.attempt < MAX_ATTEMPTS };
+        return { outcome: 'failed', code: 'WATCH_DATABASE_UNAVAILABLE', retryable: valid.attempt + 1 < WATCH_MAX_ATTEMPTS };
       }
       if (!loaded) return skipped('WATCH_NOT_FOUND');
       const { watch, portfolioMark } = loaded;
@@ -80,8 +78,8 @@ export class WatchIngestProcessor {
                 firmId: valid.firmId, watchId: valid.watchId, polledAt: nowIso(this.clock),
                 status: 'failed', errorCode: 'ALERT_PERSISTENCE_FAILED',
               });
-            } catch { return { outcome: 'failed', code: 'WATCH_POLL_UPDATE_FAILED', retryable: valid.attempt < MAX_ATTEMPTS }; }
-            return { outcome: 'failed', code: 'ALERT_PERSISTENCE_FAILED', retryable: valid.attempt < MAX_ATTEMPTS };
+            } catch { return { outcome: 'failed', code: 'WATCH_POLL_UPDATE_FAILED', retryable: valid.attempt + 1 < WATCH_MAX_ATTEMPTS }; }
+            return { outcome: 'failed', code: 'ALERT_PERSISTENCE_FAILED', retryable: valid.attempt + 1 < WATCH_MAX_ATTEMPTS };
           }
         }
         try {
@@ -90,7 +88,7 @@ export class WatchIngestProcessor {
             status: pollStatus, errorCode: null,
           });
         } catch {
-          return { outcome: 'failed', code: 'WATCH_POLL_UPDATE_FAILED', retryable: valid.attempt < MAX_ATTEMPTS };
+          return { outcome: 'failed', code: 'WATCH_POLL_UPDATE_FAILED', retryable: valid.attempt + 1 < WATCH_MAX_ATTEMPTS };
         }
         return {
           outcome: pollStatus, code: null, retryable: false,
@@ -107,14 +105,14 @@ export class WatchIngestProcessor {
             status: 'failed', errorCode: 'WATCH_SEARCH_FAILED',
           });
         } catch {
-          return { outcome: 'failed', code: 'WATCH_POLL_UPDATE_FAILED', retryable: valid.attempt < MAX_ATTEMPTS };
+          return { outcome: 'failed', code: 'WATCH_POLL_UPDATE_FAILED', retryable: valid.attempt + 1 < WATCH_MAX_ATTEMPTS };
         }
-        return { outcome: 'failed', code: 'WATCH_SEARCH_FAILED', retryable: valid.attempt < MAX_ATTEMPTS };
+        return { outcome: 'failed', code: 'WATCH_SEARCH_FAILED', retryable: valid.attempt + 1 < WATCH_MAX_ATTEMPTS };
       }
     } catch (error) {
       return {
         outcome: 'failed', code: error instanceof WatchQueueError ? error.code : 'WATCH_QUEUE_UNAVAILABLE',
-        retryable: valid?.attempt < MAX_ATTEMPTS,
+        retryable: valid?.attempt + 1 < WATCH_MAX_ATTEMPTS,
       };
     } finally {
       if (lockToken) {

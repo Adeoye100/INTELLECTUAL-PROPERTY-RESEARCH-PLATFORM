@@ -14,6 +14,11 @@ import { createUserRouter } from './routes/user-routes.js';
 import { createOfficeActionRefRouter, createOfficeActionSearchRouter } from './routes/office-action-routes.js';
 import { createAuditRequestContextMiddleware } from './audit/request-context.js';
 import { createExportRouter } from './routes/export-routes.js';
+import {
+  createRequestBoundsMiddleware,
+  createSecurityHeadersMiddleware,
+  MAX_JSON_BODY_BYTES,
+} from './http-security.js';
 
 export function createApp({
   authService, authenticate, authenticateIdentity, provisioningService, searchService = null,
@@ -36,9 +41,11 @@ export function createApp({
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', trustProxyHops);
+  app.use(createSecurityHeadersMiddleware());
+  app.use(createRequestBoundsMiddleware());
   app.use(createAuditRequestContextMiddleware());
   app.use(createCorsMiddleware());
-  app.use(express.json({ limit: '16kb' }));
+  app.use(express.json({ limit: MAX_JSON_BODY_BYTES }));
 
   app.use('/api/v1/auth', createAuthRouter(authService, { authRateLimiter }));
   app.use(

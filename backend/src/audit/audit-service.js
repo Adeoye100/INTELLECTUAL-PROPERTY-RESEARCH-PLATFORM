@@ -189,6 +189,7 @@ export function parseAuditLogListQuery(query) {
   let cursor = null;
   if (query.cursor !== undefined) {
     const raw = scalar(query.cursor, 'AUDIT_PAYLOAD_INVALID', 'Audit cursor is invalid.');
+    if (raw.length > 512) throw auditError('AUDIT_PAYLOAD_INVALID', 'Audit cursor is invalid.');
     try {
       const parsed = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8'));
       cursor = {

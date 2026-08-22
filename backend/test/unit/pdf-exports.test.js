@@ -10,8 +10,8 @@ import { ExportService } from '../../src/exports/export-service.js';
 import { ExportSourceLoader } from '../../src/exports/export-source-loader.js';
 import { createExportDocumentModel } from '../../src/exports/export-document-model.js';
 import { PdfRenderer } from '../../src/exports/pdf-renderer.js';
-import { InMemoryPdfStorage, exportStorageKey, validateExportStorageKey } from '../../src/exports/export-storage.js';
-import { deterministicPdfExportJobId, validatePdfExportJob } from '../../src/exports/pdf-export-queue.js';
+import { InMemoryPdfStorage, exportStorageKey, validateExportStorageKey, sha256 } from '../../src/exports/export-storage.js';
+import { deterministicPdfExportJobId, RedisPdfExportQueue, validatePdfExportJob } from '../../src/exports/pdf-export-queue.js';
 import { PdfExportProcessor } from '../../src/exports/pdf-export-processor.js';
 import { createExportRouter } from '../../src/routes/export-routes.js';
 import { createApp } from '../../src/app.js';
@@ -217,6 +217,21 @@ describe('Renderer, private storage, queue job, and worker boundaries', () => {
     const saved = await storage.put({ key, contentType: 'application/pdf', body: Buffer.from('%PDF-safe') });
     assert.equal(saved.byteSize, 9); assert.match(saved.checksumSha256, /^[a-f0-9]{64}$/); assert.deepEqual(await storage.get({ key }), Buffer.from('%PDF-safe'));
     assert.throws(() => validateExportStorageKey('../secrets.pdf'));
+    await assert.rejects(() => storage.put({ key, contentType: 'application/pdf', body: Buffer.from('not-a-pdf') }));
+  });
+
+  it('rejects tampered stored bytes and oversized Redis queue records before export download/JSON parsing', async () => {
+    const { service: exportService, repo, storage } = service();
+    const record = exportRecord({ status: 'completed', storageKey: exportStorageKey({ firmId, exportId }), mimeType: 'application/pdf' });
+    const body = Buffer.from('%PDF-safe');
+    record.byteSize = body.length; record.checksumSha256 = sha256(body);
+    repo.state.records = [record];
+    await storage.put({ key: record.storageKey, contentType: 'application/pdf', body });
+    storage.objects.set(record.storageKey, Buffer.from('%PDF-tampered'));
+    await assert.rejects(() => exportService.download({ firmId, exportId }), { code: 'EXPORT_DOWNLOAD_UNAVAILABLE' });
+
+    const redis = { async set() { return 'OK'; }, async lPush() {}, async zAdd() {}, async del() {}, async eval() { return '{"padding":"'.concat('a'.repeat(2_000), '"}'); } };
+    await assert.rejects(() => new RedisPdfExportQueue({ redisClient: redis }).dequeue(), { code: 'EXPORT_JOB_INVALID' });
   });
 
   it('validates versioned jobs and completes an export once without duplicate rendering', async () => {

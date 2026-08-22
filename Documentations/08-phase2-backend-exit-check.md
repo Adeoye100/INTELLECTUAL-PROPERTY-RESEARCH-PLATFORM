@@ -244,3 +244,33 @@ not resolve, execute, or change any existing Phase 2/BE-18 staging gate or the
 explicitly deferred BE-14 billing exception. PDF export staging additionally
 requires controlled migration application, private storage permissions, Redis,
 the separate worker process, and authenticated firm-isolation/download checks.
+
+## BE-21 repository-local security review update
+
+BE-21 completed a repository-local defensive review of BE-03 through BE-20 and
+recorded its evidence, fixed code findings, accepted risks, and independent
+BE-22 handoff in `09-internal-security-review.md`. It added no migration, did
+not contact a live service, and did not execute a staging check. The review does
+not close the gates above or represent penetration testing/BE-22 as complete.
+
+Fixed code findings include verified PostgreSQL TLS, early 4 KB request-target
+and 16 KB JSON-body limits with stable errors, restrictive API security headers,
+bounded queue payload parsing and audit cursors, broader recursive audit secret
+redaction, constrained Elasticsearch/USPTO outbound destinations, and
+completed-export PDF size/signature/checksum verification. The corresponding
+unit-suite evidence is recorded in the BE-21 review rather than substituted for
+deployment evidence.
+
+The following remain required before a production or Phase 2 sign-off claim:
+
+1. Apply and verify migrations 006–012 in disposable staging; confirm tenant
+   keys, append-only triggers, lifecycle constraints, and role-change behavior.
+2. Verify explicit production TLS trust, ingress/proxy trust, CORS origin policy,
+   Redis ACL/network isolation, private storage ownership/no-symlink policy,
+   worker queues, and controlled failure handling in staging.
+3. Obtain current dependency advisory data through an approved local/CI process
+   and preserve the result; the repository-local offline audit had no current
+   advisory database.
+4. Complete the independent BE-22 review scope documented in the review report.
+5. Keep BE-14 billing **Deferred by explicit decision** unless a separate,
+   authorized ticket changes that status.

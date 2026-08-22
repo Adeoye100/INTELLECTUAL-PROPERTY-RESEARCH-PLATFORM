@@ -113,7 +113,7 @@ describe('search configuration', () => {
   });
 
   it('requires a valid Elasticsearch URL and registry list when enabled', () => {
-    for (const elasticsearchUrl of [undefined, 'ftp://localhost:9200', 'http://user:pass@localhost:9200', 'http://localhost:9200?x=1', 'http://localhost:9200#fragment']) {
+    for (const elasticsearchUrl of [undefined, 'ftp://localhost:9200', 'http://user:pass@localhost:9200', 'http://localhost:9200?x=1', 'http://localhost:9200#fragment', 'http://search.example.test:9200']) {
       assert.throws(() => loadConfig(applicationEnvironment({
         SEARCH_ENABLED: 'true', ELASTICSEARCH_URL: elasticsearchUrl, SEARCH_SOURCE_REGISTRIES: 'USPTO',
       })), /ELASTICSEARCH_URL/);

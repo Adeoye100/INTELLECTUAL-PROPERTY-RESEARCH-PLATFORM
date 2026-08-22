@@ -115,6 +115,10 @@ function elasticsearchSearchUrl(env) {
   if (!['http:', 'https:'].includes(url.protocol)) {
     throw new Error('ELASTICSEARCH_URL must use HTTP or HTTPS.');
   }
+  const loopback = ['127.0.0.1', 'localhost', '::1'].includes(url.hostname);
+  if (url.protocol !== 'https:' && !loopback) {
+    throw new Error('ELASTICSEARCH_URL must use HTTPS except for loopback development.');
+  }
   if (url.username || url.password || url.search || url.hash) {
     throw new Error('ELASTICSEARCH_URL must not contain credentials, a query, or a fragment.');
   }
@@ -337,20 +341,45 @@ export function loadConfig(env = process.env) {
 export function loadUsptoIngestionConfig(env = process.env) {
   return {
     databaseUrl: required(env, 'DATABASE_URL'),
-    usptoBulkListingUrl: env.USPTO_BULK_LISTING_URL?.trim() || undefined,
+    usptoBulkListingUrl: env.USPTO_BULK_LISTING_URL === undefined
+      ? undefined : registryListingUrl(env.USPTO_BULK_LISTING_URL),
   };
 }
 
 export function loadElasticsearchSyncConfig(env = process.env) {
   return {
     databaseUrl: required(env, 'DATABASE_URL'),
-    elasticsearchUrl: required(env, 'ELASTICSEARCH_URL'),
-    elasticsearchIndex: env.ELASTICSEARCH_INDEX?.trim() || 'trademarks_composite',
+    elasticsearchUrl: elasticsearchSearchUrl(env),
+    elasticsearchIndex: elasticsearchIndexName(env.ELASTICSEARCH_INDEX?.trim() || 'trademarks_composite'),
   };
 }
 
 export function loadElasticsearchIndexConfig(env = process.env) {
   return {
-    elasticsearchUrl: required(env, 'ELASTICSEARCH_URL'),
+    elasticsearchUrl: elasticsearchSearchUrl(env),
   };
+}
+
+function elasticsearchIndexName(value) {
+  if (!/^[a-z][a-z0-9_-]{0,254}$/.test(value)) {
+    throw new Error('ELASTICSEARCH_INDEX must use a lower-case Elasticsearch index name.');
+  }
+  return value;
+}
+
+function registryListingUrl(raw) {
+  const value = raw?.trim();
+  if (!value) throw new Error('USPTO_BULK_LISTING_URL must be a valid HTTP(S) URL.');
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error('USPTO_BULK_LISTING_URL must be a valid HTTP(S) URL.');
+  }
+  const loopback = ['127.0.0.1', 'localhost', '::1'].includes(url.hostname);
+  if (!['http:', 'https:'].includes(url.protocol) || (url.protocol !== 'https:' && !loopback)
+    || url.username || url.password || url.hash) {
+    throw new Error('USPTO_BULK_LISTING_URL must use HTTPS except for loopback and must not contain credentials or a fragment.');
+  }
+  return url.toString();
 }

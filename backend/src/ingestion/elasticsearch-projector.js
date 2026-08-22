@@ -42,8 +42,18 @@ export class ElasticsearchProjector {
     indexName = TRADEMARKS_COMPOSITE_INDEX,
     fetchImpl = globalThis.fetch,
   }) {
-    if (!baseUrl?.trim()) throw new Error('ELASTICSEARCH_URL is required for projection.');
-    this.baseUrl = baseUrl.replace(/\/$/, '');
+    let parsed;
+    try { parsed = new URL(baseUrl); } catch { throw new TypeError('ELASTICSEARCH_URL is required for projection.'); }
+    const loopback = ['127.0.0.1', 'localhost', '::1'].includes(parsed.hostname);
+    if (!['http:', 'https:'].includes(parsed.protocol) || (parsed.protocol !== 'https:' && !loopback)
+      || parsed.username || parsed.password || parsed.search || parsed.hash) {
+      throw new TypeError('ELASTICSEARCH_URL must be a credential-free HTTPS URL except for loopback development.');
+    }
+    if (typeof indexName !== 'string' || !/^[a-z][a-z0-9_-]{0,254}$/.test(indexName)) {
+      throw new TypeError('Elasticsearch index name is invalid.');
+    }
+    if (typeof fetchImpl !== 'function') throw new TypeError('Elasticsearch projector needs fetch.');
+    this.baseUrl = parsed.toString().replace(/\/$/, '');
     this.indexName = indexName;
     this.fetchImpl = fetchImpl;
   }

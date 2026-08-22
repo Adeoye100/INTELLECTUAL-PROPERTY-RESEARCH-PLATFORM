@@ -212,7 +212,7 @@ Supabase provides two primary connection methods:
 1.  **Direct Connection (Port 5432)**: Use this for migrations and maintenance. The host follows the pattern `db.[REF].supabase.co`.
 2.  **Pooled Connection (Port 6543)**: Use this for the running application to handle connection pooling efficiently in serverless or highly concurrent environments. The host follows the pattern `[REF].pooler.supabase.com` (or similar depending on your region).
 
-Both methods require SSL. In the IPRP backend, this is enabled by setting `DATABASE_SSL=true` in the environment. The `pg` driver is configured to accept Supabase's certificate (using `rejectUnauthorized: false` for compatibility across various Node.js environments).
+Both methods require SSL. In the IPRP backend, this is enabled by setting `DATABASE_SSL=true` in the environment. The `pg` driver verifies the server certificate (`rejectUnauthorized: true`); deployment must provide a trust chain accepted by the Node runtime rather than disabling certificate verification.
 
 ## USPTO ingestion and Elasticsearch projection
 
@@ -1091,3 +1091,33 @@ filesystem root, Redis, PostgreSQL migration application, and worker process.
 Live Redis/storage permissions and disposable-staging export verification are
 operational gates. BE-20 does not change the deferred BE-14 billing decision or
 any existing Phase 2/BE-18 staging gate.
+
+## BE-21 repository-local security hardening
+
+BE-21 performed a repository-local review of BE-03 through BE-20; the complete
+traceable record is in `../Documentations/09-internal-security-review.md`. It
+does not claim a penetration test, a live-service review, migration application,
+or completion of BE-22.
+
+The API now applies a 4 KB request-target limit and 16 KB JSON limit before
+routing, emits stable `REQUEST_TARGET_TOO_LARGE` (414) and
+`REQUEST_BODY_TOO_LARGE` (413) responses, and adds restrictive API security
+headers. The audit cursor is capped at 512 characters; recursive audit
+redaction also catches case-insensitive sensitive key fragments. Queue payloads
+are capped at 1 KB before parsing. These are compatibility-preserving limits
+for existing bounded API contracts.
+
+Outbound Elasticsearch configuration and projection accept credential-free
+HTTPS URLs, allowing plain HTTP only for `localhost`, `127.0.0.1`, or `::1`
+development endpoints. The index is restricted to a lowercase safe-name
+allowlist. The USPTO bulk listing accepts only credential-free HTTP(S) URLs,
+requires HTTPS except for loopback development, applies a 30-second abortable
+request timeout with redirects disabled, and will fetch only same-origin archive
+links discovered from the configured listing. No route accepts an outbound URL,
+host, index, or registry destination from a client.
+
+Completed-export downloads now recheck PDF magic bytes, byte size, and stored
+SHA-256 before streaming. The storage key remains private and never reaches a
+response. The private filesystem root, Redis ACLs, production CORS/ingress, and
+all migration/worker checks remain deployment gates; see the review report for
+the accepted assumptions and BE-22 handoff.

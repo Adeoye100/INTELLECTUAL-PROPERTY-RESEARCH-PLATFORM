@@ -5,6 +5,7 @@ import {
   parseExportRequestId, EXPORT_UUID_PATTERN,
 } from './export-validation.js';
 import { deterministicPdfExportJobId } from './pdf-export-queue.js';
+import { sha256 } from './export-storage.js';
 
 function scope(value, message) {
   if (typeof value !== 'string' || !EXPORT_UUID_PATTERN.test(value)) throw forbidden(message);
@@ -134,7 +135,10 @@ export class ExportService {
     }
     try {
       const body = await this.storage.get({ key: record.storageKey });
-      if (!body) throw new Error('missing');
+      if (!Buffer.isBuffer(body) || !body.subarray(0, 5).equals(Buffer.from('%PDF-'))
+        || body.length !== record.byteSize || sha256(body) !== record.checksumSha256) {
+        throw new Error('invalid export artifact');
+      }
       return { id: record.id, body, mimeType: 'application/pdf' };
     } catch {
       throw new AppError(503, 'EXPORT_DOWNLOAD_UNAVAILABLE', 'Export download is temporarily unavailable.');

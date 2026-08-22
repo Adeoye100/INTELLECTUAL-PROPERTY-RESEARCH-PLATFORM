@@ -55,7 +55,7 @@ describe('registry ingestion boundaries', () => {
     };
     let request;
     const projector = new ElasticsearchProjector({
-      baseUrl: 'http://elasticsearch.test:9200',
+      baseUrl: 'https://elasticsearch.test:9200',
       fetchImpl: async (url, options) => {
         request = { url, options };
         return { ok: true, json: async () => ({ errors: false, items: [] }) };
@@ -66,7 +66,7 @@ describe('registry ingestion boundaries', () => {
       await syncRegistryTrademarksToElasticsearch({ repository, projector }),
       { projected: 1 },
     );
-    assert.equal(request.url, 'http://elasticsearch.test:9200/_bulk');
+    assert.equal(request.url, 'https://elasticsearch.test:9200/_bulk');
     assert.match(request.options.body, /"_index":"trademarks_composite"/);
     assert.match(request.options.body, /"source_registry":"USPTO"/);
     assert.deepEqual(repositoryCalls, [[row]]);
@@ -89,14 +89,14 @@ describe('registry ingestion boundaries', () => {
     };
 
     await projectToElasticsearch(row, {
-      baseUrl: 'http://elasticsearch.test:9200/',
+      baseUrl: 'https://elasticsearch.test:9200/',
       fetchImpl: async (url, options) => {
         request = { url, options };
         return { ok: true, json: async () => ({ errors: false, items: [] }) };
       },
     });
 
-    assert.equal(request.url, 'http://elasticsearch.test:9200/_bulk');
+    assert.equal(request.url, 'https://elasticsearch.test:9200/_bulk');
     const lines = request.options.body.trim().split('\n').map(JSON.parse);
     assert.deepEqual(lines, [
       { index: { _index: 'trademarks_composite', _id: row.id } },
@@ -128,7 +128,7 @@ describe('registry ingestion boundaries', () => {
     };
 
     await projectToElasticsearch(row, {
-      baseUrl: 'http://elasticsearch.test:9200',
+      baseUrl: 'https://elasticsearch.test:9200',
       fetchImpl: async (url, options) => {
         request = { url, options };
         return { ok: true, json: async () => ({ errors: false, items: [] }) };
@@ -158,7 +158,7 @@ describe('registry ingestion boundaries', () => {
           source_registry: 'USPTO',
           source_reference_id: sourceReferenceId,
         }, {
-          baseUrl: 'http://elasticsearch.test:9200',
+          baseUrl: 'https://elasticsearch.test:9200',
           fetchImpl: async () => {
             fetched = true;
             return { ok: true, json: async () => ({ errors: false, items: [] }) };

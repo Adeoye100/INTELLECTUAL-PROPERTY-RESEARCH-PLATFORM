@@ -10,6 +10,7 @@ import { WatchIngestProcessor } from '../../src/watch/watch-ingest-processor.js'
 import { WatchScheduler } from '../../src/watch/watch-scheduler.js';
 import { WatchService } from '../../src/watch/watch-service.js';
 import { createWatchRuntime } from '../../src/watch/watch-runtime.js';
+import { WatchWorker } from '../../src/watch/watch-worker.js';
 import { createWatchRouter } from '../../src/routes/watch-routes.js';
 
 const firmId = '11111111-1111-4111-8111-111111111111';
@@ -146,6 +147,8 @@ describe('watch queue and scheduling', () => {
     assert.equal(deterministicWatchJobId(watchId, scheduledFor), deterministicWatchJobId(watchId, scheduledFor));
     assert.deepEqual(validateWatchJob(job()), job());
     assert.throws(() => validateWatchJob({ ...job(), firmId: 'bad' }), { code: 'WATCH_JOB_INVALID' });
+    const poisoned = fakeRedis({ async rPop() { return '{"padding":"'.concat('a'.repeat(2_000), '"}'); } });
+    await assert.rejects(() => new RedisWatchIngestQueue({ redisClient: poisoned }).dequeue(), { code: 'WATCH_JOB_INVALID' });
     const queue = new RedisWatchIngestQueue({ redisClient: fakeRedis() });
     assert.equal((await queue.enqueue(job())).enqueued, true);
     assert.equal((await queue.enqueue(job())).deduplicated, true);
@@ -237,6 +240,30 @@ describe('watch ingest processor', () => {
     });
     assert.deepEqual(await failed.process(job()), { outcome: 'failed', code: 'WATCH_SEARCH_FAILED', retryable: true });
     assert.equal(updates[0].errorCode, 'WATCH_SEARCH_FAILED');
+  });
+});
+
+describe('watch worker retry boundary', () => {
+  it('requeues only bounded retryable jobs with a fresh deterministic ID and backoff', async () => {
+    const queued = [job(), null];
+    const retries = [];
+    const worker = new WatchWorker({
+      scheduler: { async runOnce() { return { selected: 0 }; } },
+      queue: {
+        async dequeue() { return queued.shift(); },
+        async enqueue(next) { retries.push(next); return { enqueued: true }; },
+      },
+      processor: { async process() { return { outcome: 'failed', code: 'WATCH_SEARCH_FAILED', retryable: true }; } },
+      intervalMs: 1_000, maxJobsPerTick: 2, clock,
+    });
+    worker.accepting = true;
+    const summary = await worker.runOnce();
+    assert.equal(summary.outcomes[0].retryScheduled, true);
+    assert.deepEqual(retries, [{
+      version: 1,
+      jobId: deterministicWatchJobId(watchId, '2026-08-21T00:00:01.000Z'),
+      watchId, firmId, portfolioMarkId: markId, scheduledFor: '2026-08-21T00:00:01.000Z', attempt: 1,
+    }]);
   });
 });
 

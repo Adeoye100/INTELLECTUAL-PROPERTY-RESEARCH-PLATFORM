@@ -12,6 +12,7 @@ import {
 import { parseUsptoBulkXml } from './bulk-xml-parser.js';
 
 const DAILY_FILE_PATTERN = /href\s*=\s*["']([^"']*apc(\d{6})\.zip(?:\?[^"']*)?)["']/gi;
+const REGISTRY_TIMEOUT_MS = 30_000;
 
 function toNodeReadable(body) {
   if (!body) throw new Error('USPTO response did not contain a body.');
@@ -54,18 +55,32 @@ export class UsptoBulkXmlAdapter extends RegistryAdapter {
     fetchImpl = globalThis.fetch,
   } = {}) {
     super(USPTO_BULK_SOURCE_NAME);
-    this.listingUrl = listingUrl;
+    let parsed;
+    try { parsed = new URL(listingUrl); } catch { throw new TypeError('USPTO bulk listing URL must be a valid HTTP(S) URL.'); }
+    const loopback = ['127.0.0.1', 'localhost', '::1'].includes(parsed.hostname);
+    if (!['http:', 'https:'].includes(parsed.protocol) || (parsed.protocol !== 'https:' && !loopback)
+      || parsed.username || parsed.password || parsed.hash) {
+      throw new TypeError('USPTO bulk listing URL must use credential-free HTTPS except for loopback testing.');
+    }
+    if (typeof fetchImpl !== 'function') throw new TypeError('USPTO bulk adapter needs fetch.');
+    this.listingUrl = parsed.toString();
+    this.listingOrigin = parsed.origin;
     this.fetchImpl = fetchImpl;
   }
 
   async discoverUpdates(since) {
     const response = await this.fetchImpl(this.listingUrl, {
       headers: { Accept: 'text/html,application/xhtml+xml' },
+      redirect: 'error',
+      signal: AbortSignal.timeout(REGISTRY_TIMEOUT_MS),
     });
     if (!response.ok) {
       throw new RegistryHttpError(this.sourceName, 'daily-file discovery', response.status);
     }
-    const links = dailyFileLinks(await response.text(), this.listingUrl);
+    const links = dailyFileLinks(await response.text(), this.listingUrl)
+      // A listing is upstream input. Archive URLs must remain on the explicit
+      // configured listing origin, never become arbitrary fetch destinations.
+      .filter((link) => new URL(link.url).origin === this.listingOrigin);
     if (!links.length) {
       throw new Error(
         `${this.sourceName} listing contained no apcYYMMDD.zip links; `
@@ -95,9 +110,11 @@ export class UsptoBulkXmlAdapter extends RegistryAdapter {
     for (const update of updates) {
       const response = await this.fetchImpl(update.url, {
         headers: { Accept: 'application/zip,application/octet-stream' },
+        redirect: 'error',
+        signal: AbortSignal.timeout(REGISTRY_TIMEOUT_MS),
       });
       if (!response.ok) {
-        throw new RegistryHttpError(this.sourceName, `download ${update.url}`, response.status);
+        throw new RegistryHttpError(this.sourceName, 'daily archive download', response.status);
       }
       yield* this.parseArchive(response.body);
     }

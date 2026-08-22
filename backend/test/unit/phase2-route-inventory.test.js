@@ -15,6 +15,10 @@ const portfolioInput = {
 };
 
 const watchInput = { portfolioMarkId: recordId, state: 'enabled', pollIntervalMinutes: 60 };
+const officeActionInput = {
+  sourceRegistry: 'USPTO', sourceReferenceId: 'OA-001', documentType: 'office_action', summaryMethod: 'manual',
+};
+const exportInput = { type: 'search_results', sourceEntityId: recordId, parameters: {}, idempotencyKey: 'phase2-inventory' };
 
 function record(overrides = {}) {
   return { id: recordId, firmId, ownerUserId: userId, markText: 'PHASE TWO', ...overrides };
@@ -84,6 +88,9 @@ function createTestApp({ calls = [] } = {}) {
       async listSearchResults() { return { searchResults: [], nextCursor: null }; },
       async getSearchResult() { return {}; },
     },
+    officeActionSearchService: {
+      async searchOfficeActions() { return { results: [], sourceStatuses: [], partial: false, requestId: 'office-action-1' }; },
+    },
     portfolioMarkService: {
       async createPortfolioMark(payload) { calls.push(['portfolio.create', payload]); return record(); },
       async listPortfolioMarks(payload) { calls.push(['portfolio.list', payload]); return list; },
@@ -106,6 +113,19 @@ function createTestApp({ calls = [] } = {}) {
     },
     auditService: { async list(payload) { calls.push(['audit.list', payload]); return { auditLogs: [], nextCursor: null }; } },
     userRoleService: { async changeRole(payload) { calls.push(['user.role', payload]); return { id: payload.targetUserId, role: payload.input.role, active: true }; } },
+    officeActionRefService: {
+      async createOfficeActionRef(payload) { calls.push(['office-action.create', payload]); return { id: recordId, ...officeActionInput }; },
+      async listOfficeActionRefs(payload) { calls.push(['office-action.list', payload]); return list; },
+      async getOfficeActionRef(payload) { ensureFirm(payload.firmId); return { id: recordId, ...officeActionInput }; },
+      async updateOfficeActionRef(payload) { ensureFirm(payload.firmId); return { id: recordId, ...officeActionInput, ...payload.input }; },
+      async deleteOfficeActionRef(payload) { ensureFirm(payload.firmId); },
+    },
+    exportService: {
+      async createExport(payload) { calls.push(['export.create', payload]); return { created: true, export: { id: recordId, status: 'queued' } }; },
+      async listExports(payload) { calls.push(['export.list', payload]); return { exports: [], nextCursor: null }; },
+      async getExport(payload) { ensureFirm(payload.firmId); return { id: recordId, status: 'completed' }; },
+      async download(payload) { ensureFirm(payload.firmId); return { id: recordId, mimeType: 'application/pdf', body: Buffer.from('%PDF-test') }; },
+    },
   });
 }
 
@@ -125,6 +145,8 @@ describe('Phase 2 mounted route inventory', () => {
       ['GET', '/api/v1/admin/ping'], ['GET', '/api/v1/attorney/ping', undefined, 'attorney-token'],
       ['GET', '/api/v1/viewer/ping', undefined, 'viewer-token'], ['GET', `/api/v1/firms/${firmId}/ping`],
       ['GET', '/api/v1/search?mark=PHASE2'],
+      ['GET', '/api/v1/search-results'], ['GET', `/api/v1/search-results/${recordId}`],
+      ['GET', '/api/v1/office-actions/search?markText=PHASE2'],
       ['POST', '/api/v1/portfolio-marks', portfolioInput], ['GET', '/api/v1/portfolio-marks'],
       ['GET', `/api/v1/portfolio-marks/${recordId}`], ['PATCH', `/api/v1/portfolio-marks/${recordId}`, { status: 'filed' }],
       ['DELETE', `/api/v1/portfolio-marks/${recordId}`],
@@ -133,6 +155,13 @@ describe('Phase 2 mounted route inventory', () => {
       ['GET', '/api/v1/alerts'], ['GET', `/api/v1/alerts/${recordId}`],
       ['PATCH', `/api/v1/alerts/${recordId}`, { action: 'read' }], ['GET', '/api/v1/audit-logs'],
       ['PATCH', `/api/v1/users/${recordId}/role`, { role: 'viewer' }],
+      ['POST', `/api/v1/portfolio-marks/${recordId}/office-action-refs`, officeActionInput],
+      ['GET', `/api/v1/portfolio-marks/${recordId}/office-action-refs`],
+      ['GET', `/api/v1/portfolio-marks/${recordId}/office-action-refs/${recordId}`],
+      ['PATCH', `/api/v1/portfolio-marks/${recordId}/office-action-refs/${recordId}`, { documentType: 'final_office_action' }],
+      ['DELETE', `/api/v1/portfolio-marks/${recordId}/office-action-refs/${recordId}`],
+      ['POST', '/api/v1/exports', exportInput], ['GET', '/api/v1/exports'],
+      ['GET', `/api/v1/exports/${recordId}`], ['GET', `/api/v1/exports/${recordId}/download`],
     ];
     for (const [method, path, body, token] of routes) {
       let request_ = request(app)[method.toLowerCase()](path);
@@ -148,17 +177,19 @@ describe('Phase 2 mounted route inventory', () => {
 describe('Phase 2 authorization and firm-isolation regression matrix', () => {
   it('rejects unauthenticated access and keeps viewer access read-only', async () => {
     const app = createTestApp();
-    for (const path of ['/api/v1/me', '/api/v1/search?mark=PHASE2', '/api/v1/portfolio-marks', '/api/v1/watches', '/api/v1/alerts', '/api/v1/audit-logs']) {
+    for (const path of ['/api/v1/me', '/api/v1/search?mark=PHASE2', '/api/v1/search-results', '/api/v1/office-actions/search?markText=PHASE2', '/api/v1/portfolio-marks', '/api/v1/watches', '/api/v1/alerts', '/api/v1/audit-logs', '/api/v1/exports']) {
       assert.equal((await request(app).get(path)).status, 401, path);
     }
     for (const [method, path, body] of [
       ['post', '/api/v1/portfolio-marks', portfolioInput],
       ['post', '/api/v1/watches', watchInput],
       ['patch', `/api/v1/alerts/${recordId}`, { action: 'read' }],
+      ['post', `/api/v1/portfolio-marks/${recordId}/office-action-refs`, officeActionInput],
+      ['post', '/api/v1/exports', exportInput],
     ]) {
       assert.equal((await authenticated(request(app)[method](path), 'viewer-token').send(body)).status, 403, path);
     }
-    for (const path of ['/api/v1/search?mark=PHASE2', '/api/v1/portfolio-marks', '/api/v1/watches', '/api/v1/alerts']) {
+    for (const path of ['/api/v1/search?mark=PHASE2', '/api/v1/search-results', '/api/v1/office-actions/search?markText=PHASE2', '/api/v1/portfolio-marks', '/api/v1/watches', '/api/v1/alerts']) {
       assert.equal((await authenticated(request(app).get(path), 'viewer-token')).status, 200, path);
     }
   });
@@ -172,6 +203,8 @@ describe('Phase 2 authorization and firm-isolation regression matrix', () => {
     assert.equal((await authenticated(request(app).post('/api/v1/portfolio-marks'), 'attorney-token').send(portfolioInput)).status, 201);
     assert.equal((await authenticated(request(app).post('/api/v1/watches'), 'attorney-token').send(watchInput)).status, 201);
     assert.equal((await authenticated(request(app).patch(`/api/v1/alerts/${recordId}`), 'attorney-token').send({ action: 'dismiss' })).status, 200);
+    assert.equal((await authenticated(request(app).post(`/api/v1/portfolio-marks/${recordId}/office-action-refs`), 'attorney-token').send(officeActionInput)).status, 201);
+    assert.equal((await authenticated(request(app).post('/api/v1/exports'), 'attorney-token').send(exportInput)).status, 202);
     assert.equal((await authenticated(request(app).get('/api/v1/audit-logs'), 'admin-token')).status, 200);
   });
 
@@ -180,9 +213,23 @@ describe('Phase 2 authorization and firm-isolation regression matrix', () => {
     const app = createTestApp({ calls });
     const crossFirm = await authenticated(request(app).get(`/api/v1/portfolio-marks/${recordId}`), 'other-admin-token');
     assert.equal(crossFirm.status, 404);
+    const crossFirmNested = await authenticated(
+      request(app).get(`/api/v1/portfolio-marks/${recordId}/office-action-refs/${recordId}`),
+      'other-admin-token',
+    );
+    assert.equal(crossFirmNested.status, 404);
+    const crossFirmExport = await authenticated(request(app).get(`/api/v1/exports/${recordId}`), 'other-admin-token');
+    assert.equal(crossFirmExport.status, 404);
     const invalidOverride = await authenticated(request(app).post('/api/v1/portfolio-marks'), 'admin-token')
       .send({ ...portfolioInput, firmId: otherFirmId });
     assert.equal(invalidOverride.status, 400);
+    const nestedOverride = await authenticated(request(app).post(`/api/v1/portfolio-marks/${recordId}/office-action-refs`), 'admin-token')
+      .send({ ...officeActionInput, firmId: otherFirmId });
+    assert.equal(nestedOverride.status, 400);
+    const exportOverride = await authenticated(request(app).post('/api/v1/exports'), 'admin-token')
+      .send({ ...exportInput, firmId: otherFirmId });
+    assert.equal(exportOverride.status, 400);
     assert.equal(calls.some(([name]) => name === 'portfolio.create'), false);
+    assert.equal(calls.some(([name]) => name === 'office-action.create' || name === 'export.create'), false);
   });
 });

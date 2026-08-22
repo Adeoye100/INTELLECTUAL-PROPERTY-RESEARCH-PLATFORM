@@ -18,6 +18,7 @@ export function validateExportStorageKey(value) {
 export function sha256(value) { return createHash('sha256').update(value).digest('hex'); }
 function validBody(body, maximumBytes) {
   if (!Buffer.isBuffer(body) || body.length < 1 || body.length > maximumBytes) throw new TypeError('Export PDF bytes are invalid or exceed the configured limit.');
+  if (!body.subarray(0, 5).equals(Buffer.from('%PDF-'))) throw new TypeError('Export bytes are not a PDF document.');
   return body;
 }
 function contentType(value) {

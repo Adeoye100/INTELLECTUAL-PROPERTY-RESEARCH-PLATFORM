@@ -12,6 +12,7 @@ const SENSITIVE_KEYS = new Set([
   'authorization', 'cookie', 'secret', 'apikey', 'privatekey', 'clientsecret',
   'jwt', 'sessiontoken',
 ]);
+const SENSITIVE_KEY_FRAGMENT = /(password|token|authorization|cookie|secret|apikey|privatekey|clientsecret|jwt)/;
 const POLLUTION_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
 function invalid(message = 'Audit payload must contain JSON-safe values.') {
@@ -64,7 +65,8 @@ function sanitizeValue(value, { depth, limits, ancestors }) {
       if (POLLUTION_KEYS.has(key)) continue;
       const descriptor = Object.getOwnPropertyDescriptor(value, key);
       if (!descriptor || !Object.hasOwn(descriptor, 'value')) throw invalid();
-      sanitized[key] = SENSITIVE_KEYS.has(normalizedKey(key))
+      const normalized = normalizedKey(key);
+      sanitized[key] = SENSITIVE_KEYS.has(normalized) || SENSITIVE_KEY_FRAGMENT.test(normalized)
         ? AUDIT_REDACTION
         : sanitizeValue(descriptor.value, { depth: depth + 1, limits, ancestors });
     }

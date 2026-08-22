@@ -11,8 +11,9 @@ const TYPE_SET = new Set(EXPORT_TYPES);
 const STATUS_SET = new Set(EXPORT_STATUSES);
 
 function invalid(code, message, field) { throw badRequest(code, message, field ? { field } : undefined); }
-function object(value, field = 'body') {
-  if (!value || typeof value !== 'object' || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype) {
+function object(value, field = 'body', { allowNullPrototype = false } = {}) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+    || (Object.getPrototypeOf(value) !== Object.prototype && (!allowNullPrototype || Object.getPrototypeOf(value) !== null))) {
     invalid('EXPORT_REQUEST_INVALID', `${field} must be an object.`, field);
   }
   return value;
@@ -125,7 +126,9 @@ function size(value) {
   return Number(value);
 }
 export function parseExportListQuery(query) {
-  object(query, 'query');
+  // Express's hardened query parser intentionally provides a null-prototype map.
+  // It remains safe here because every key is allowlisted below and output is rebuilt.
+  object(query, 'query', { allowNullPrototype: true });
   const allowed = new Set(['pageSize', 'cursor', 'status', 'type']);
   for (const key of Object.keys(query)) if (!allowed.has(key)) invalid('EXPORT_REQUEST_INVALID', `${key} is not a supported filter.`, key);
   const status = query.status === undefined ? null : text(query.status, 'status', 20);

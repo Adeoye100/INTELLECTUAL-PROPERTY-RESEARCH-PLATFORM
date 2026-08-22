@@ -618,3 +618,25 @@ attribution, generation time, export ID, and page numbers. Migration
 `012_create_exports.sql` was not applied. Redis, private storage permissions,
 the worker process, migration application, and disposable staging verification
 remain operational gates; BE-14 billing remains explicitly deferred.
+
+## BE-21 API security boundary
+
+BE-21 adds backend-only hardening without a frontend feature change. The API
+rejects request targets longer than 4 KB with `414 REQUEST_TARGET_TOO_LARGE`
+and JSON bodies over 16 KB with `413 REQUEST_BODY_TOO_LARGE`; clients should
+not retry either unchanged request. Existing endpoint-level field, pagination,
+cursor, metadata, and export limits still apply and may return their established
+`400` validation codes.
+
+Responses and audit records do not include Authorization headers, cookies,
+tokens, raw request bodies, storage keys, filesystem paths, signed URLs, stack
+traces, or infrastructure error details. A completed export download is
+revalidated for PDF signature, recorded byte size, and SHA-256 integrity before
+it is sent; a failed integrity check returns `503 EXPORT_DOWNLOAD_UNAVAILABLE`.
+
+No firm selector is accepted by any API body or query: all current and future
+calls must rely on the verified membership represented by the Bearer token.
+Production origin/proxy/TLS deployment values and the private storage root are
+operational configuration, not a frontend-controlled contract. The full
+repository-local review and its BE-22 handoff are recorded in
+`09-internal-security-review.md`; BE-14 remains explicitly deferred.

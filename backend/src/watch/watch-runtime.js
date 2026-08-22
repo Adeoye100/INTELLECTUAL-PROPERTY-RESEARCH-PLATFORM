@@ -14,7 +14,7 @@ export function createWatchRuntime({ config, redisClient, watchRepository, searc
   });
   const worker = new WatchWorker({
     scheduler, queue, processor, intervalMs: config.watchSchedulerIntervalMs,
-    maxJobsPerTick: config.watchSchedulerBatchSize,
+    maxJobsPerTick: config.watchSchedulerBatchSize, clock,
   });
   return { queue, scheduler, processor, worker };
 }

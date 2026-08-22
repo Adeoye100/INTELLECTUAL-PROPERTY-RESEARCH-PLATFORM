@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { EXPORT_UUID_PATTERN } from './export-validation.js';
 
 export const PDF_EXPORT_QUEUE = 'queue:pdf_export';
+export const MAX_PDF_EXPORT_QUEUE_JOB_BYTES = 1024;
 export class PdfExportQueueError extends Error {
   constructor(code = 'EXPORT_QUEUE_UNAVAILABLE') { super('PDF export queue is unavailable.'); this.code = code; }
 }
@@ -34,6 +35,10 @@ export class RedisPdfExportQueue {
     if (typeof queueKey !== 'string' || !/^queue:[a-z0-9:_-]{1,100}$/.test(queueKey) || !Number.isSafeInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 10) {
       throw new TypeError('RedisPdfExportQueue needs valid queue configuration.');
     }
+    if (!Number.isSafeInteger(dedupeTtlSeconds) || dedupeTtlSeconds < 60 || dedupeTtlSeconds > 604_800
+      || !Number.isSafeInteger(lockTtlMs) || lockTtlMs < 1_000 || lockTtlMs > 3_600_000) {
+      throw new TypeError('RedisPdfExportQueue needs bounded TTL configuration.');
+    }
     this.redisClient = redisClient; this.queueKey = queueKey; this.maxAttempts = maxAttempts;
     this.dedupeTtlSeconds = dedupeTtlSeconds; this.lockTtlMs = lockTtlMs;
   }
@@ -60,7 +65,12 @@ export class RedisPdfExportQueue {
     let raw;
     try { raw = await this.redisClient.eval(DEQUEUE, { keys: [this.queueKey, this.scheduledKey()], arguments: [String(Date.now())] }); } catch { throw new PdfExportQueueError(); }
     if (raw === null) return null;
-    try { return validatePdfExportJob(JSON.parse(raw), this.maxAttempts); } catch { throw new PdfExportQueueError('EXPORT_JOB_INVALID'); }
+    try {
+      if (typeof raw !== 'string' || Buffer.byteLength(raw, 'utf8') > MAX_PDF_EXPORT_QUEUE_JOB_BYTES) {
+        throw new Error('oversized');
+      }
+      return validatePdfExportJob(JSON.parse(raw), this.maxAttempts);
+    } catch { throw new PdfExportQueueError('EXPORT_JOB_INVALID'); }
   }
   async acquireProcessingLock(jobId) {
     try { const token = randomUUID(); const value = await this.redisClient.set(this.lockKey(jobId), token, { NX: true, PX: this.lockTtlMs }); return value === 'OK' ? token : null; } catch { throw new PdfExportQueueError(); }
