@@ -5,6 +5,7 @@ import { createAuthRouter } from './routes/auth-routes.js';
 import { createProtectedRouter } from './routes/protected-routes.js';
 import { createProvisioningRouter } from './routes/provisioning-routes.js';
 import { createSearchRouter } from './routes/search-routes.js';
+import { createSearchResultRouter } from './routes/search-result-routes.js';
 import { createPortfolioMarkRouter } from './routes/portfolio-mark-routes.js';
 import { createWatchRouter } from './routes/watch-routes.js';
 import { createAlertRouter } from './routes/alert-routes.js';
@@ -15,6 +16,7 @@ import { createAuditRequestContextMiddleware } from './audit/request-context.js'
 
 export function createApp({
   authService, authenticate, authenticateIdentity, provisioningService, searchService = null,
+  searchResultService = null,
   portfolioMarkService = null,
   watchService = null,
   alertService = null,
@@ -42,8 +44,11 @@ export function createApp({
     createProvisioningRouter(authenticateIdentity, provisioningService, { authRateLimiter }),
   );
   app.use('/api/v1', createProtectedRouter(authenticate, authService, { authRateLimiter }));
-  if (searchService) {
-    app.use('/api/v1', createSearchRouter(authenticate, searchService));
+  if (searchService && searchResultService) {
+    app.use('/api/v1', createSearchRouter(authenticate, searchService, { searchResultService }));
+  }
+  if (searchResultService) {
+    app.use('/api/v1', createSearchResultRouter(authenticate, searchResultService));
   }
   if (officeActionSearchService) {
     app.use('/api/v1', createOfficeActionSearchRouter(authenticate, officeActionSearchService, {

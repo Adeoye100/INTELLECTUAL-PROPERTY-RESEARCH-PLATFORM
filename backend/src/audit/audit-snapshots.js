@@ -38,3 +38,8 @@ export function officeActionRefAuditSnapshot(record) {
     'summaryMethod', 'sourceDocumentUrl', 'sourceMetadata',
   ]);
 }
+
+/** A bounded summary only; immutable search evidence stays in search_results. */
+export function searchExecutionAuditSnapshot(record) {
+  return pick(record, ['searchId', 'resultCount', 'partial', 'methodologyVersions']);
+}

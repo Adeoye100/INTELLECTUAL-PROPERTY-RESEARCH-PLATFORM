@@ -21,12 +21,31 @@ function testApp(searchService, calls = []) {
     return next();
   };
   const app = express();
+  const searchId = '99999999-9999-4999-8999-999999999999';
+  const searchResultService = {
+    async persistSearch({ searchResponse }) {
+      return {
+        response: {
+          searchId,
+          results: searchResponse.results.map((hit) => ({
+            id: hit.recordId, searchId, candidateMarkText: hit.markText,
+            candidateSource: hit.sourceRegistry, candidateRef: hit.sourceReferenceId,
+            owner: hit.owner, jurisdiction: hit.jurisdiction, niceClasses: hit.niceClasses,
+            filingDate: hit.filingDate, status: hit.status, riskAnalysis: hit.riskAnalysis,
+          })),
+          sourceStatuses: searchResponse.sourceStatuses,
+          partial: searchResponse.partial,
+          requestId: searchResponse.requestId,
+        },
+      };
+    },
+  };
   app.use('/api/v1', createSearchRouter(authenticate, {
     async search(query) {
       calls.push(query);
       return searchService.search(query);
     },
-  }));
+  }, { searchResultService }));
   app.use(errorHandler);
   return app;
 }
@@ -90,6 +109,7 @@ describe('GET /api/v1/search boundary', () => {
     assert.equal(response.status, 401);
     assert.equal(response.body.code, 'UNAUTHORIZED');
     assert.throws(() => createSearchRouter(() => {}, null), /needs a search service/);
+    assert.throws(() => createSearchRouter(() => {}, successfulSearch()), /needs a search result service/);
   });
 
   it('allows admin, attorney, and viewer roles', async () => {
@@ -141,8 +161,9 @@ describe('GET /api/v1/search boundary', () => {
       .get('/api/v1/search?mark=NIMBL').set('Authorization', 'Bearer attorney-token');
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, {
+      searchId: '99999999-9999-4999-8999-999999999999',
       results: [{
-        id: 'es-id-1', searchId: 'request-1', candidateMarkText: 'NIMBL', candidateSource: 'USPTO',
+        id: 'es-id-1', searchId: '99999999-9999-4999-8999-999999999999', candidateMarkText: 'NIMBL', candidateSource: 'USPTO',
         candidateRef: 'USPTO-123', owner: null, jurisdiction: 'US', niceClasses: [9, 42],
         filingDate: null, status: 'registered', riskAnalysis: riskAnalysisFor({
           recordId: 'es-id-1', sourceRegistry: 'USPTO', sourceReferenceId: 'USPTO-123',

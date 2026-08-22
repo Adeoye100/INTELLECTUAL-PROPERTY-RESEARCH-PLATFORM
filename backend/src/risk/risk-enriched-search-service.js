@@ -119,9 +119,9 @@ export class RiskEnrichedSearchService {
     this.riskScorer = riskScorer;
   }
 
-  async search(query) {
+  async search(query, options = {}) {
     assertQuery(query);
-    const response = await this.searchService.search(query);
+    const response = await this.searchService.search(query, options);
     if (!response || typeof response !== 'object' || !Array.isArray(response.results)) {
       throw new RiskEnrichmentError();
     }

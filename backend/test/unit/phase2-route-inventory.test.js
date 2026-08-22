@@ -63,6 +63,27 @@ function createTestApp({ calls = [] } = {}) {
     },
     provisioningService: { async provisionFirm() { return { firmId, userId }; } },
     searchService: { async search() { return searchResponse(); } },
+    searchResultService: {
+      async persistSearch({ searchResponse: searched }) {
+        const searchId = recordId;
+        return {
+          response: {
+            searchId,
+            results: searched.results.map((hit) => ({
+              id: hit.recordId, searchId, candidateMarkText: hit.markText,
+              candidateSource: hit.sourceRegistry, candidateRef: hit.sourceReferenceId,
+              owner: hit.owner, jurisdiction: hit.jurisdiction, niceClasses: hit.niceClasses,
+              filingDate: hit.filingDate, status: hit.status, riskAnalysis: hit.riskAnalysis,
+            })),
+            sourceStatuses: searched.sourceStatuses,
+            partial: searched.partial,
+            requestId: searched.requestId,
+          },
+        };
+      },
+      async listSearchResults() { return { searchResults: [], nextCursor: null }; },
+      async getSearchResult() { return {}; },
+    },
     portfolioMarkService: {
       async createPortfolioMark(payload) { calls.push(['portfolio.create', payload]); return record(); },
       async listPortfolioMarks(payload) { calls.push(['portfolio.list', payload]); return list; },

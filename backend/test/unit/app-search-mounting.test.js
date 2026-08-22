@@ -14,6 +14,27 @@ function createTestApp(searchService = null, portfolioMarkService = null, watchS
     authenticate,
     authenticateIdentity: authenticate,
     searchService,
+    searchResultService: searchService ? {
+      async persistSearch({ searchResponse }) {
+        const searchId = '99999999-9999-4999-8999-999999999999';
+        return {
+          response: {
+            searchId,
+            results: searchResponse.results.map((hit) => ({
+              id: hit.recordId, searchId, candidateMarkText: hit.markText,
+              candidateSource: hit.sourceRegistry, candidateRef: hit.sourceReferenceId,
+              owner: hit.owner, jurisdiction: hit.jurisdiction, niceClasses: hit.niceClasses,
+              filingDate: hit.filingDate, status: hit.status, riskAnalysis: hit.riskAnalysis,
+            })),
+            sourceStatuses: searchResponse.sourceStatuses,
+            partial: searchResponse.partial,
+            requestId: searchResponse.requestId,
+          },
+        };
+      },
+      async listSearchResults() { return { searchResults: [], nextCursor: null }; },
+      async getSearchResult() { return {}; },
+    } : null,
     portfolioMarkService,
     watchService,
     alertService,

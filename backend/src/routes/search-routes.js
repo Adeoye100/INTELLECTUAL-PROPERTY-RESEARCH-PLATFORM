@@ -4,25 +4,7 @@ import { AppError } from '../errors.js';
 import { RiskEnrichmentError } from '../risk/risk-enriched-search-service.js';
 import { parseSearchQuery } from '../search/search-query.js';
 
-function apiRiskAnalysis(riskAnalysis) {
-  if (!riskAnalysis || typeof riskAnalysis !== 'object') throw new RiskEnrichmentError();
-  return {
-    candidateRecordId: riskAnalysis.candidateRecordId,
-    candidateSource: riskAnalysis.candidateSource,
-    candidateRef: riskAnalysis.candidateRef,
-    phoneticScore: riskAnalysis.phoneticScore,
-    visualScore: riskAnalysis.visualScore,
-    conceptualScore: riskAnalysis.conceptualScore,
-    classOverlap: riskAnalysis.classOverlap,
-    classOverlapScore: riskAnalysis.classOverlapScore,
-    compositeScore: riskAnalysis.compositeScore,
-    compositeRating: riskAnalysis.compositeRating,
-    methodology: riskAnalysis.methodology,
-    matchedMarkRefs: riskAnalysis.matchedMarkRefs,
-  };
-}
-
-export function createSearchRouter(authenticate, searchService) {
+export function createSearchRouter(authenticate, searchService, { searchResultService } = {}) {
   const validAuthenticate = typeof authenticate === 'function'
     || (Array.isArray(authenticate) && authenticate.length > 0
       && authenticate.every((middleware) => typeof middleware === 'function'));
@@ -31,6 +13,9 @@ export function createSearchRouter(authenticate, searchService) {
   }
   if (!searchService || typeof searchService.search !== 'function') {
     throw new TypeError('createSearchRouter needs a search service.');
+  }
+  if (!searchResultService || typeof searchResultService.persistSearch !== 'function') {
+    throw new TypeError('createSearchRouter needs a search result service.');
   }
 
   const router = Router();
@@ -41,27 +26,17 @@ export function createSearchRouter(authenticate, searchService) {
     async (request, response, next) => {
       try {
         const query = parseSearchQuery(request.query);
-        const federatedResponse = await searchService.search(query);
-        const results = federatedResponse.results.map((hit) => ({
-          id: hit.recordId,
-          searchId: federatedResponse.requestId,
-          candidateMarkText: hit.markText,
-          candidateSource: hit.sourceRegistry,
-          candidateRef: hit.sourceReferenceId,
-          owner: hit.owner,
-          jurisdiction: hit.jurisdiction,
-          niceClasses: hit.niceClasses,
-          filingDate: hit.filingDate,
-          status: hit.status,
-          riskAnalysis: apiRiskAnalysis(hit.riskAnalysis),
-        }));
-
-        response.json({
-          results,
-          sourceStatuses: federatedResponse.sourceStatuses,
-          partial: federatedResponse.partial,
-          requestId: federatedResponse.requestId,
+        const federatedResponse = await searchService.search(query, {
+          requestId: request.auditContext?.requestId ?? null,
         });
+        const persisted = await searchResultService.persistSearch({
+          firmId: request.auth.firmId,
+          requestedByUserId: request.auth.userId,
+          query,
+          searchResponse: federatedResponse,
+          requestContext: request.auditContext,
+        });
+        response.json(persisted.response);
       } catch (error) {
         if (error instanceof RiskEnrichmentError) {
           return next(new AppError(

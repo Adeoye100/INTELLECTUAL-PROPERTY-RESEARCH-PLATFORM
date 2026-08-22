@@ -60,7 +60,11 @@ export class FederatedSearchService {
     });
   }
 
-  async search(query) {
+  async search(query, { requestId = null } = {}) {
+    const suppliedRequestId = typeof requestId === 'string'
+      && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(requestId)
+      ? requestId
+      : null;
     const settled = await Promise.allSettled(
       this.sources.map((source) => Promise.resolve().then(() => source.search(query))),
     );
@@ -84,7 +88,7 @@ export class FederatedSearchService {
       results,
       sourceStatuses,
       partial: sourceStatuses.some(({ status }) => status === 'unavailable'),
-      requestId: this.requestIdFactory(),
+      requestId: suppliedRequestId ?? this.requestIdFactory(),
     };
   }
 }

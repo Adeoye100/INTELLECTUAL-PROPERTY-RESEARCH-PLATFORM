@@ -16,6 +16,8 @@ import { createApp } from './app.js';
 import { PortfolioMarkRepository } from './portfolio/portfolio-mark-repository.js';
 import { PortfolioMarkService } from './portfolio/portfolio-mark-service.js';
 import { createSearchRuntime } from './search/search-runtime.js';
+import { SearchResultRepository } from './search/search-result-repository.js';
+import { SearchResultService } from './search/search-result-service.js';
 import { WatchRepository } from './watch/watch-repository.js';
 import { WatchService } from './watch/watch-service.js';
 import { createWatchRuntime } from './watch/watch-runtime.js';
@@ -82,6 +84,8 @@ export async function createSystem(config, { officeActionSources = [] } = {}) {
   const auditLogRepository = new AuditLogRepository(pool);
   const auditService = new AuditService({ repository: auditLogRepository });
   const exportAuditService = new ExportAuditService({ auditService });
+  const searchResultRepository = new SearchResultRepository(pool);
+  const searchResultService = new SearchResultService({ repository: searchResultRepository, auditService });
   const authenticate = [
     createSupabaseAuthenticate(supabaseVerifier),
     createResolveRoleAndFirm(roleFirmResolver),
@@ -114,6 +118,7 @@ export async function createSystem(config, { officeActionSources = [] } = {}) {
       authenticateIdentity,
       provisioningService,
       searchService,
+      searchResultService,
       portfolioMarkService,
       watchService,
       alertService,
@@ -153,6 +158,8 @@ export async function createSystem(config, { officeActionSources = [] } = {}) {
     searchSources,
     federatedSearchService,
     searchService,
+    searchResultRepository,
+    searchResultService,
     async close() {
       await Promise.allSettled([redisClient.quit(), pool.end()]);
     },
