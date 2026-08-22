@@ -9,6 +9,7 @@ import { SearchResultRepository } from '../../src/search/search-result-repositor
 import { SearchResultService } from '../../src/search/search-result-service.js';
 import { parseSearchResultListQuery } from '../../src/search/search-result-validation.js';
 import { createSearchResultRouter } from '../../src/routes/search-result-routes.js';
+import { createSearchRouter } from '../../src/routes/search-routes.js';
 
 const firmId = '11111111-1111-4111-8111-111111111111';
 const otherFirmId = '22222222-2222-4222-8222-222222222222';
@@ -160,6 +161,8 @@ describe('search_results snapshot schema and validation', () => {
       rawSearchResponse({ results: [{ ...rawSearchResponse().results[0], sourceReferenceId: '' }] }),
       rawSearchResponse({ results: [{ ...rawSearchResponse().results[0], riskAnalysis: { ...rawSearchResponse().results[0].riskAnalysis, matchedMarkRefs: [] } }] }),
       rawSearchResponse({ sourceStatuses: (() => { const status = { source: 'USPTO', status: 'complete', resultCount: 1 }; status.self = status; return [status]; })() }),
+      rawSearchResponse({ sourceStatuses: [JSON.parse('{"source":"USPTO","status":"complete","resultCount":1,"__proto__":"blocked"}')] }),
+      rawSearchResponse({ results: [{ ...rawSearchResponse().results[0], riskAnalysis: { ...rawSearchResponse().results[0].riskAnalysis, visualScore: Number.NaN } }] }),
     ]) await assert.rejects(
       () => service().service.persistSearch({ firmId, requestedByUserId: actorUserId, query, searchResponse: response }),
       (error) => ['SEARCH_SNAPSHOT_PROVENANCE_INVALID', 'SEARCH_SNAPSHOT_RISK_EVIDENCE_INVALID', 'SEARCH_SNAPSHOT_INVALID'].includes(error.code),
@@ -345,5 +348,26 @@ describe('Search results repository and HTTP routes', () => {
     assert.equal((await request(app).get('/api/v1/search-results/not-a-uuid').set('Authorization', 'admin')).status, 400);
     assert.equal((await request(app).post('/api/v1/search-results').set('Authorization', 'admin')).status, 404);
     assert.equal(calls.every(([, payload]) => payload.firmId === firmId), true);
+  });
+
+  it('persists through the authenticated execution route before returning its durable searchId', async () => {
+    const persisted = service();
+    const authenticate = (req, _res, next) => {
+      if (req.get('authorization') !== 'Bearer token') return next(unauthorized());
+      req.auth = { userId: actorUserId, firmId, role: 'viewer' };
+      req.auditContext = { requestId: 'request-1', ipAddress: null, userAgent: null };
+      return next();
+    };
+    const app = express();
+    app.use('/api/v1', createSearchRouter(authenticate, {
+      async search() { return rawSearchResponse(); },
+    }, { searchResultService: persisted.service }));
+    app.use(errorHandler);
+    const response = await request(app).get('/api/v1/search?mark=FORGE').set('Authorization', 'Bearer token');
+    assert.equal(response.status, 200);
+    assert.equal(response.body.searchId, searchId);
+    assert.equal(response.body.results[0].searchId, searchId);
+    assert.equal(persisted.repository.state.snapshots.length, 1);
+    assert.equal(persisted.recorded.calls.length, 1);
   });
 });

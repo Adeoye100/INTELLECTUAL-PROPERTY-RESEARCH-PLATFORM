@@ -43,7 +43,9 @@ and environment configuration.
 | `GET /api/v1/auth/verify-email/:token` | Verification token in path | `{ verified: true }` | Public holder of token | GET mutation semantics, redirects, caching, already-used behavior |
 | `POST /api/v1/auth/verify-email/resend` | `{ email }` | `202 { accepted: true }` | Public or authenticated unverified user | Anti-enumeration and throttling |
 | `GET /api/v1/dashboard/summary` | No body; candidate `scenario` query exists only in MSW | `DashboardSummary` | Admin, Attorney, Viewer within firm | Aggregate definitions, time zone/range, freshness, partial-section identifiers |
-| `GET /api/v1/search` | Query: `mark`, repeated `jurisdiction`, comma-separated `class`, `status`, `owner`, `filedFrom`, `filedTo`; `resultId` is rejected by the authenticated search boundary (snapshot retrieval remains BE-19) | `SearchResponse` with `results`, per-source statuses, `partial?`, `requestId?`; every result includes transient `riskAnalysis` with BE-10B component scores, `conceptualScore: null`, methodology, provenance, and Visual/Phonetic/Class evidence. `owner` and `filingDate` may be `null` when the registry has no value. Elasticsearch `relevanceScore`, persistent risk IDs, and legal conclusions are not exposed. | Admin, Attorney, Viewer; usage limits server-enforced | GET vs search-job POST, pagination, progressive polling/streaming, canonical result-detail route, source timeout semantics, query limits; frontend `SearchResult` currently types nullable fields and the new `riskAnalysis` contract differently and requires reconciliation before live integration |
+| `GET /api/v1/search` | Query: `mark`, repeated `jurisdiction`, comma-separated `class`, `status`, `owner`, `filedFrom`, `filedTo` | Implemented BE-19 `SearchResponse`: `{ searchId, results, sourceStatuses, partial, requestId }`. Every result uses that immutable `searchId` and includes risk evidence with `conceptualScore: null`; `owner` and `filingDate` may be `null`. Elasticsearch `relevanceScore`, raw responses, and legal conclusions are not exposed. | Admin, Attorney, Viewer | The server persists the normalized result/evidence snapshot transactionally before responding |
+| `GET /api/v1/search-results` | Optional `requestedByUserId`, `createdFrom`, `createdTo`, `partial`, `pageSize`, `cursor` | `{ searchResults, nextCursor }` summaries only | Admin firm-wide; Attorney/Viewer own history only | Bounded cursor pagination, `createdAt DESC, id DESC`; no result arrays in list rows |
+| `GET /api/v1/search-results/:id` | UUID path parameter | Exact historical normalized query, results, source statuses, methodology versions, request ID, and creation time | Admin, Attorney, Viewer in firm | Firm-scoped; never reruns Elasticsearch or recalculates risk |
 | `POST /api/v1/portfolio/import` | `{ searchResultId: string }` | `201 PortfolioMark` | Admin, Attorney | Idempotency, source snapshot, ownership/firm selection, renewal derivation |
 | `GET /api/v1/portfolio-marks` | Implemented canonical list; see BE-11 contract below | `200 { items, pagination }` | Admin, Attorney, Viewer within firm | Frontend must migrate old `/portfolio` mock calls before live use |
 | `POST /api/v1/portfolio-marks` | Implemented canonical create; see BE-11 contract below | `201 PortfolioMark` | Admin, Attorney | Transactional BE-16 audit event included |
@@ -488,3 +490,77 @@ share a transaction with audit events `office_action_ref.created`, `.updated`,
 and `.deleted` (`entityType: office_action_ref`). Snapshots contain only bounded
 reference fields and allow-listed metadata, never raw documents or credentials.
 Migration `010_create_office_action_refs.sql` was not applied.
+
+## BE-19 immutable search-result contract
+
+`GET /api/v1/search` remains the canonical execution route for authenticated
+Admin, Attorney, and Viewer users. BE-19 adds a top-level `searchId` without
+removing the established `results`, `sourceStatuses`, `partial`, or `requestId`
+fields:
+
+```json
+{
+  "searchId": "uuid",
+  "results": [{
+    "id": "source-scoped internal candidate identifier",
+    "searchId": "same uuid",
+    "candidateMarkText": "FORGE GLOBAL",
+    "candidateSource": "USPTO",
+    "candidateRef": "genuine registry reference",
+    "owner": null,
+    "jurisdiction": "US",
+    "niceClasses": [9, 42],
+    "filingDate": null,
+    "status": "registered",
+    "riskAnalysis": { "conceptualScore": null, "methodology": {}, "matchedMarkRefs": [] }
+  }],
+  "sourceStatuses": [{ "source": "USPTO", "status": "complete", "resultCount": 1 }],
+  "partial": false,
+  "requestId": "bounded request ID"
+}
+```
+
+`searchId` is a persistent snapshot UUID, not an Elasticsearch ID, a risk-score
+ID, or a registry reference. It is present even for zero-result searches. The
+server persists the exact normalized query, ordered result/evidence contract,
+source statuses, partial flag, result count, and distinct methodology versions
+before responding. Owner, filing date, and conceptual score retain `null`.
+Elasticsearch relevance, raw Elasticsearch/source payloads, headers, cookies,
+credentials, legal recommendations, and generated legal conclusions are never
+stored or returned.
+
+`GET /api/v1/search-results/:id` returns the exact stored historical snapshot
+without rerunning search or recalculating risk. It is firm-scoped and available
+to Admin, Attorney, and Viewer; a malformed ID is rejected safely and a missing
+or cross-firm ID returns `404 SEARCH_RESULT_NOT_FOUND`.
+
+`GET /api/v1/search-results` returns:
+
+```json
+{ "searchResults": [{ "id": "uuid", "requestedByUserId": "uuid", "requestId": "string", "query": {}, "resultCount": 1, "partial": false, "methodologyVersions": ["confusion-risk-v1.0.0-provisional"], "createdAt": "ISO-8601" }], "nextCursor": null }
+```
+
+It accepts optional `requestedByUserId`, `createdFrom`, `createdTo`, `partial`,
+`pageSize`, and opaque `cursor`. `pageSize` defaults to 25 and is at most 100;
+ordering is `createdAt DESC, id DESC`. Admin can list or filter firm history.
+Attorney and Viewer requests are additionally constrained to their own search
+history even when a requester filter is supplied. There are no snapshot update
+or delete routes.
+
+Retries with the same valid request ID reuse a snapshot only when the normalized
+query and complete response are equivalent; differing content receives
+`409 SEARCH_SNAPSHOT_CONFLICT`. Stable snapshot errors are
+`SEARCH_SNAPSHOT_INVALID`, `SEARCH_SNAPSHOT_TOO_LARGE`,
+`SEARCH_SNAPSHOT_PROVENANCE_INVALID`, `SEARCH_SNAPSHOT_RISK_EVIDENCE_INVALID`,
+`SEARCH_SNAPSHOT_CONFLICT`, `SEARCH_SNAPSHOT_WRITE_FAILED`,
+`SEARCH_RESULT_NOT_FOUND`, and `SEARCH_SNAPSHOT_CURSOR_INVALID`.
+
+The persisted snapshot and one bounded `search.executed` audit event share a
+single transaction. The audit record includes only the search ID, result count,
+partial state, methodology versions, source-name groups, and normalized query
+counts. BE-20 must use the internal
+`loadSearchSnapshotForExport({ firmId, actorUserId, searchResultId })` boundary
+and existing `ExportAuditService` lifecycle hook; it must not recalculate the
+historical search or create a client-facing export-event endpoint. Migration
+`011_create_search_results.sql` was not applied. Snapshot retention and any
+authorized cleanup process remain operational/legal policy decisions.

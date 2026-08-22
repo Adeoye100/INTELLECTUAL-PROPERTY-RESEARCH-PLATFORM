@@ -154,4 +154,10 @@ describe('FederatedSearchService', () => {
     assert.equal((await service.search({ mark: 'NIMBL' })).requestId, 'request-1');
     assert.equal((await service.search({ mark: 'NIMBL' })).requestId, 'request-2');
   });
+
+  it('preserves a valid trusted request ID for retry-safe execution snapshots', async () => {
+    const service = createService([{ sourceName: 'USPTO', search: async () => [] }]);
+    const result = await service.search({ mark: 'NIMBL' }, { requestId: 'request-context-123' });
+    assert.equal(result.requestId, 'request-context-123');
+  });
 });

@@ -86,6 +86,19 @@ describe('RiskEnrichedSearchService', () => {
     });
   });
 
+  it('forwards the trusted execution request ID without changing query inputs', async () => {
+    let options;
+    const underlying = {
+      async search(_query, receivedOptions) {
+        options = receivedOptions;
+        return { results: [result()], sourceStatuses: [], partial: false, requestId: 'request-context-123' };
+      },
+    };
+    await new RiskEnrichedSearchService({ searchService: underlying, riskScorer: createScorer() })
+      .search(query, { requestId: 'request-context-123' });
+    assert.deepEqual(options, { requestId: 'request-context-123' });
+  });
+
   it('enriches every candidate while preserving provenance and response metadata', async () => {
     const statuses = [{ source: 'USPTO', status: 'complete', resultCount: 2 }];
     const response = {

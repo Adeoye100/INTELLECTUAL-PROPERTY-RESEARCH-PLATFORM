@@ -2,7 +2,7 @@ import { AppError, badRequest } from '../errors.js';
 import { AUDIT_UUID_PATTERN } from '../audit/audit-service.js';
 
 export const SEARCH_SNAPSHOT_MAX_RESULTS = 100;
-export const SEARCH_SNAPSHOT_MAX_BYTES = 512 * 1024;
+export const SEARCH_SNAPSHOT_MAX_BYTES = 256 * 1024;
 export const SEARCH_RESULT_LIST_DEFAULT_PAGE_SIZE = 25;
 export const SEARCH_RESULT_LIST_MAX_PAGE_SIZE = 100;
 

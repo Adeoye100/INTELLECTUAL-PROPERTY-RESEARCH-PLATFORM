@@ -77,10 +77,11 @@ no query, mark, registry reference, token, or complete error is logged.
 
 When `SEARCH_ENABLED=true`, the runtime wraps `FederatedSearchService` with this
 decorator and exposes the enriched service to the authenticated search route.
-The API returns transient `riskAnalysis` evidence—not `riskScore`—for every
-candidate, while omitting Elasticsearch `relevanceScore`, persistence IDs, and
-any legal conclusion. The decorator and API projection are code-complete; they
-make no construction-time network calls.
+The API returns `riskAnalysis` evidence—not `riskScore`—for every candidate,
+while omitting Elasticsearch `relevanceScore` and any legal conclusion. BE-19
+adds one immutable persisted `searchId` to the search response and every result;
+that ID is not an Elasticsearch or registry identifier. The decorator and API
+projection make no construction-time network calls.
 
 Before BE-10 can be treated as operationally ready, complete these gates:
 
@@ -95,7 +96,7 @@ Before BE-10 can be treated as operationally ready, complete these gates:
 `FederatedSearchService` is an infrastructure-independent orchestration core;
 it does not add an HTTP route or call Elasticsearch or external registries. Give
 it one or more sources shaped as `{ sourceName: 'USPTO', search: async (query) => [] }`.
-Its `search(query)` runs every source concurrently and returns
+Its `search(query, { requestId? })` runs every source concurrently and returns
 `{ results, sourceStatuses, partial, requestId }`. Source failures and invalid
 non-array outputs are isolated as `unavailable`, while healthy source results
 and their registry attribution are returned in configured-source order. Risk
@@ -943,3 +944,51 @@ OFFICE_ACTION_SEARCH_MAX_RESULTS=25          # 1–100
 
 BE-18 does not resolve any BE-17 Phase 2 staging gate and does not change the
 explicitly deferred BE-14 billing status.
+
+## BE-19 immutable search snapshots
+
+Every successful authenticated `GET /api/v1/search` now creates or reuses one
+firm-scoped immutable `search_results` snapshot before its response is sent.
+The response is additively `{ searchId, results, sourceStatuses, partial,
+requestId }`; all result `searchId` values equal the top-level UUID, including
+for zero-result searches. The search service receives the trusted request-context
+ID, so a retry carrying the same valid request ID is idempotent only when its
+normalized query and complete result/evidence snapshot are equivalent. A
+different snapshot with that ID returns `409 SEARCH_SNAPSHOT_CONFLICT`.
+
+Snapshots contain only the normalized public query, ordered public results,
+registry provenance, complete risk evidence, source statuses, partial flag,
+result count, and the distinct methodology versions used at execution. They
+preserve nullable owner, filing date, and conceptual score values. They never
+store raw Elasticsearch responses, relevance scores, headers, cookies,
+credentials, request bodies, or infrastructure errors. Snapshot validation
+rejects unsafe/circular/non-finite values, prototype-pollution keys, malformed
+provenance/evidence, excessive arrays, and payloads over 256 KiB without
+mutating caller objects.
+
+Snapshot insert and the single `search.executed` audit event share one PostgreSQL
+transaction. The audit event records only `{ searchId, resultCount, partial,
+methodologyVersions }` plus bounded source/count metadata. An audit or snapshot
+write failure rolls the transaction back and returns a safe write failure; no
+search response claims persistence succeeded.
+
+`GET /api/v1/search-results/:id` returns the exact stored historical query,
+results, statuses, partial state, methodology versions, request ID, and creation
+time after authenticated Admin/Attorney/Viewer firm-scoped lookup. It never
+reruns Elasticsearch or risk scoring. `GET /api/v1/search-results` returns
+bounded cursor-paginated summaries (`createdAt DESC, id DESC`); Admin can filter
+the firm by requester while Attorney and Viewer are restricted to their own
+history. There are no update/delete snapshot routes.
+
+`SearchResultService.loadSearchSnapshotForExport({ firmId, actorUserId,
+searchResultId })` is the server-only BE-20 reuse boundary. It returns the stored
+snapshot unchanged after firm/actor validation; it creates no PDF, signed URL,
+or export event and performs no search/risk call. BE-20 must use this loader and
+the existing `ExportAuditService` lifecycle hooks rather than recalculate a
+historical search.
+
+Migration `011_create_search_results.sql` is additive/repeat-safe and was not
+applied here. Search snapshots can contain client research information, so their
+retention/expiry and any authorized cleanup process remain operational/legal
+policy decisions. BE-19 does not resolve existing BE-17/BE-18 staging gates or
+the deferred BE-14 billing exception.

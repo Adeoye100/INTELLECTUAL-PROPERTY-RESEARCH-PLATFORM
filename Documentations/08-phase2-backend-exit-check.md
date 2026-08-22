@@ -234,3 +234,7 @@ Phase 3 work under BE-17.
 BE-18 adds Office Action code and an unapplied migration `010`, but it does not
 resolve, execute, or change any existing Phase 2 staging gate or the BE-14
 exception status.
+
+BE-19 adds immutable search snapshot code and an unapplied migration `011`. It
+does not resolve, execute, or change any existing Phase 2/BE-18 staging gate or
+the BE-14 exception status.

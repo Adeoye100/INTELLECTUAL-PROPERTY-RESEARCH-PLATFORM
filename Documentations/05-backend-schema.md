@@ -120,23 +120,27 @@ boundaries.
 | dismissed_at | timestamptz, nullable | set only for `dismissed` status |
 | updated_at | timestamptz | |
 
-### `searches`
+### `search_results` (immutable historical search snapshot)
 | Column | Type | Notes |
 |---|---|---|
-| id | uuid PK | |
-| user_id | uuid FK | |
-| query_text | text | |
-| filters | jsonb | jurisdiction, class, date range |
-| created_at | timestamptz | |
+| id | uuid PK | one completed search execution; this is the public `searchId` |
+| firm_id | uuid FK → firms, non-null | mandatory tenant boundary |
+| requested_by_user_id | uuid FK → users, non-null | resolved from the authenticated Supabase subject during insert |
+| request_id | varchar(128), non-null | bounded request-context execution ID; unique per firm for retry idempotency |
+| query_snapshot | jsonb object, non-null | exact normalized public query (`mark`, jurisdictions, classes, status, owner, dates) |
+| results_snapshot | jsonb array, non-null | ordered normalized public results and complete risk evidence; no raw Elasticsearch response/relevance score |
+| source_statuses | jsonb array, non-null | ordered complete/unavailable source statuses |
+| partial | boolean, non-null | source degradation state at execution time |
+| result_count | integer, non-null | non-negative and validated against the stored results array before insert |
+| methodology_versions | jsonb array, non-null | distinct risk methodology versions in deterministic first-result order |
+| created_at | timestamptz, non-null | UTC execution snapshot time |
 
-### `search_results` (cached snapshot of what was shown, for audit/export)
-| Column | Type | Notes |
-|---|---|---|
-| id | uuid PK | |
-| search_id | uuid FK | |
-| candidate_mark_text | text | |
-| candidate_source | text | |
-| candidate_ref | text | external ID in source registry |
+Migration `011_create_search_results.sql` adds this append-only table, tenant
+and requester foreign keys, JSON top-level checks, request uniqueness, lookup
+indexes, and a trigger rejecting all update/delete operations. The repository
+exposes insert/read methods only. It was **not applied** by BE-19. Retention or
+expiry cleanup is an operational/legal policy and requires a separately
+authorized administrative process; no hard-delete endpoint exists.
 
 ### `risk_scores`
 | Column | Type | Notes |
@@ -208,7 +212,7 @@ additive/repeat-safe and was **not applied** by BE-18.
 | firm_id | uuid FK → firms, non-null | immutable tenant boundary |
 | actor_user_id | uuid FK → users, non-null | resolved from verified Supabase subject during scoped insert |
 | action | varchar(80) | constrained frozen BE-16 action taxonomy |
-| entity_type | varchar(40) | constrained `portfolio_mark` / `watch` / `alert` / `user` / `export` / `office_action_ref` |
+| entity_type | varchar(40) | constrained `portfolio_mark` / `watch` / `alert` / `user` / `export` / `office_action_ref` / `search_result` |
 | entity_id | uuid, nullable | genuine mutated resource/job ID; never fabricated |
 | before_state | jsonb, nullable | sanitized JSON object only |
 | after_state | jsonb, nullable | sanitized JSON object only |
