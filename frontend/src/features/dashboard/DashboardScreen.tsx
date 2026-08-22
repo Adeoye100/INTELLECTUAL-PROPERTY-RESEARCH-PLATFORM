@@ -48,7 +48,8 @@ export const DashboardScreen: React.FC = () => {
   }
 
   if ('portfolio' in dashboard.data!) return <AnalyticsDashboard data={dashboard.data} onRetry={() => void dashboard.refetch()} />;
-  const summary = { recentAlerts: [], recentSearches: [], searchActivity: [], riskDistribution: [], unavailableSections: [], partial: false, activeWatches: 0, portfolioHealthPercent: 0, portfolioMarkCount: 0, ...(dashboard.data as DashboardSummary) };
+  const legacy = dashboard.data as Partial<DashboardSummary>;
+  const summary = { recentAlerts: [], recentSearches: [], searchActivity: [], riskDistribution: [], unavailableSections: [], partial: false, activeWatches: 0, portfolioHealthPercent: 0, portfolioMarkCount: 0, ...legacy };
   const urgentAlerts = summary.recentAlerts
     .filter((alert) => !alert.resolved && alert.riskLevel === 'high')
     .sort((left, right) => right.detectedAt.localeCompare(left.detectedAt));

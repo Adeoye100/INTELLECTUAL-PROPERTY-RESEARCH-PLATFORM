@@ -25,13 +25,13 @@ import type {
   SearchResponse,
   RiskDetailRouteState,
   RiskLevel,
-  RiskScore,
   Matter,
   MatterSaveRequest,
 } from '../../types';
 import { cn } from '../../lib/utils';
 import { getSearchResult } from './searchApi';
 import { ConfusionRiskBreakdown } from './ConfusionRiskBreakdown';
+import { RiskBadge } from '../../components/visualization/ChartPrimitives';
 
 // ---------------------------------------------------------------------------
 // Risk level presentation helpers
@@ -396,11 +396,7 @@ export const RiskDetailScreen: React.FC = () => {
               >
                 {rp && <rp.Icon className="h-10 w-10" aria-hidden={true} />}
               </div>
-              <p
-                className={cn('text-2xl font-black uppercase tracking-wide', rp?.colour)}
-              >
-                {rp?.label ?? '—'} risk
-              </p>
+              <RiskBadge rating={score.compositeRating} score={score.compositeScore} />
               <p className="mt-1 text-sm font-semibold text-text-primary">
                 Likelihood of confusion
               </p>

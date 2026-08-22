@@ -73,7 +73,7 @@ describe('SearchScreen', () => {
 
     expect(screen.getByText(/USPTO: Responded/)).toBeVisible();
     expect(screen.getByText(/EUIPO: Pending/)).toBeVisible();
-    expect(screen.getByText(/UKIPO: Delayed/)).toBeVisible();
+    expect(screen.getByText(/UKIPO: Pending/)).toBeVisible();
     expect(screen.getByText(/WIPO: Unavailable/)).toBeVisible();
     const bodyRows = within(screen.getByRole('table', { name: /ranked by explicit risk/i })).getAllByRole('row').slice(1);
     expect(bodyRows[0]).toHaveTextContent('FORGE TEK');

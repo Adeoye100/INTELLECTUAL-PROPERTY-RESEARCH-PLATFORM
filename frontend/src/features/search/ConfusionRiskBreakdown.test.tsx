@@ -8,7 +8,7 @@ describe('ConfusionRiskBreakdown', () => {
     expect(screen.getByRole('heading', { name: 'Confusion-risk components' })).toBeInTheDocument();
     expect(screen.getByText('Phonetic similarity')).toBeInTheDocument();
     expect(screen.getByText('Visual similarity')).toBeInTheDocument();
-    expect(screen.getByText('Nice-class overlap')).toBeInTheDocument();
+    expect(screen.getByText('Nice-class overlap score')).toBeInTheDocument();
     expect(screen.getByText('Not supported')).toBeInTheDocument();
     expect(screen.getByText('Visual evidence')).toBeInTheDocument();
   });
