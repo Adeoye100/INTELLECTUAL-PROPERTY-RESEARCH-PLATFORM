@@ -1,50 +1,50 @@
-name: Backend quality
+name: Backend quality and release gates
 
 on:
   pull_request:
-    paths:
-      - 'backend/**'
-      - '.github/workflows/backend-quality.yml'
+    paths: ['backend/**', 'infra/**', '.github/workflows/backend-quality.yml']
   push:
     branches: [main]
-    paths:
-      - 'backend/**'
-      - '.github/workflows/backend-quality.yml'
+    paths: ['backend/**', 'infra/**', '.github/workflows/backend-quality.yml']
+  workflow_dispatch:
+    inputs:
+      run_staging_gate:
+        description: 'Record the provider-blocked staging gate after all checks pass'
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
 
 concurrency:
-  group: backend-quality-${{ github.ref }}
+  group: backend-quality-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   quality:
-    name: Syntax, unit, and real-store integration tests
-    runs-on: ubuntu-latest
+    name: Syntax, unit, and ephemeral-store integration tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:16.6-alpine3.20
         env:
           POSTGRES_DB: iprp_test
           POSTGRES_USER: iprp
           POSTGRES_PASSWORD: iprp-test
-        ports:
-          - 5432:5432
+        ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U iprp -d iprp_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
+          --health-cmd "pg_isready -U iprp -d iprp_test" --health-interval 5s --health-timeout 5s --health-retries 10
       redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
+        image: redis:7.4.2-alpine3.20
+        ports: ['6379:6379']
         options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 10
     defaults:
       run:
         working-directory: backend
@@ -54,36 +54,77 @@ jobs:
       REDIS_URL: redis://127.0.0.1:6379/0
       TEST_REDIS_URL: redis://127.0.0.1:6379/15
       JWT_ACCESS_SECRET: ci-only-secret-that-is-at-least-32-bytes
+      SUPABASE_URL: http://localhost:54321
+      SUPABASE_SECRET_KEY: ci-only-supabase-service-key
+      SUPABASE_JWT_VERIFICATION_MODE: jwks
+      SUPABASE_JWT_ALGORITHMS: ES256
+      AUTH_RATE_LIMIT_KEY_SECRET: separate-ci-rate-limit-secret-at-least-32-bytes
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a
         with:
-          version: 11
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: backend/pnpm-lock.yaml
-
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('backend/pnpm-lock.yaml') }}
+      - name: Enable locked pnpm
+        run: corepack enable && corepack prepare pnpm@11.15.1 --activate
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
+      - name: Check source and static migration inventory
+        run: pnpm check && pnpm migration:check
+      - name: Run isolated migration and tests
+        run: pnpm migrate && pnpm test
 
-      - name: Check JavaScript syntax
-        run: pnpm check
+  security:
+    name: Local secret and advisory gates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Enable locked pnpm
+        run: corepack enable && corepack prepare pnpm@11.15.1 --activate
+      - name: Install locked dependencies
+        working-directory: backend
+        run: pnpm install --frozen-lockfile
+      - name: Tracked-file secret-pattern scan
+        working-directory: backend
+        run: pnpm security:secrets
+      - name: Dependency advisory scan when registry data is available
+        working-directory: backend
+        continue-on-error: true
+        run: pnpm audit --prod --audit-level high
 
-      - name: Run migrations
-        run: pnpm migrate
-
-      - name: Run unit and real-store integration tests
-        run: pnpm test
-
-      - name: Report failure
-        if: failure()
+  container:
+    name: Build API and worker images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Build non-publishing image targets
+        working-directory: backend
         run: |
-          echo '### Backend quality gate failed' >> "$GITHUB_STEP_SUMMARY"
-          echo 'Inspect the failed syntax, migration, or test step above.' >> "$GITHUB_STEP_SUMMARY"
+          docker build --target api --tag iprp-api:ci .
+          docker build --target watch-worker --tag iprp-watch-worker:ci .
+          docker build --target pdf-export-worker --tag iprp-pdf-worker:ci .
+
+  staging-gate:
+    name: Staging deployment and smoke gate
+    needs: [quality, security, container]
+    if: github.event_name == 'workflow_dispatch' && inputs.run_staging_gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: staging
+    steps:
+      - name: Stop before deployment until the provider decision exists
+        run: |
+          echo 'Staging deployment is intentionally blocked: AWS versus GCP has not been selected.'
+          echo 'After provider selection, this gate must deploy the signed image, run pnpm --dir backend test:staging-smoke, and retain non-sensitive evidence.'
+          exit 1
+
+  production-gate:
+    name: Manual production approval gate
+    needs: [staging-gate]
+    if: false # enabled only in a provider-specific pipeline after the architecture decision
+    runs-on: ubuntu-24.04
+    environment: production
+    steps:
+      - run: echo 'Provider-specific deploy, health verification, and rollback remain blocked by ADR-001.'

@@ -20,7 +20,10 @@
     "test:unit": "node --test test/unit/*.test.js",
     "test:integration": "node --env-file=.env --test --test-concurrency=1 test/integration/*.test.js",
     "test:staging-smoke": "node scripts/staging-smoke-test.js",
-    "check": "node scripts/check-source.js"
+    "check": "node scripts/check-source.js",
+    "migration:check": "node scripts/check-migrations.js",
+    "security:secrets": "node scripts/secret-scan.js",
+    "openapi:check": "node scripts/check-openapi.js"
   },
   "keywords": [],
   "author": "ADept - Adeoye Emmanuel Opeyemi",

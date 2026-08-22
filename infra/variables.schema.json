@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "IPRP provider-neutral deployment inputs",
+  "type": "object",
+  "required": ["environment", "region", "availabilityZones", "containerImage", "secretReferences"],
+  "properties": {
+    "environment": { "enum": ["staging", "production"] },
+    "region": { "type": "string", "pattern": "^[a-z0-9-]{3,32}$" },
+    "availabilityZones": { "type": "integer", "minimum": 1, "maximum": 3 },
+    "containerImage": { "type": "string", "minLength": 1 },
+    "secretReferences": { "type": "object", "additionalProperties": { "type": "string", "minLength": 1 } },
+    "remoteState": { "type": "string", "minLength": 1 },
+    "stateLock": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

@@ -7,11 +7,21 @@ const server = system.app.listen(config.port, () => {
   console.log(`IPRP API listening on port ${config.port}.`);
 });
 
+let stopping = false;
 async function shutdown(signal) {
+  if (stopping) return;
+  stopping = true;
   console.log(`Received ${signal}; shutting down.`);
+  const deadline = setTimeout(() => {
+    console.error('Graceful shutdown timed out.');
+    process.exit(1);
+  }, 25_000);
+  deadline.unref();
   server.close(async () => {
-    await system.close();
-    process.exit(0);
+    try {
+      await system.close();
+      process.exitCode = 0;
+    } finally { clearTimeout(deadline); }
   });
 }
 

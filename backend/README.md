@@ -1121,3 +1121,20 @@ SHA-256 before streaming. The storage key remains private and never reaches a
 response. The private filesystem root, Redis ACLs, production CORS/ingress, and
 all migration/worker checks remain deployment gates; see the review report for
 the accepted assumptions and BE-22 handoff.
+
+## BE-22 to BE-26 operational handoff
+
+`GET /healthz` is a public process probe and `GET /readyz` performs only safe
+PostgreSQL/Redis readiness checks, returning a generic `503 NOT_READY` when a
+dependency is unavailable. The image targets are `api`, `watch-worker`, and
+`pdf-export-worker` in `Dockerfile`; they are non-root and never run migrations
+on startup. Use a writable `/tmp` and private export mount when using a
+read-only root filesystem.
+
+`openapi.json` is checked by `pnpm openapi:check` and the unit route-parity
+test. `pnpm migration:check` inspects 001–012 without applying them, and
+`pnpm security:secrets` reports only safe filename/category findings. The k6
+compatible load suite is under `load/`; it has no measured staging result and
+will refuse unsafe targets without explicit opt-in. See the documentation index
+and operations runbook for provider, staging, independent-audit, and failover
+gates. BE-14 remains deferred.

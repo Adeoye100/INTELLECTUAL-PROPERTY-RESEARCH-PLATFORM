@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "reviewedCommit": "6f9a751917741330caae0ddd0502414cf3d0497e",
+  "independentSignoff": "pending",
+  "routeRbacTests": ["security/authorization-matrix.md", "test/unit/phase2-route-inventory.test.js", "test/unit/rbac.test.js", "test/unit/protected-routes.test.js"],
+  "securityRegressionTests": ["test/unit/security-hardening.test.js", "test/unit/bounded-registry-response.test.js", "test/unit/health-routes.test.js", "test/unit/openapi-parity.test.js", "test/unit/auth-rate-limiter.test.js", "test/unit/supabase-verifier.test.js", "test/unit/pdf-exports.test.js", "test/unit/watch-service.test.js"],
+  "migrationInventory": { "directory": "migrations", "range": "001-012", "appliedByThisWork": false, "staticCommand": "pnpm --dir backend migration:check" },
+  "dependencyScan": { "command": "pnpm --dir backend audit --offline", "availability": "no current advisory result; registry resolution failed during BE-21", "decision": "operational gate" },
+  "secretScan": { "command": "pnpm --dir backend security:secrets", "timestamp": "2026-08-22T18:56:56+01:00", "result": "no reportable backend tracked-file pattern finding", "valuesCaptured": false },
+  "openFindings": ["External registry source-specific streaming-limit assurance", "Current dependency advisory data", "Deployment storage/network/session-revocation controls"],
+  "acceptedFindings": ["Supabase-owned refresh/session and bounded membership-cache revocation latency"],
+  "operationalGates": ["Provider ADR-001", "Disposable staging migrations", "Private storage and Redis ACL validation", "Staging authentication/role/export/worker checks", "Independent review"],
+  "reviewCommands": ["pnpm --dir backend check", "pnpm --dir backend test:unit", "pnpm --dir backend security:secrets", "pnpm --dir backend migration:check", "pnpm --dir backend openapi:check"]
+}

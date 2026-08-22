@@ -640,3 +640,13 @@ Production origin/proxy/TLS deployment values and the private storage root are
 operational configuration, not a frontend-controlled contract. The full
 repository-local review and its BE-22 handoff are recorded in
 `09-internal-security-review.md`; BE-14 remains explicitly deferred.
+
+## BE-25 health and readiness contract
+
+`GET /healthz` is public process liveness and returns `{ "status": "ok" }`.
+`GET /readyz` is public, dependency-safe readiness and returns
+`{ "status": "ready" }` only when the configured PostgreSQL and Redis checks
+succeed; otherwise it returns `503 NOT_READY` without infrastructure names,
+credentials, or stack details. These endpoints are operational probes, not a
+client authorization/session substitute. The canonical machine-readable reference
+is `backend/openapi.json` and is checked against the mounted route inventory.

@@ -1,23 +1,27 @@
-import { Readable } from 'node:stream';
 import unzipper from 'unzipper';
 import {
   NotSupportedError,
   RegistryAdapter,
   RegistryHttpError,
+  RegistryResponseSizeError,
 } from '../registry-adapter.js';
 import {
   DEFAULT_USPTO_BULK_LISTING_URL,
   USPTO_BULK_SOURCE_NAME,
 } from './constants.js';
 import { parseUsptoBulkXml } from './bulk-xml-parser.js';
+import {
+  DEFAULT_MAX_REGISTRY_COMPRESSED_BYTES,
+  DEFAULT_MAX_REGISTRY_DECOMPRESSED_BYTES,
+  limitReadableBytes,
+  readBoundedText,
+  requestBoundedResponse,
+  toNodeReadable,
+} from '../bounded-response.js';
 
 const DAILY_FILE_PATTERN = /href\s*=\s*["']([^"']*apc(\d{6})\.zip(?:\?[^"']*)?)["']/gi;
 const REGISTRY_TIMEOUT_MS = 30_000;
-
-function toNodeReadable(body) {
-  if (!body) throw new Error('USPTO response did not contain a body.');
-  return typeof body.pipe === 'function' ? body : Readable.fromWeb(body);
-}
+const MAX_LISTING_BYTES = 1 * 1024 * 1024;
 
 function dateFromFileStamp(stamp) {
   const year = 2000 + Number(stamp.slice(0, 2));
@@ -53,6 +57,9 @@ export class UsptoBulkXmlAdapter extends RegistryAdapter {
   constructor({
     listingUrl = DEFAULT_USPTO_BULK_LISTING_URL,
     fetchImpl = globalThis.fetch,
+    maxListingBytes = MAX_LISTING_BYTES,
+    maxArchiveCompressedBytes = DEFAULT_MAX_REGISTRY_COMPRESSED_BYTES,
+    maxArchiveDecompressedBytes = DEFAULT_MAX_REGISTRY_DECOMPRESSED_BYTES,
   } = {}) {
     super(USPTO_BULK_SOURCE_NAME);
     let parsed;
@@ -66,18 +73,27 @@ export class UsptoBulkXmlAdapter extends RegistryAdapter {
     this.listingUrl = parsed.toString();
     this.listingOrigin = parsed.origin;
     this.fetchImpl = fetchImpl;
+    for (const [name, value] of Object.entries({ maxListingBytes, maxArchiveCompressedBytes, maxArchiveDecompressedBytes })) {
+      if (!Number.isSafeInteger(value) || value < 1 || value > 512 * 1024 * 1024) throw new TypeError(`${name} must be a bounded positive byte count.`);
+    }
+    this.maxListingBytes = maxListingBytes;
+    this.maxArchiveCompressedBytes = maxArchiveCompressedBytes;
+    this.maxArchiveDecompressedBytes = maxArchiveDecompressedBytes;
   }
 
   async discoverUpdates(since) {
-    const response = await this.fetchImpl(this.listingUrl, {
-      headers: { Accept: 'text/html,application/xhtml+xml' },
-      redirect: 'error',
-      signal: AbortSignal.timeout(REGISTRY_TIMEOUT_MS),
+    const request = await requestBoundedResponse({
+      fetchImpl: this.fetchImpl, url: this.listingUrl, sourceName: this.sourceName,
+      operation: 'daily-file discovery', accept: 'text/html,application/xhtml+xml', timeoutMs: REGISTRY_TIMEOUT_MS,
+      maxCompressedBytes: this.maxListingBytes, maxDecompressedBytes: this.maxListingBytes,
     });
-    if (!response.ok) {
-      throw new RegistryHttpError(this.sourceName, 'daily-file discovery', response.status);
+    if (!request.response.ok) {
+      request.close();
+      throw new RegistryHttpError(this.sourceName, 'daily-file discovery', request.response.status);
     }
-    const links = dailyFileLinks(await response.text(), this.listingUrl)
+    const links = dailyFileLinks(await readBoundedText(request, {
+      maxBytes: this.maxListingBytes, sourceName: this.sourceName, operation: 'daily-file discovery',
+    }), this.listingUrl)
       // A listing is upstream input. Archive URLs must remain on the explicit
       // configured listing origin, never become arbitrary fetch destinations.
       .filter((link) => new URL(link.url).origin === this.listingOrigin);
@@ -91,32 +107,46 @@ export class UsptoBulkXmlAdapter extends RegistryAdapter {
     return links.filter(({ date }) => date >= firstDay);
   }
 
-  async *parseArchive(readable) {
+  async *parseArchive(readable, { abortController = null } = {}) {
     const archive = toNodeReadable(readable).pipe(unzipper.Parse({ forceStream: true }));
     let xmlEntries = 0;
+    let decompressedBytes = 0;
+    const records = [];
     for await (const entry of archive) {
       if (entry.type !== 'File' || !entry.path.toLowerCase().endsWith('.xml')) {
         entry.autodrain();
         continue;
       }
       xmlEntries += 1;
-      yield* parseUsptoBulkXml(entry);
+      const remaining = this.maxArchiveDecompressedBytes - decompressedBytes;
+      if (remaining < 1) throw new RegistryResponseSizeError(this.sourceName, 'daily archive decompression');
+      const boundedEntry = limitReadableBytes(entry, {
+        sourceName: this.sourceName, operation: 'daily archive decompression', maxBytes: remaining, abortController,
+        onBytes: (size) => { decompressedBytes += size; },
+      });
+      for await (const record of parseUsptoBulkXml(boundedEntry)) records.push(record);
     }
     if (!xmlEntries) throw new Error(`${this.sourceName} ZIP contained no XML file.`);
+    // Do not expose partially parsed archive data if a later entry violates a
+    // size bound or fails decompression.
+    yield* records;
   }
 
   async *fetchUpdates(since) {
     const updates = await this.discoverUpdates(since);
     for (const update of updates) {
-      const response = await this.fetchImpl(update.url, {
-        headers: { Accept: 'application/zip,application/octet-stream' },
-        redirect: 'error',
-        signal: AbortSignal.timeout(REGISTRY_TIMEOUT_MS),
+      const request = await requestBoundedResponse({
+        fetchImpl: this.fetchImpl, url: update.url, sourceName: this.sourceName,
+        operation: 'daily archive download', accept: 'application/zip,application/octet-stream', timeoutMs: REGISTRY_TIMEOUT_MS,
+        maxCompressedBytes: this.maxArchiveCompressedBytes, maxDecompressedBytes: this.maxArchiveCompressedBytes,
       });
-      if (!response.ok) {
-        throw new RegistryHttpError(this.sourceName, 'daily archive download', response.status);
+      if (!request.response.ok) {
+        request.close();
+        throw new RegistryHttpError(this.sourceName, 'daily archive download', request.response.status);
       }
-      yield* this.parseArchive(response.body);
+      try {
+        yield* this.parseArchive(request.body);
+      } finally { request.close(); }
     }
   }
 

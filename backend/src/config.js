@@ -329,6 +329,7 @@ export function loadConfig(env = process.env) {
     redisUrl: required(env, 'REDIS_URL'),
     jwtAccessSecret,
     inviteTokenTtlSeconds: positiveInteger(env, 'INVITE_TOKEN_TTL_SECONDS', 604_800),
+    workerHeartbeatTtlSeconds: boundedPositiveInteger(env, 'WORKER_HEARTBEAT_TTL_SECONDS', 120, 30, 3_600),
     ...supabaseConfig,
     ...searchConfig,
     ...officeActionSearchConfig,

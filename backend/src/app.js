@@ -14,6 +14,7 @@ import { createUserRouter } from './routes/user-routes.js';
 import { createOfficeActionRefRouter, createOfficeActionSearchRouter } from './routes/office-action-routes.js';
 import { createAuditRequestContextMiddleware } from './audit/request-context.js';
 import { createExportRouter } from './routes/export-routes.js';
+import { createHealthRouter } from './routes/health-routes.js';
 import {
   createRequestBoundsMiddleware,
   createSecurityHeadersMiddleware,
@@ -34,6 +35,7 @@ export function createApp({
   exportService = null,
   authRateLimiter = null,
   trustProxyHops = 0,
+  readinessChecks = [],
 }) {
   if (!Number.isSafeInteger(trustProxyHops) || trustProxyHops < 0 || trustProxyHops > 10) {
     throw new Error('trustProxyHops must be an integer between 0 and 10.');
@@ -46,6 +48,7 @@ export function createApp({
   app.use(createAuditRequestContextMiddleware());
   app.use(createCorsMiddleware());
   app.use(express.json({ limit: MAX_JSON_BODY_BYTES }));
+  app.use(createHealthRouter({ readinessChecks }));
 
   app.use('/api/v1/auth', createAuthRouter(authService, { authRateLimiter }));
   app.use(

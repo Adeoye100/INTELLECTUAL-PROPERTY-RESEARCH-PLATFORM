@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createReadStream } from 'node:fs';
+import { Readable } from 'node:stream';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -17,6 +18,15 @@ async function collect(iterable) {
   const records = [];
   for await (const record of iterable) records.push(record);
   return records;
+}
+
+function response(body, { status = 200, contentLength = null } = {}) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get(name) { return name.toLowerCase() === 'content-length' ? contentLength : null; } },
+    body: Readable.from([Buffer.from(body)]),
+  };
 }
 
 describe('USPTO Bulk XML adapter', () => {
@@ -67,11 +77,8 @@ describe('USPTO Bulk XML adapter', () => {
       listingUrl: 'https://example.test/listing',
       fetchImpl: async (url) => {
         calls.push(url);
-        if (url.endsWith('/listing')) return {
-          ok: true,
-          text: async () => '<a href="apc260104.zip">old</a><a href="apc260105.zip">new</a>',
-        };
-        return { ok: true, body: {} };
+        if (url.endsWith('/listing')) return response('<a href="apc260104.zip">old</a><a href="apc260105.zip">new</a>');
+        return response('test archive');
       },
     });
     adapter.parseArchive = async function* parseArchive() { yield { sourceReferenceId: '98038829' }; };
@@ -91,7 +98,7 @@ describe('USPTO Bulk XML adapter', () => {
       listingUrl: 'https://registry.example.test/listing',
       fetchImpl: async (url) => {
         calls.push(url);
-        return { ok: true, text: async () => '<a href="https://unexpected.example.test/apc260105.zip">archive</a>' };
+        return response('<a href="https://unexpected.example.test/apc260105.zip">archive</a>');
       },
     });
     await assert.rejects(

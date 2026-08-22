@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "providerStatus": "blocked_pending_adr_001",
+  "environments": {
+    "staging": {
+      "availabilityZones": 1,
+      "apiMinReplicas": 1,
+      "workerReplicas": { "watch": 1, "pdfExport": 0 },
+      "statefulTopology": "cost-sensitive managed single-zone only; no production availability claim"
+    },
+    "production": {
+      "availabilityZones": 2,
+      "apiMinReplicas": 2,
+      "apiMaximumReplicas": 8,
+      "minimumHealthyDuringRollout": 1,
+      "workerReplicas": { "watch": 2, "pdfExport": 2 },
+      "workerRestartPolicy": "replace on process failure; alert when heartbeat is stale",
+      "statefulTopology": "managed multi-zone PostgreSQL and Redis; resilient managed Elasticsearch/OpenSearch topology"
+    }
+  },
+  "network": {
+    "public": ["loadBalancer"],
+    "private": ["api", "watchWorker", "pdfExportWorker", "postgresql", "redis", "search", "objectStorage"],
+    "forbiddenPublicEndpoints": ["postgresql", "redis", "search", "objectStorage"]
+  },
+  "resources": {
+    "api": { "containerTarget": "api", "healthPath": "/healthz", "readinessPath": "/readyz", "gracefulShutdownSeconds": 25 },
+    "watchWorker": { "containerTarget": "watch-worker", "heartbeatKey": "worker:heartbeat:watch" },
+    "pdfExportWorker": { "containerTarget": "pdf-export-worker", "heartbeatKey": "worker:heartbeat:pdf-export" },
+    "database": { "encryption": "at_rest_and_in_transit", "backup": true, "deletionProtection": true },
+    "redis": { "encryption": "in_transit_and_at_rest_where_supported", "multiZoneProduction": true },
+    "search": { "encryption": "at_rest_and_in_transit", "privateEndpoint": true },
+    "exportStorage": { "private": true, "versioning": true, "encryption": "at_rest", "publicAccess": false }
+  },
+  "monitoring": [
+    "unhealthy_api_replicas", "queue_depth_and_age", "worker_heartbeat_staleness", "database_saturation",
+    "redis_failure", "search_cluster_health", "export_failures", "audit_write_failures"
+  ],
+  "recoveryObjectives": {
+    "production": { "rpo": "24h maximum data loss pending provider backup confirmation", "rto": "4h maximum restoration target pending failover exercise" },
+    "staging": { "rpo": "best effort", "rto": "best effort" }
+  }
+}

@@ -6,6 +6,7 @@ import { WatchRepository } from './watch-repository.js';
 import { createWatchRuntime } from './watch-runtime.js';
 import { AlertRepository } from '../alerts/alert-repository.js';
 import { AlertGenerationService } from '../alerts/alert-generation-service.js';
+import { WorkerHeartbeat } from '../operations/worker-heartbeat.js';
 
 const config = loadConfig();
 if (!config.watchEnabled) {
@@ -25,11 +26,19 @@ if (!config.watchEnabled) {
   });
   runtime.worker.start();
   console.log('Watch worker started.');
+  const heartbeat = new WorkerHeartbeat({
+    redisClient, serviceName: 'watch', ttlSeconds: config.workerHeartbeatTtlSeconds,
+  });
+  await heartbeat.beat();
+  const heartbeatTimer = setInterval(() => {
+    heartbeat.beat().catch((error) => console.error('Watch heartbeat error', { name: error.name, code: error.code ?? 'UNKNOWN' }));
+  }, Math.floor(config.workerHeartbeatTtlSeconds * 500));
 
   let stopping = false;
   const shutdown = async () => {
     if (stopping) return;
     stopping = true;
+    clearInterval(heartbeatTimer);
     await runtime.worker.stop();
     await Promise.allSettled([redisClient.quit(), pool.end()]);
   };

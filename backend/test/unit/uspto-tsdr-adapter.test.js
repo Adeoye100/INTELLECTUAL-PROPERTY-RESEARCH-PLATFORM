@@ -45,7 +45,7 @@ describe('USPTO TSDR adapter (response projection pending live key verification)
       apiKey: 'test-only-key',
       fetchImpl: async (url, options) => {
         request = { url, options };
-        return { ok: true, json: async () => fixture };
+        return new Response(JSON.stringify(fixture), { status: 200, headers: { 'Content-Type': 'application/json' } });
       },
     });
 

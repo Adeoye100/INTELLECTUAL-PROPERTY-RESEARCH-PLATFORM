@@ -245,6 +245,18 @@ explicitly deferred BE-14 billing exception. PDF export staging additionally
 requires controlled migration application, private storage permissions, Redis,
 the separate worker process, and authenticated firm-isolation/download checks.
 
+## BE-22 through BE-26 handoff status
+
+BE-22 adds repository-local outbound-response limits and an independent-audit
+evidence package; its engineering remediation is complete, while independent
+sign-off is pending. BE-23 adds safe k6-compatible load assets but has no staging
+P95 measurements. BE-24/25 add containers, CI gates, provider-neutral topology,
+health/readiness and recovery design; AWS versus GCP remains unselected, so no
+provider deployment or Multi-AZ failover is claimed. BE-26 adds the OpenAPI
+reference, route-parity test, runbook, training guide, and documentation index.
+These additions do not apply migrations, close staging gates, or alter the
+explicit BE-14 billing deferral.
+
 ## BE-21 repository-local security review update
 
 BE-21 completed a repository-local defensive review of BE-03 through BE-20 and

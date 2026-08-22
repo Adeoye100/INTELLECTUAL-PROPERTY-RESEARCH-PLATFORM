@@ -1,0 +1,30 @@
+# Development-only local stores. Set local values in ignored backend/.env; no
+# credential or production endpoint is committed here.
+services:
+  postgres:
+    image: postgres:16.6-alpine3.20
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set in backend/.env}
+      POSTGRES_USER: ${POSTGRES_USER:?set in backend/.env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in backend/.env}
+    ports: ["127.0.0.1:5432:5432"]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init-test-db.sql:/docker-entrypoint-initdb.d/10-init-test-db.sql:ro
+  redis:
+    image: redis:7.4.2-alpine3.20
+    ports: ["127.0.0.1:6379:6379"]
+  elasticsearch:
+    build:
+      context: .
+      dockerfile: docker/elasticsearch/Dockerfile
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports: ["127.0.0.1:9200:9200"]
+    volumes: ["elasticsearch-data:/usr/share/elasticsearch/data"]
+
+volumes:
+  postgres-data:
+  elasticsearch-data:

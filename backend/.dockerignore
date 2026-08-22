@@ -1,0 +1,11 @@
+node_modules
+.env
+.env.*
+test
+load
+coverage
+pnpm-debug.log
+Dockerfile
+compose*.yaml
+docker/postgres
+docker/elasticsearch

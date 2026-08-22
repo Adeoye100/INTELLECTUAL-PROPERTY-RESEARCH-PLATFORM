@@ -49,6 +49,15 @@ export class RegistryHttpError extends Error {
   }
 }
 
+export class RegistryResponseSizeError extends Error {
+  constructor(sourceName, operation) {
+    super(`${sourceName} ${operation} response exceeded the configured size limit.`);
+    this.name = 'RegistryResponseSizeError';
+    this.code = 'REGISTRY_RESPONSE_TOO_LARGE';
+    this.sourceName = sourceName;
+  }
+}
+
 // JavaScript does not enforce interfaces at runtime. This base class makes the
 // contract executable while JSDoc supplies the record/status shapes to editors.
 export class RegistryAdapter {

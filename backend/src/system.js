@@ -137,6 +137,10 @@ export async function createSystem(config, { officeActionSources = [], exportSto
       exportService: pdfExportRuntime?.exportService ?? null,
       authRateLimiter,
       trustProxyHops: config.trustProxyHops,
+      readinessChecks: [
+        async () => { await pool.query('SELECT 1'); },
+        async () => { await redisClient.ping(); },
+      ],
     }),
     pool,
     redisClient,

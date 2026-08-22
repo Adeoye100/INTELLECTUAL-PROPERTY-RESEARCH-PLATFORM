@@ -15,6 +15,7 @@ import { WatchService } from '../watch/watch-service.js';
 import { AlertRepository } from '../alerts/alert-repository.js';
 import { AlertService } from '../alerts/alert-service.js';
 import { createPdfExportRuntime } from './pdf-export-runtime.js';
+import { WorkerHeartbeat } from '../operations/worker-heartbeat.js';
 
 const config = loadConfig();
 if (!config.pdfExportEnabled) {
@@ -36,10 +37,18 @@ if (!config.pdfExportEnabled) {
   });
   runtime.worker.start();
   console.log('PDF export worker started.');
+  const heartbeat = new WorkerHeartbeat({
+    redisClient, serviceName: 'pdf-export', ttlSeconds: config.workerHeartbeatTtlSeconds,
+  });
+  await heartbeat.beat();
+  const heartbeatTimer = setInterval(() => {
+    heartbeat.beat().catch((error) => console.error('PDF export heartbeat error', { name: error.name, code: error.code ?? 'UNKNOWN' }));
+  }, Math.floor(config.workerHeartbeatTtlSeconds * 500));
   let stopping = false;
   const shutdown = async () => {
     if (stopping) return;
     stopping = true;
+    clearInterval(heartbeatTimer);
     await runtime.worker.stop();
     await Promise.allSettled([redisClient.quit(), pool.end()]);
   };
