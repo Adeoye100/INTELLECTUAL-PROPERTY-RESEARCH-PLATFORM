@@ -61,8 +61,8 @@ and environment configuration.
 | `GET /api/v1/alerts` | Implemented canonical list; see BE-13 contract below | `200 { items, pagination }` | Admin, Attorney, Viewer within firm | No outbound delivery behavior in BE-13 |
 | `GET /api/v1/alerts/:id` | UUID path parameter | `200 Alert` | Admin, Attorney, Viewer within firm | Implemented BE-13 |
 | `PATCH /api/v1/alerts/:id` | `{ action: 'read' \| 'dismiss' }` | `200 Alert` | Admin, Attorney | Strict state transitions only |
-| `GET /api/v1/office-actions/search` | Query: `markText`, `niceClass` | `OfficeActionRef[]` | Admin, Attorney, Viewer | Licensed source, pagination, citation fields, filters, result provenance |
-| `POST /api/v1/office-actions/link` | `{ officeActionId, portfolioMarkId }` | `{ success, message, linkedOfficeActionId, linkedPortfolioMarkId }` | Admin, Attorney | Canonical resource model, duplicate/unlink behavior, audit event |
+| `GET /api/v1/office-actions/search` | Implemented canonical BE-18 search; see contract below | `OfficeActionSearchResponse` | Admin, Attorney, Viewer | Feature-gated; no live provider is bundled |
+| `POST /api/v1/office-actions/link` | Not a canonical backend route | — | — | Replaced by nested portfolio-mark Office Action reference routes |
 | `GET /api/v1/matters` | No body | `Matter[]` | Admin, Attorney, Viewer within firm | Entire route; frontend currently uses local storage instead of this mock handler |
 | `POST /api/v1/matters` | Candidate `{ name, clientRef? }` | `201 Matter` | Admin, Attorney | Entire create contract, required client/firm data, audit event |
 | `POST /api/v1/matters/:matterId/risk-results` | `MatterSaveRequest` risk snapshot | `MatterSaveResult` | Admin, Attorney | Snapshot authority, versioning, idempotency, whether browser-supplied scores are accepted (they should not be authoritative) |
@@ -418,3 +418,73 @@ secrets, search, and the watch worker.
 
 BE-14 subscription/billing remains **Deferred by explicit decision**. It is not
 represented as a completed backend route or a Phase 2 staging pass.
+
+## BE-18 implemented Office Action research contract
+
+`GET /api/v1/office-actions/search` is available only when the backend receives
+an injected Office Action source adapter and `OFFICE_ACTION_SEARCH_ENABLED=true`.
+It requires a Bearer-authenticated Admin, Attorney, or Viewer. Search accepts a
+non-empty combination of `applicationNumber`, `markText`, `owner`, `filedFrom`,
+`filedTo`, repeated `documentType`, repeated `jurisdiction`, and `maxResults`.
+Dates are strict calendar dates, ranges are ordered, collections contain at most
+ten values, and `maxResults` is bounded by the configured maximum (25 by
+default). `firmId` and unsupported/nested query fields are rejected.
+
+The normalized internal source query is:
+
+```json
+{
+  "applicationNumber": "88/123456 or null",
+  "markText": "FORGE or null",
+  "owner": "Owner or null",
+  "filedFrom": "YYYY-MM-DD or null",
+  "filedTo": "YYYY-MM-DD or null",
+  "documentTypes": ["non_final_office_action"],
+  "jurisdictions": ["US"],
+  "maxResults": 25
+}
+```
+
+The response is `{ results, sourceStatuses, partial, requestId }`. Results
+preserve genuine `sourceRegistry` and `sourceReferenceId`, nullable source
+fields as `null`, document attribution, and only allow-listed source metadata
+(`documentTitle`, `documentLanguage`, `sourceRecordType`, `sourceUpdatedAt`). A
+source timeout, malformed response, or network failure becomes that source's
+`{ status: "unavailable", resultCount: 0 }`; healthy source results remain in
+configured source and provider-result order. Duplicate records are removed only
+when both registry and genuine source reference match. No source payload, stack
+trace, generated summary, legal conclusion, or recommendation is returned.
+
+No licensed live Office Action adapter is bundled. The injected source interface
+is `{ sourceName, searchOfficeActions: async (query) => [] }`; it has no
+construction-time network call. Configuring a real adapter and proving registry
+licensing/provenance remains an operational gate.
+
+The canonical linked-reference resource is nested under the authenticated
+firm's portfolio mark:
+
+| Method and path | Roles | Contract |
+|---|---|---|
+| `POST /api/v1/portfolio-marks/:portfolioMarkId/office-action-refs` | Admin, Attorney | Creates an attributed genuine registry reference; returns `201` |
+| `GET /api/v1/portfolio-marks/:portfolioMarkId/office-action-refs` | Admin, Attorney, Viewer | Returns `{ items, pagination }`; page size is at most 100 |
+| `GET /api/v1/portfolio-marks/:portfolioMarkId/office-action-refs/:id` | Admin, Attorney, Viewer | Returns one reference |
+| `PATCH /api/v1/portfolio-marks/:portfolioMarkId/office-action-refs/:id` | Admin, Attorney | Corrects bounded summary/date/metadata fields; source registry/reference and tenant identity are immutable |
+| `DELETE /api/v1/portfolio-marks/:portfolioMarkId/office-action-refs/:id` | Admin, Attorney | Returns `204` and uses the same scoped deletion convention as portfolio marks |
+
+Create requires `sourceRegistry`, genuine non-empty `sourceReferenceId`,
+`documentType`, and explicit `summaryMethod` (`registry`, `manual`, or
+`extracted`). It accepts only bounded application/date/examiner/summary/document
+URL and allow-listed metadata fields. Plain-text summaries are optional research
+assistance: `registry` identifies source-provided text, while `manual` and
+`extracted` are not labelled as verbatim examiner statements. BE-18 performs no
+AI summarization, does not invent reasoning/statutes/deadlines, and provides no
+legal conclusion or advice.
+
+The server derives firm and actor exclusively from verified membership. Missing
+or cross-firm portfolio marks are `404 PORTFOLIO_MARK_NOT_FOUND`; a missing or
+cross-firm nested reference is `404 OFFICE_ACTION_REF_NOT_FOUND`; duplicate
+provenance links are `409 OFFICE_ACTION_REF_CONFLICT`. Create/update/delete
+share a transaction with audit events `office_action_ref.created`, `.updated`,
+and `.deleted` (`entityType: office_action_ref`). Snapshots contain only bounded
+reference fields and allow-listed metadata, never raw documents or credentials.
+Migration `010_create_office_action_refs.sql` was not applied.

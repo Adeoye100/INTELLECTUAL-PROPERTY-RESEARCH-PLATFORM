@@ -26,9 +26,17 @@ import { AuditLogRepository } from './audit/audit-log-repository.js';
 import { AuditService } from './audit/audit-service.js';
 import { ExportAuditService } from './audit/export-audit-service.js';
 import { UserRoleService } from './users/user-role-service.js';
+import { createOfficeActionSearchRuntime } from './office-actions/office-action-search-runtime.js';
+import { OfficeActionRefRepository } from './office-actions/office-action-ref-repository.js';
+import { OfficeActionRefService } from './office-actions/office-action-ref-service.js';
 
-export async function createSystem(config) {
+export async function createSystem(config, { officeActionSources = [] } = {}) {
   const { searchSources, federatedSearchService, searchService } = createSearchRuntime(config);
+  const {
+    officeActionSources: configuredOfficeActionSources,
+    federatedOfficeActionSearchService,
+    officeActionSearchService,
+  } = createOfficeActionSearchRuntime(config, { sources: officeActionSources });
   const supabaseVerifier = new SupabaseVerifier({
     supabaseUrl: config.supabaseUrl,
     publishableKey: config.supabasePublishableKey,
@@ -91,6 +99,8 @@ export async function createSystem(config) {
   const alertRepository = new AlertRepository(pool);
   const alertService = new AlertService({ repository: alertRepository, auditService });
   const userRoleService = new UserRoleService({ userRepository, auditService, roleFirmResolver });
+  const officeActionRefRepository = new OfficeActionRefRepository(pool);
+  const officeActionRefService = new OfficeActionRefService({ repository: officeActionRefRepository, auditService });
   const alertGenerationService = config.watchEnabled
     ? new AlertGenerationService({ repository: alertRepository }) : null;
   const watchRuntime = createWatchRuntime({
@@ -109,6 +119,9 @@ export async function createSystem(config) {
       alertService,
       auditService,
       userRoleService,
+      officeActionSearchService,
+      officeActionSearchMaxResults: config.officeActionSearchMaxResults,
+      officeActionRefService,
       authRateLimiter,
       trustProxyHops: config.trustProxyHops,
     }),
@@ -128,6 +141,11 @@ export async function createSystem(config) {
     auditService,
     exportAuditService,
     userRoleService,
+    officeActionRefRepository,
+    officeActionRefService,
+    officeActionSources: configuredOfficeActionSources,
+    federatedOfficeActionSearchService,
+    officeActionSearchService,
     alertGenerationService,
     roleFirmResolver,
     supabaseAdminUserService,

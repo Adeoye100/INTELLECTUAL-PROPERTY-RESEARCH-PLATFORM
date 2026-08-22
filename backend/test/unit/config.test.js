@@ -150,6 +150,33 @@ describe('search configuration', () => {
   });
 });
 
+describe('Office Action search configuration', () => {
+  it('defaults Office Action search to disabled without source configuration', () => {
+    const config = loadConfig(applicationEnvironment());
+    assert.equal(config.officeActionSearchEnabled, false);
+    assert.deepEqual(config.officeActionSourceRegistries, []);
+    assert.equal(config.officeActionSourceTimeoutMs, 3_000);
+    assert.equal(config.officeActionSearchMaxResults, 25);
+  });
+
+  it('strictly validates enabled Office Action registries, timeout, and result bounds', () => {
+    const enabled = loadConfig(applicationEnvironment({
+      OFFICE_ACTION_SEARCH_ENABLED: 'true', OFFICE_ACTION_SOURCE_REGISTRIES: ' uspto,EU-IPO,USPTO ',
+      OFFICE_ACTION_SOURCE_TIMEOUT_MS: '1500', OFFICE_ACTION_SEARCH_MAX_RESULTS: '20',
+    }));
+    assert.deepEqual(enabled.officeActionSourceRegistries, ['USPTO', 'EU-IPO']);
+    assert.equal(enabled.officeActionSourceTimeoutMs, 1_500);
+    assert.equal(enabled.officeActionSearchMaxResults, 20);
+    for (const overrides of [
+      { OFFICE_ACTION_SEARCH_ENABLED: 'yes' },
+      { OFFICE_ACTION_SEARCH_ENABLED: 'true', OFFICE_ACTION_SOURCE_REGISTRIES: undefined },
+      { OFFICE_ACTION_SEARCH_ENABLED: 'true', OFFICE_ACTION_SOURCE_REGISTRIES: 'EU IPO' },
+      { OFFICE_ACTION_SEARCH_ENABLED: 'true', OFFICE_ACTION_SOURCE_REGISTRIES: 'USPTO', OFFICE_ACTION_SOURCE_TIMEOUT_MS: '99' },
+      { OFFICE_ACTION_SEARCH_ENABLED: 'true', OFFICE_ACTION_SOURCE_REGISTRIES: 'USPTO', OFFICE_ACTION_SEARCH_MAX_RESULTS: '101' },
+    ]) assert.throws(() => loadConfig(applicationEnvironment(overrides)));
+  });
+});
+
 describe('authentication rate-limit configuration', () => {
   it('loads the versioned default policies and direct-connection proxy default', () => {
     const config = loadConfig(applicationEnvironment());

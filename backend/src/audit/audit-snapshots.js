@@ -30,3 +30,11 @@ export function alertAuditSnapshot(record) {
 export function userRoleAuditSnapshot(record) {
   return pick(record, ['id', 'role', 'active']);
 }
+
+export function officeActionRefAuditSnapshot(record) {
+  return pick(record, [
+    'id', 'portfolioMarkId', 'sourceRegistry', 'sourceReferenceId', 'applicationNumber',
+    'documentType', 'officeActionDate', 'examinerName', 'examinerReasoningSummary',
+    'summaryMethod', 'sourceDocumentUrl', 'sourceMetadata',
+  ]);
+}

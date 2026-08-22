@@ -881,3 +881,65 @@ worker paths, demonstrate a controlled partial registry failure, run every
 non-deferred endpoint smoke check, and formally accept or complete the separate
 BE-14 billing exception. BE-14 remains **Deferred by explicit decision** here;
 no billing route was added.
+
+## BE-18 Office Action research and portfolio links
+
+BE-18 supplies firm-scoped Office Action research links and a feature-gated,
+injected search boundary. Migration `010_create_office_action_refs.sql` is
+additive and **has not been applied**. It creates attributed source references
+linked by `(firm_id, portfolio_mark_id)`, a unique genuine
+`(firm, mark, registry, source reference)` link, bounded object-only metadata,
+lookup indexes, and extends the closed BE-16 audit taxonomy with
+`office_action_ref.created`, `.updated`, and `.deleted`.
+
+`GET /api/v1/office-actions/search` requires authenticated Admin, Attorney, or
+Viewer access. It is mounted only when
+`OFFICE_ACTION_SEARCH_ENABLED=true` and an adapter is injected. The normalized
+query has `applicationNumber`, `markText`, `owner`, date range,
+`documentTypes`, `jurisdictions`, and bounded `maxResults`; at least one
+criterion is required. Its response preserves source order, genuine registry
+provenance, nulls, `{ sourceStatuses, partial, requestId }`, and only four
+allow-listed source metadata fields. Failed, timed-out, or malformed sources
+become unavailable while healthy source results remain. No raw registry
+payload, source stack trace, legal conclusion, or generated summary is exposed.
+
+No live/licensed provider is fabricated. A source is injected as:
+
+```js
+{ sourceName: 'USPTO', searchOfficeActions: async (query) => [] }
+```
+
+Construction does not call the adapter. A licensed provider implementation,
+its credentials, and staging provenance validation are operational gates.
+
+The stored-reference API is available independently of the search feature:
+
+- `POST/GET /api/v1/portfolio-marks/:portfolioMarkId/office-action-refs`
+- `GET/PATCH/DELETE /api/v1/portfolio-marks/:portfolioMarkId/office-action-refs/:id`
+
+Admin and Attorney can create/update/delete; Viewer is read-only. The server
+uses authenticated firm and actor context only. Missing/cross-firm marks return
+`PORTFOLIO_MARK_NOT_FOUND`; missing/cross-firm nested references return
+`OFFICE_ACTION_REF_NOT_FOUND`; duplicate genuine links return
+`OFFICE_ACTION_REF_CONFLICT`.
+
+Create requires a source registry, genuine source reference, document type, and
+explicit summary method (`registry`, `manual`, or `extracted`). Summaries are
+optional bounded plain text. `registry` identifies source-provided material;
+manual/extracted summaries are research notes, never represented as verbatim
+examiner speech. BE-18 includes no AI summarizer, legal determination, advice,
+invented statute, refusal ground, or deadline. Each mutation writes its redacted
+before/after audit event in the same PostgreSQL transaction. Raw documents,
+payloads, headers, and credentials are neither stored nor audited.
+
+Configuration defaults to disabled:
+
+```text
+OFFICE_ACTION_SEARCH_ENABLED=false
+OFFICE_ACTION_SOURCE_REGISTRIES=USPTO        # required only when enabled
+OFFICE_ACTION_SOURCE_TIMEOUT_MS=3000         # 100–60000
+OFFICE_ACTION_SEARCH_MAX_RESULTS=25          # 1–100
+```
+
+BE-18 does not resolve any BE-17 Phase 2 staging gate and does not change the
+explicitly deferred BE-14 billing status.

@@ -13,6 +13,9 @@ export const AUDIT_ACTIONS = Object.freeze({
   EXPORT_REQUESTED: 'export.requested',
   EXPORT_COMPLETED: 'export.completed',
   EXPORT_FAILED: 'export.failed',
+  OFFICE_ACTION_REF_CREATED: 'office_action_ref.created',
+  OFFICE_ACTION_REF_UPDATED: 'office_action_ref.updated',
+  OFFICE_ACTION_REF_DELETED: 'office_action_ref.deleted',
 });
 
 export const AUDIT_ENTITY_TYPES = Object.freeze({
@@ -21,6 +24,7 @@ export const AUDIT_ENTITY_TYPES = Object.freeze({
   ALERT: 'alert',
   USER: 'user',
   EXPORT: 'export',
+  OFFICE_ACTION_REF: 'office_action_ref',
 });
 
 export const AUDIT_ACTION_VALUES = Object.freeze(Object.values(AUDIT_ACTIONS));

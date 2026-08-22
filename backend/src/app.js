@@ -10,6 +10,7 @@ import { createWatchRouter } from './routes/watch-routes.js';
 import { createAlertRouter } from './routes/alert-routes.js';
 import { createAuditLogRouter } from './routes/audit-log-routes.js';
 import { createUserRouter } from './routes/user-routes.js';
+import { createOfficeActionRefRouter, createOfficeActionSearchRouter } from './routes/office-action-routes.js';
 import { createAuditRequestContextMiddleware } from './audit/request-context.js';
 
 export function createApp({
@@ -19,6 +20,9 @@ export function createApp({
   alertService = null,
   auditService = null,
   userRoleService = null,
+  officeActionSearchService = null,
+  officeActionSearchMaxResults = 25,
+  officeActionRefService = null,
   authRateLimiter = null,
   trustProxyHops = 0,
 }) {
@@ -41,6 +45,11 @@ export function createApp({
   if (searchService) {
     app.use('/api/v1', createSearchRouter(authenticate, searchService));
   }
+  if (officeActionSearchService) {
+    app.use('/api/v1', createOfficeActionSearchRouter(authenticate, officeActionSearchService, {
+      maximumResults: officeActionSearchMaxResults,
+    }));
+  }
   if (portfolioMarkService) {
     app.use('/api/v1', createPortfolioMarkRouter(authenticate, portfolioMarkService));
   }
@@ -55,6 +64,9 @@ export function createApp({
   }
   if (userRoleService) {
     app.use('/api/v1', createUserRouter(authenticate, userRoleService));
+  }
+  if (officeActionRefService) {
+    app.use('/api/v1', createOfficeActionRefRouter(authenticate, officeActionRefService));
   }
 
   app.use((_request, response) => {

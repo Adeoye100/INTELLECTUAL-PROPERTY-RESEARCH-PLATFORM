@@ -171,10 +171,25 @@ methodology.
 | Column | Type | Notes |
 |---|---|---|
 | id | uuid PK | |
-| portfolio_mark_id | uuid FK | |
-| reference_text | text | |
-| examiner_reasoning_summary | text | |
-| linked_precedent_ref | text | |
+| firm_id | uuid FK → firms, non-null | tenant boundary |
+| portfolio_mark_id | uuid | composite firm-scoped FK → portfolio_marks |
+| source_registry | varchar(100) | normalized attributed registry |
+| source_reference_id | varchar(200) | non-empty genuine registry document reference; never an internal UUID substitute |
+| application_number | varchar(100), nullable | source-provided application number only |
+| document_type | varchar(80) | closed BE-18 document-type vocabulary |
+| office_action_date | date, nullable | source document date |
+| examiner_name | varchar(200), nullable | source-provided only; never invented |
+| examiner_reasoning_summary | varchar(4000), nullable | bounded plain-text research summary, not legal advice or an examiner quotation unless `summary_method=registry` says it is source-provided |
+| summary_method | varchar(20) | `registry`, `manual`, or `extracted` attribution |
+| source_document_url | varchar(2048), nullable | credential/query/fragment-free HTTP(S) attribution URL only |
+| source_metadata | jsonb, non-null | bounded allow-listed object; no raw document/payload |
+| linked_by_user_id | uuid FK → users, non-null | authenticated linker |
+| created_at / updated_at | timestamptz | UTC timestamps |
+
+Migration `010_create_office_action_refs.sql` adds this table, its firm/portfolio
+composite key, source provenance uniqueness, object-only metadata constraint,
+lookup indexes, and the three Office Action audit actions/entity type. It is
+additive/repeat-safe and was **not applied** by BE-18.
 
 ### `subscriptions`
 | Column | Type | Notes |
@@ -193,7 +208,7 @@ methodology.
 | firm_id | uuid FK → firms, non-null | immutable tenant boundary |
 | actor_user_id | uuid FK → users, non-null | resolved from verified Supabase subject during scoped insert |
 | action | varchar(80) | constrained frozen BE-16 action taxonomy |
-| entity_type | varchar(40) | constrained `portfolio_mark` / `watch` / `alert` / `user` / `export` |
+| entity_type | varchar(40) | constrained `portfolio_mark` / `watch` / `alert` / `user` / `export` / `office_action_ref` |
 | entity_id | uuid, nullable | genuine mutated resource/job ID; never fabricated |
 | before_state | jsonb, nullable | sanitized JSON object only |
 | after_state | jsonb, nullable | sanitized JSON object only |

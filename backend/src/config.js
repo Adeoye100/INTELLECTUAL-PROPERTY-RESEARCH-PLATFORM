@@ -167,6 +167,49 @@ function loadSearchConfig(env) {
   };
 }
 
+function officeActionSearchEnabled(env) {
+  const value = env.OFFICE_ACTION_SEARCH_ENABLED?.trim() || 'false';
+  if (value !== 'true' && value !== 'false') {
+    throw new Error('OFFICE_ACTION_SEARCH_ENABLED must be either true or false.');
+  }
+  return value === 'true';
+}
+
+function officeActionRegistries(env) {
+  const raw = required(env, 'OFFICE_ACTION_SOURCE_REGISTRIES');
+  const registries = raw.split(',').map((registry) => registry.trim().toUpperCase());
+  if (registries.length === 0 || registries.some((registry) => !SEARCH_REGISTRY_NAME.test(registry))) {
+    throw new Error('OFFICE_ACTION_SOURCE_REGISTRIES must be a comma-separated list of registry names using A-Z, 0-9, underscore, or hyphen.');
+  }
+  const uniqueRegistries = [...new Set(registries)];
+  if (uniqueRegistries.length > 20) {
+    throw new Error('OFFICE_ACTION_SOURCE_REGISTRIES may contain no more than 20 registries.');
+  }
+  return uniqueRegistries;
+}
+
+function loadOfficeActionSearchConfig(env) {
+  const enabled = officeActionSearchEnabled(env);
+  const timeoutMs = boundedPositiveInteger(
+    env, 'OFFICE_ACTION_SOURCE_TIMEOUT_MS', 3_000, MIN_SEARCH_TIMEOUT_MS, MAX_SEARCH_TIMEOUT_MS,
+  );
+  const maxResults = boundedPositiveInteger(env, 'OFFICE_ACTION_SEARCH_MAX_RESULTS', 25, 1, 100);
+  if (!enabled) {
+    return {
+      officeActionSearchEnabled: false,
+      officeActionSourceRegistries: [],
+      officeActionSourceTimeoutMs: timeoutMs,
+      officeActionSearchMaxResults: maxResults,
+    };
+  }
+  return {
+    officeActionSearchEnabled: true,
+    officeActionSourceRegistries: officeActionRegistries(env),
+    officeActionSourceTimeoutMs: timeoutMs,
+    officeActionSearchMaxResults: maxResults,
+  };
+}
+
 function supabaseUrl(env) {
   const raw = required(env, 'SUPABASE_URL');
   let url;
@@ -240,6 +283,7 @@ export function loadConfig(env = process.env) {
     throw new Error('Missing required environment variable: SUPABASE_SECRET_KEY');
   }
   const searchConfig = loadSearchConfig(env);
+  const officeActionSearchConfig = loadOfficeActionSearchConfig(env);
   const watchConfig = loadWatchConfig(env);
   if (watchConfig.watchEnabled && !searchConfig.searchEnabled) {
     throw new Error('WATCH_ENABLED requires SEARCH_ENABLED=true.');
@@ -257,6 +301,7 @@ export function loadConfig(env = process.env) {
     inviteTokenTtlSeconds: positiveInteger(env, 'INVITE_TOKEN_TTL_SECONDS', 604_800),
     ...supabaseConfig,
     ...searchConfig,
+    ...officeActionSearchConfig,
     ...watchConfig,
     ...authRateLimitConfig,
   };

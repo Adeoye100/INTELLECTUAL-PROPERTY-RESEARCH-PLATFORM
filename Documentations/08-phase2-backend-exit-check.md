@@ -230,3 +230,7 @@ This is not another BE-16 implementation ticket and does not represent BE-14
 as complete. Once the listed disposable-staging checks pass and the BE-14
 exception is formally accepted, update this evidence rather than starting
 Phase 3 work under BE-17.
+
+BE-18 adds Office Action code and an unapplied migration `010`, but it does not
+resolve, execute, or change any existing Phase 2 staging gate or the BE-14
+exception status.
