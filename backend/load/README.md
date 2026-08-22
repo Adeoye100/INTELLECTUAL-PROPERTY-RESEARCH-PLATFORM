@@ -1,32 +1,12 @@
-# Safe backend load suite
+# Safe backend load-test harness (VZ-03)
 
-These are standard k6-compatible scripts. k6 is not a locked repository
-dependency, so the suite is intentionally not executed here or downloaded.
+These k6-compatible scripts are intentionally not executed by CI. They require
+an explicitly approved staging URL and dedicated test data. `smoke.js` is the
+only default-sized profile; larger profiles require `LOAD_TEST_PROFILE=staged`
+and `ALLOW_PRODUCTION_LOAD_TEST=true` for production-looking hosts.
 
-All scripts require a dedicated test token and `LOAD_TEST_BASE_URL`. The default
-profile is a 15-second, one-VU smoke profile. Loopback requires
-`ALLOW_LOCAL_MOCK_LOAD_TEST=true`; a production-looking hostname additionally
-requires `ALLOW_PRODUCTION_LOAD_TEST=true`; the staged profile requires
-`ALLOW_LARGER_LOAD_TEST=true`. Scripts issue only GET requests, send
-`X-Load-Test: iprp-safe-*`, never log the token, never contact registries
-directly, and abort when the error threshold is exceeded.
+Required environment: `LOAD_TEST_BASE_URL` (API base, ending in `/api/v1`).
+Optional: `LOAD_TEST_TOKEN` (dedicated token; never print it), `LOAD_TEST_PROFILE`.
+The scripts send `X-IPRP-Load-Test: vz-03` and never call registries directly.
 
-```sh
-LOAD_TEST_BASE_URL=https://api.staging.example.test \
-LOAD_TEST_ACCESS_TOKEN=dedicated-test-token \
-k6 run backend/load/smoke.js
-
-LOAD_TEST_BASE_URL=https://api.staging.example.test \
-LOAD_TEST_ACCESS_TOKEN=dedicated-test-token \
-LOAD_TEST_PROFILE=staged ALLOW_LARGER_LOAD_TEST=true \
-k6 run backend/load/single-jurisdiction-search.js
-```
-
-The search scenarios record standard k6 latency percentiles/throughput/statuses
-plus timeout, partial-source, and source-status metrics. The targets are P95
-under 2 seconds for single-jurisdiction and 5 seconds for federated search.
-
-There is no mounted/documented backend dashboard aggregate endpoint. Therefore
-`dashboard.js` deliberately fails before sending traffic; it must not be
-pointed at the frontend planning-only `/dashboard/summary` path. A future
-documented aggregate endpoint can add a scenario with the 1.5-second P95 target.
+Example (approved staging only): `LOAD_TEST_BASE_URL=https://staging.example/api/v1 LOAD_TEST_TOKEN=… k6 run backend/load/smoke.js`.

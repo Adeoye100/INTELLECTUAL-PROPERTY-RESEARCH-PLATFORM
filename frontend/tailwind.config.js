@@ -54,6 +54,9 @@ export default {
         'risk-low': '#166B46',
         'risk-medium': '#765400',
         'risk-high': '#B3261E',
+        'status-success': '#146575',
+        'status-warning': '#765400',
+        'status-danger': '#7A4E00',
       },
       backgroundImage: {
         'forge-gradient': 'linear-gradient(180deg, #0A1428 0%, #146575 100%)',

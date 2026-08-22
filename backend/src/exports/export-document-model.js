@@ -9,9 +9,9 @@ function evidenceLines(result) {
     `Owner: ${value(result.owner)} | Jurisdiction: ${value(result.jurisdiction)} | Classes: ${result.niceClasses.join(', ') || NOT_AVAILABLE}`,
     `Status: ${value(result.status)} | Filing date: ${value(result.filingDate)}`,
     `Risk: ${value(risk.compositeRating).toUpperCase()} | Composite score: ${value(risk.compositeScore)}`,
-    `Visual evidence score: ${value(risk.visualScore)}`,
-    `Phonetic evidence score: ${value(risk.phoneticScore)}`,
-    `Class evidence: ${risk.classOverlap ? 'Overlap identified' : 'No overlap identified'} | Score: ${value(risk.classOverlapScore)}`,
+    `Visual evidence score (Visual similarity component): ${value(risk.visualScore)} / 100`,
+    `Phonetic evidence score (Phonetic similarity component): ${value(risk.phoneticScore)} / 100`,
+    `Class evidence (Nice-class overlap component): ${value(risk.classOverlapScore)} / 100 — ${risk.classOverlap ? 'Overlap identified' : 'No overlapping classes'}`,
     `Conceptual score: ${value(risk.conceptualScore)}`,
     `Methodology: ${value(risk.methodology.version)} — ${value(risk.methodology.description)}`,
   ];
@@ -53,6 +53,7 @@ export function createExportDocumentModel(model) {
       'Nice classes': model.portfolioMark.niceClasses.join(', ') || null, Status: model.portfolioMark.status,
       'Filing date': model.portfolioMark.filingDate, 'Registration date': model.portfolioMark.registrationDate,
       'Renewal date': model.portfolioMark.renewalDate,
+      'Renewal deadline state': renewalState(model.portfolioMark.renewalDate),
     }) });
     output.sections.push({ heading: 'Attributed Office Actions', lines: model.officeActions.length ? model.officeActions.flatMap((item) => pairs({
       Source: `${value(item.sourceRegistry)} ${value(item.sourceReferenceId)}`, Application: item.applicationNumber,
@@ -68,4 +69,11 @@ export function createExportDocumentModel(model) {
     return output;
   }
   throw new TypeError('Unsupported export document model.');
+}
+
+function renewalState(date) {
+  if (!date) return 'No renewal date';
+  const target = Date.parse(`${date}T00:00:00Z`); const today = new Date(); const days = Math.floor((target - Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())) / 86400000);
+  if (!Number.isFinite(days)) return 'No renewal date';
+  if (days < 0) return 'Overdue'; if (days <= 30) return 'Due soon'; return 'Upcoming';
 }

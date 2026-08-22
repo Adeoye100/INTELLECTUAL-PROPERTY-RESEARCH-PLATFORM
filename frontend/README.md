@@ -19,7 +19,19 @@ When importing the project to Vercel:
 
 Copy the relevant values from `.env` into deployment-managed environment configuration. Live mode requires `VITE_API_BASE_URL` and the value must end in `/api/v1`. `VITE_API_MODE` defaults to `live`; MSW starts only when `VITE_API_MODE=mock` is explicitly set while running a Vite development build. Staging and production builds reject mock mode.
 
-The current repository has no backend application implementation, so no live endpoint is claimed as integrated. See `../Documentations/07-frontend-api-contracts.md` for the mock-only candidate contracts and blockers.
+The frontend only claims the documented backend contracts; approved environment
+configuration is required before a live request is attempted. See
+`../Documentations/07-frontend-api-contracts.md` for route details and staging
+gates.
+
+## Visualization Track
+
+Dashboard analytics is read from the firm-scoped backend aggregate endpoint,
+not recomputed from raw rows. Recharts 3.10.1 powers the dashboard and
+confusion-risk component chart. Shared visualization primitives enforce
+accessible text equivalents, reduced motion, risk-token exclusivity, neutral
+source/renewal states, and loading/empty/error/partial states. Real staging
+P95 and visual QA evidence remain pending.
 
 ## Quality gate
 

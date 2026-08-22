@@ -3,8 +3,6 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   ChevronLeft,
-  Scale,
-  FileText,
   AlertTriangle,
   AlertCircle,
   CheckCircle,
@@ -14,10 +12,6 @@ import {
   BookOpen,
   FolderOpen,
   Trash2,
-  Brain,
-  Eye,
-  Hash,
-  HelpCircle,
   Info,
   Loader2,
 } from 'lucide-react';
@@ -37,14 +31,7 @@ import type {
 } from '../../types';
 import { cn } from '../../lib/utils';
 import { getSearchResult } from './searchApi';
-import {
-  ResponsiveContainer,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
-} from 'recharts';
+import { ConfusionRiskBreakdown } from './ConfusionRiskBreakdown';
 
 // ---------------------------------------------------------------------------
 // Risk level presentation helpers
@@ -80,74 +67,6 @@ const riskPresentation: Record<RiskLevel, RiskPresentation> = {
     bg: 'bg-risk-low/10',
     Icon: ShieldCheck,
   },
-};
-
-const evidenceIcon: Record<string, React.FC<{ className?: string }>> = {
-  Phonetic: Scale,
-  Visual: Eye,
-  Conceptual: Brain,
-  Class: Hash,
-};
-
-// ---------------------------------------------------------------------------
-// Evidence panel sub-component
-// ---------------------------------------------------------------------------
-
-interface EvidencePanelProps {
-  score: RiskScore;
-}
-
-const EvidencePanel: React.FC<EvidencePanelProps> = ({ score }) => {
-  const hasConceptual = score.matchedMarkRefs.some((r) => r.type === 'Conceptual');
-  const conceptualUnavailable = score.conceptualScore === null && !hasConceptual;
-
-  return (
-    <div className="space-y-3">
-      {score.matchedMarkRefs.map((ref, idx) => {
-        const Icon = evidenceIcon[ref.type] ?? FileText;
-        const colourMap: Record<string, string> = {
-          Phonetic: 'bg-blue-100 text-blue-700',
-          Visual: 'bg-purple-100 text-purple-700',
-          Conceptual: 'bg-amber-100 text-amber-700',
-          Class: 'bg-forge-teal-700/10 text-forge-teal-700',
-        };
-        return (
-          <div
-            key={idx}
-            className="flex items-start gap-4 rounded border border-forge-silver-300 bg-surface-base p-4"
-          >
-            <div className={cn('mt-0.5 rounded p-2', colourMap[ref.type] ?? 'bg-forge-silver-100 text-text-secondary')}>
-              <Icon className="h-4 w-4" aria-hidden={true} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-2">
-                <h4 className="font-bold text-text-primary">{ref.type} similarity</h4>
-                <span className="text-xs font-bold uppercase text-forge-teal-700">
-                  {ref.score}% confidence
-                </span>
-              </div>
-              <p className="mt-1 text-sm text-text-secondary">{ref.evidence}</p>
-            </div>
-          </div>
-        );
-      })}
-
-      {conceptualUnavailable && (
-        <div className="flex items-start gap-4 rounded border border-forge-silver-300 bg-surface-base p-4 opacity-60">
-          <div className="mt-0.5 rounded bg-forge-silver-100 p-2 text-text-secondary">
-            <HelpCircle className="h-4 w-4" aria-hidden={true} />
-          </div>
-          <div>
-            <h4 className="font-bold text-text-secondary">Conceptual similarity</h4>
-            <p className="mt-1 text-sm text-text-secondary">
-              Conceptual scoring is not available for this source or methodology version. The
-              composite risk rating reflects phonetic, visual, and class evidence only.
-            </p>
-          </div>
-        </div>
-      )}
-    </div>
-  );
 };
 
 // ---------------------------------------------------------------------------
@@ -248,14 +167,6 @@ export const RiskDetailScreen: React.FC = () => {
   const score = result?.riskScore;
   const rp = score ? riskPresentation[score.compositeRating] : null;
 
-  const radarData = score
-    ? [
-        { subject: 'Phonetic', value: score.phoneticScore },
-        { subject: 'Visual', value: score.visualScore },
-        { subject: 'Conceptual', value: score.conceptualScore ?? 0 },
-        { subject: 'Class', value: score.classOverlap ? 100 : 0 },
-      ]
-    : [];
 
   // ---- Handlers ----
   const handleMatterSaved = (matter: Matter, created: boolean) => {
@@ -466,40 +377,7 @@ export const RiskDetailScreen: React.FC = () => {
           </Card>
 
           {/* Evidence panel */}
-          <Card title="Supporting evidence">
-            <EvidencePanel score={score} />
-          </Card>
-
-          {/* Methodology / attribution */}
-          {score.methodology && (
-            <Card title="Scoring methodology">
-              <dl className="space-y-3 text-sm">
-                <div className="flex flex-wrap gap-x-4 gap-y-1">
-                  <dt className="text-xs font-bold uppercase text-text-secondary">Version</dt>
-                  <dd className="font-mono font-semibold text-text-primary">
-                    {score.methodology.version}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-bold uppercase text-text-secondary">Description</dt>
-                  <dd className="mt-1 text-text-secondary">{score.methodology.description}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-bold uppercase text-text-secondary">Sources consulted</dt>
-                  <dd className="mt-1 flex flex-wrap gap-2">
-                    {score.methodology.sourceAttribution.map((src) => (
-                      <span
-                        key={src}
-                        className="rounded bg-forge-silver-100 px-2 py-0.5 text-xs font-semibold text-text-primary"
-                      >
-                        {src}
-                      </span>
-                    ))}
-                  </dd>
-                </div>
-              </dl>
-            </Card>
-          )}
+          <ConfusionRiskBreakdown score={score} />
         </div>
 
         {/* ---- Right column: summary + actions ---- */}
@@ -587,40 +465,6 @@ export const RiskDetailScreen: React.FC = () => {
               ))}
             </dl>
 
-            {/* Radar chart */}
-            <div className="mt-4 border-t border-forge-silver-300 pt-4">
-              <p className="mb-2 text-xs font-bold uppercase text-text-secondary">
-                Risk vector chart
-              </p>
-              <div className="h-52 w-full" aria-hidden="true">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
-                    <PolarGrid />
-                    <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11 }} />
-                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                    <Radar
-                      name="Risk"
-                      dataKey="value"
-                      stroke={
-                        score.compositeRating === 'high'
-                          ? '#B3261E'
-                          : score.compositeRating === 'medium'
-                            ? '#B8860B'
-                            : '#1E8A5B'
-                      }
-                      fill={
-                        score.compositeRating === 'high'
-                          ? '#B3261E'
-                          : score.compositeRating === 'medium'
-                            ? '#B8860B'
-                            : '#1E8A5B'
-                      }
-                      fillOpacity={0.5}
-                    />
-                  </RadarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
           </Card>
 
           {/* Action panel */}

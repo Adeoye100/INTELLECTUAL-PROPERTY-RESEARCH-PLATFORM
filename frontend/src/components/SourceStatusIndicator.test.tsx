@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { SourceStatusIndicator } from './SourceStatusIndicator';
 
 describe('SourceStatusIndicator', () => {
-  it('pairs every source state with visible text and an icon-backed severity badge', () => {
+  it('pairs every source state with visible text and a non-risk status indicator', () => {
     render(
       <SourceStatusIndicator
         statuses={[
@@ -15,10 +15,10 @@ describe('SourceStatusIndicator', () => {
       />,
     );
 
-    expect(screen.getByText(/USPTO: Complete/)).toHaveClass('bg-risk-low');
-    expect(screen.getByText('EUIPO: Pending')).toHaveClass('bg-risk-medium');
-    expect(screen.getByText('UKIPO: Delayed')).toHaveClass('bg-risk-medium');
-    expect(screen.getByText('WIPO: Unavailable')).toHaveClass('bg-risk-high');
-    expect(screen.getByRole('alert')).toHaveTextContent(/results are partial/i);
+    expect(screen.getByLabelText(/USPTO: Responded/)).toBeInTheDocument();
+    expect(screen.getByLabelText('EUIPO: Pending')).toBeInTheDocument();
+    expect(screen.getByLabelText('UKIPO: Pending')).toBeInTheDocument();
+    expect(screen.getByLabelText('WIPO: Unavailable')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(/results are partial/i);
   });
 });

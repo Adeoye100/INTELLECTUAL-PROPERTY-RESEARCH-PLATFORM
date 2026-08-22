@@ -1,0 +1,27 @@
+erDiagram
+  FIRMS ||--o{ USERS : employs
+  FIRMS ||--o{ FIRM_INVITATIONS : issues
+  FIRMS ||--o{ PORTFOLIO_MARKS : owns
+  PORTFOLIO_MARKS ||--o{ WATCHES : monitored_by
+  WATCHES ||--o{ RISK_SCORES : produces
+  WATCHES ||--o{ ALERTS : generates
+  PORTFOLIO_MARKS ||--o{ RISK_SCORES : assessed
+  PORTFOLIO_MARKS ||--o{ OFFICE_ACTION_REFS : cites
+  FIRMS ||--o{ SEARCH_RESULTS : stores
+  USERS ||--o{ SEARCH_RESULTS : requests
+  FIRMS ||--o{ EXPORTS : owns
+  USERS ||--o{ EXPORTS : requests
+  FIRMS ||--o{ AUDIT_LOGS : records
+  USERS ||--o{ AUDIT_LOGS : acts
+  FIRMS { uuid id PK; }
+  USERS { uuid id PK; uuid firm_id FK; user_role role; }
+  FIRM_INVITATIONS { uuid id PK; uuid firm_id FK; uuid issued_by_user_id FK; }
+  REGISTRY_TRADEMARKS { uuid id PK; string source_registry; string source_reference_id; }
+  PORTFOLIO_MARKS { uuid id PK; uuid firm_id FK; uuid owner_user_id FK; date renewal_date; }
+  WATCHES { uuid id PK; uuid firm_id FK; uuid portfolio_mark_id FK; }
+  RISK_SCORES { uuid id PK; uuid firm_id FK; uuid portfolio_mark_id FK; uuid watch_id FK; }
+  ALERTS { uuid id PK; uuid firm_id FK; uuid watch_id FK; uuid risk_score_id FK; }
+  OFFICE_ACTION_REFS { uuid id PK; uuid firm_id FK; uuid portfolio_mark_id FK; }
+  SEARCH_RESULTS { uuid id PK; uuid firm_id FK; uuid requested_by_user_id FK; }
+  EXPORTS { uuid id PK; uuid firm_id FK; uuid requested_by_user_id FK; }
+  AUDIT_LOGS { uuid id PK; uuid firm_id FK; uuid actor_user_id FK; }

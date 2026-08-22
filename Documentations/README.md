@@ -9,6 +9,7 @@
 - [Deployment and operations runbook](12-deployment-and-operations-runbook.md)
 - [Admin training guide](13-admin-training-guide.md)
 - [Hosting-provider ADR](14-hosting-provider-decision.md) and [IaC interface](../infra/README.md)
+- [Visualization Track audit and delivery index](14-visual-system-and-component-audit.md) and [status](15-visualization-track-status.md)
 
 BE-14 billing is deferred. Existing staging, independent-audit, P95, provider,
 and Multi-AZ failover gates remain pending until separately evidenced.

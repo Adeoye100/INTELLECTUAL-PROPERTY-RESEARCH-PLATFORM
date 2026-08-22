@@ -13,19 +13,13 @@ Three data stores, three jobs: PostgreSQL is the system of record, Redis is the 
 
 ## 1. Entity-Relationship Overview
 
-```mermaid
-erDiagram
-    FIRMS ||--o{ USERS : employs
-    FIRMS ||--o{ SUBSCRIPTIONS : has
-    USERS ||--o{ SEARCHES : runs
-    USERS ||--o{ PORTFOLIO_MARKS : manages
-    PORTFOLIO_MARKS ||--o{ WATCHES : monitored_by
-    WATCHES ||--o{ ALERTS : generates
-    SEARCHES ||--o{ SEARCH_RESULTS : returns
-    SEARCH_RESULTS ||--o{ RISK_SCORES : scored_by
-    PORTFOLIO_MARKS ||--o{ OFFICE_ACTION_REFS : cites
-    USERS ||--o{ AUDIT_LOGS : triggers
-```
+The verified editable ERD is [backend-schema-erd.mmd](assets/backend-schema-erd.mmd)
+with rendered [SVG](assets/backend-schema-erd.svg). It includes only tables
+created by migrations 001–012. The diagram is accessible as text: firms own
+users and tenant records; portfolio marks connect to watches, immutable risk
+scores, alerts and attributed Office Action references; users request immutable
+search snapshots and exports; audit logs are append-only; registry trademarks
+retain source registry/reference provenance.
 
 ## 2. PostgreSQL Tables (System of Record)
 

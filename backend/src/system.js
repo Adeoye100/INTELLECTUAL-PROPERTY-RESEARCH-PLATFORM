@@ -32,6 +32,7 @@ import { createOfficeActionSearchRuntime } from './office-actions/office-action-
 import { OfficeActionRefRepository } from './office-actions/office-action-ref-repository.js';
 import { OfficeActionRefService } from './office-actions/office-action-ref-service.js';
 import { createPdfExportRuntime } from './exports/pdf-export-runtime.js';
+import { DashboardAnalyticsRepository, DashboardAnalyticsService } from './dashboard/dashboard-analytics.js';
 
 export async function createSystem(config, { officeActionSources = [], exportStorage = null } = {}) {
   const { searchSources, federatedSearchService, searchService } = createSearchRuntime(config);
@@ -103,6 +104,7 @@ export async function createSystem(config, { officeActionSources = [], exportSto
   });
   const alertRepository = new AlertRepository(pool);
   const alertService = new AlertService({ repository: alertRepository, auditService });
+  const dashboardAnalyticsService = new DashboardAnalyticsService({ repository: new DashboardAnalyticsRepository(pool), redisClient });
   const userRoleService = new UserRoleService({ userRepository, auditService, roleFirmResolver });
   const officeActionRefRepository = new OfficeActionRefRepository(pool);
   const officeActionRefService = new OfficeActionRefService({ repository: officeActionRefRepository, auditService });
@@ -137,6 +139,7 @@ export async function createSystem(config, { officeActionSources = [], exportSto
       exportService: pdfExportRuntime?.exportService ?? null,
       authRateLimiter,
       trustProxyHops: config.trustProxyHops,
+      dashboardAnalyticsService,
       readinessChecks: [
         async () => { await pool.query('SELECT 1'); },
         async () => { await redisClient.ping(); },
@@ -157,6 +160,7 @@ export async function createSystem(config, { officeActionSources = [], exportSto
     exportService: pdfExportRuntime?.exportService ?? null,
     alertRepository,
     alertService,
+    dashboardAnalyticsService,
     auditLogRepository,
     auditService,
     exportAuditService,

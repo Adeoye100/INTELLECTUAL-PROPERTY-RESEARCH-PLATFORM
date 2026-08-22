@@ -1138,3 +1138,10 @@ compatible load suite is under `load/`; it has no measured staging result and
 will refuse unsafe targets without explicit opt-in. See the documentation index
 and operations runbook for provider, staging, independent-audit, and failover
 gates. BE-14 remains deferred.
+# Dashboard analytics (VZ-03)
+
+`GET /api/v1/dashboard/analytics?range=7d|30d|90d` returns firm-scoped
+portfolio/watch aggregates. PostgreSQL remains authoritative; Redis caches a
+normalized firm/range key for 60 seconds. Cache read/write failures degrade to
+the database and are reported as `cacheStatus: miss`, never as cross-firm data.
+The aggregate is not real-time and contains no user token or raw row payload.

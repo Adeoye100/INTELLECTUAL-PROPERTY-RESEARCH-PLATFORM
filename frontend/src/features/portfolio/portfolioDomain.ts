@@ -18,10 +18,13 @@ export const defaultPortfolioFilters: PortfolioFilters = {
 
 const startOfUtcDay = (date: Date) => Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 
-export const renewalDaysRemaining = (renewalDate: string, now = new Date()) =>
-  Math.ceil((Date.parse(`${renewalDate}T00:00:00Z`) - startOfUtcDay(now)) / 86_400_000);
+export const renewalDaysRemaining = (renewalDate: string | null | undefined, now = new Date()) => {
+  if (!renewalDate || !/^\d{4}-\d{2}-\d{2}$/.test(renewalDate)) return Number.POSITIVE_INFINITY;
+  return Math.ceil((Date.parse(`${renewalDate}T00:00:00Z`) - startOfUtcDay(now)) / 86_400_000);
+};
 
-export const getRenewalWarning = (renewalDate: string, now = new Date()) => {
+export const getRenewalWarning = (renewalDate: string | null | undefined, now = new Date()) => {
+  if (!renewalDate || !/^\d{4}-\d{2}-\d{2}$/.test(renewalDate)) return { level: 'none' as const, label: 'No renewal date', days: Number.POSITIVE_INFINITY };
   const days = renewalDaysRemaining(renewalDate, now);
   if (days < 0) return { level: 'high' as const, label: `Overdue by ${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'}`, days };
   if (days <= 30) return { level: 'high' as const, label: `Due in ${days} day${days === 1 ? '' : 's'}`, days };

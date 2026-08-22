@@ -37,3 +37,12 @@ and partial-source rate, source status, and a link to non-sensitive output. Run
 federated only after source licenses and a dedicated staging target are approved.
 
 **Status:** **Load-testing suite code-complete; staging P95 verification pending.**
+# VZ-03 additions
+
+Safe k6-compatible scripts live under `backend/load/` and require an explicitly
+approved `LOAD_TEST_BASE_URL`. The scripts emit `X-IPRP-Load-Test: vz-03`, use
+dedicated credentials, and never target registries. No approved staging run was
+performed in this pass, so no latency numbers are fabricated.
+
+Targets: single-jurisdiction P95 <2s; federated P95 <5s; dashboard aggregate
+P95 <1.5s. Status: **suite code-complete; P95 verification pending**.

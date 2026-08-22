@@ -71,7 +71,7 @@ describe('SearchScreen', () => {
     expect(requestUrl.searchParams.get('filedFrom')).toBe('2023-01-01');
     expect(requestUrl.searchParams.get('filedTo')).toBe('2025-12-31');
 
-    expect(screen.getByText(/USPTO: Complete/)).toBeVisible();
+    expect(screen.getByText(/USPTO: Responded/)).toBeVisible();
     expect(screen.getByText(/EUIPO: Pending/)).toBeVisible();
     expect(screen.getByText(/UKIPO: Delayed/)).toBeVisible();
     expect(screen.getByText(/WIPO: Unavailable/)).toBeVisible();

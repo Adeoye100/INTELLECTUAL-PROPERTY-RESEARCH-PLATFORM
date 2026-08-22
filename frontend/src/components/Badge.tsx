@@ -1,6 +1,6 @@
 import React from 'react';
 import { cn } from '../lib/utils';
-import { AlertCircle, CheckCircle, Info } from 'lucide-react';
+import { Info } from 'lucide-react';
 
 type RiskLevel = 'low' | 'medium' | 'high' | 'none';
 
@@ -12,43 +12,18 @@ interface BadgeProps {
 }
 
 export const Badge: React.FC<BadgeProps> = ({ children, risk = 'none', tone = 'neutral', className }) => {
-  const riskStyles = {
-    low: 'bg-risk-low text-white',
-    medium: 'bg-risk-medium text-white',
-    high: 'bg-risk-high text-white',
-    none: 'bg-forge-silver-300 text-text-primary',
-  };
-
-  const icons = {
-    low: <CheckCircle className="w-3 h-3 mr-1" aria-hidden="true" />,
-    medium: <Info className="w-3 h-3 mr-1" aria-hidden="true" />,
-    high: <AlertCircle className="w-3 h-3 mr-1" aria-hidden="true" />,
-    none: null,
-  };
-
-  const toneStyles = {
-    neutral: riskStyles.none,
-    success: riskStyles.low,
-    warning: riskStyles.medium,
-    danger: riskStyles.high,
-  };
-
-  const toneIcons = {
-    neutral: null,
-    success: icons.low,
-    warning: icons.medium,
-    danger: icons.high,
-  };
+  const riskStyles = { low: 'bg-risk-low text-white', medium: 'bg-risk-medium text-white', high: 'bg-risk-high text-white', none: 'bg-forge-silver-100 text-text-primary border-forge-silver-300' };
+  const toneStyles = { neutral: riskStyles.none, success: 'bg-status-success/10 text-status-success border-status-success/40', warning: 'bg-status-warning/10 text-status-warning border-status-warning/40', danger: 'bg-status-danger/10 text-status-danger border-status-danger/40' };
 
   return (
     <span
       className={cn(
-        'inline-flex items-center px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider',
+        'inline-flex items-center gap-1 border px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider',
         risk === 'none' ? toneStyles[tone] : riskStyles[risk],
         className
       )}
     >
-      {risk === 'none' ? toneIcons[tone] : icons[risk]}
+      {risk === 'none' && tone !== 'neutral' && <Info className="w-3 h-3" aria-hidden="true" />}
       {children}
     </span>
   );

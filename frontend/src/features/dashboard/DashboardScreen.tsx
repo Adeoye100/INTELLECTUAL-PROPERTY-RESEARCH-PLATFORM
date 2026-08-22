@@ -1,24 +1,25 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, ArrowRight, BriefcaseBusiness, Eye, RefreshCw, Search } from 'lucide-react';
+import { AlertCircle, ArrowRight, BriefcaseBusiness, CalendarDays, Eye, EyeOff, RefreshCw, Search } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Link } from 'react-router-dom';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
-import type { DashboardSummary } from '../../types';
+import type { DashboardAnalytics, DashboardSummary } from '../../types';
 import { useAuthStore } from '../auth/authStore';
 import { OnboardingChecklist } from '../onboarding/OnboardingChecklist';
 import { useOnboardingStore } from '../onboarding/onboardingStore';
-import { getDashboardSummary } from './dashboardApi';
+import { getDashboardAnalytics } from './dashboardApi';
+import { ChartCard, ChartEmptyState, AccessibleDataTable, RiskBadge } from '../../components/visualization/ChartPrimitives';
 
 export const DashboardScreen: React.FC = () => {
   const user = useAuthStore((state) => state.user);
   const clientProgress = useOnboardingStore((state) => user ? state.progressByUser[user.id] : undefined);
   const showOnboarding = user?.onboardingRequired === true && !clientProgress?.completedPath;
-  const dashboard = useQuery<DashboardSummary>({
-    queryKey: ['dashboard', 'summary'],
-    queryFn: getDashboardSummary,
+  const dashboard = useQuery<DashboardAnalytics | DashboardSummary>({
+    queryKey: ['dashboard', 'analytics', '30d'],
+    queryFn: getDashboardAnalytics,
     enabled: !showOnboarding,
     retry: false,
   });
@@ -46,7 +47,8 @@ export const DashboardScreen: React.FC = () => {
     );
   }
 
-  const summary = dashboard.data!;
+  if ('portfolio' in dashboard.data!) return <AnalyticsDashboard data={dashboard.data} onRetry={() => void dashboard.refetch()} />;
+  const summary = { recentAlerts: [], recentSearches: [], searchActivity: [], riskDistribution: [], unavailableSections: [], partial: false, activeWatches: 0, portfolioHealthPercent: 0, portfolioMarkCount: 0, ...(dashboard.data as DashboardSummary) };
   const urgentAlerts = summary.recentAlerts
     .filter((alert) => !alert.resolved && alert.riskLevel === 'high')
     .sort((left, right) => right.detectedAt.localeCompare(left.detectedAt));
@@ -113,6 +115,17 @@ export const DashboardScreen: React.FC = () => {
 
 function MetricCard({ label, value, detail, icon }: { label: string; value: string; detail: string; icon: React.ReactNode }) {
   return <Card><div className="flex items-center justify-between"><p className="text-xs font-bold uppercase text-text-secondary">{label}</p><span className="text-forge-teal-700">{icon}</span></div><p className="mt-1 text-3xl font-black text-text-primary">{value}</p><p className="mt-2 text-xs text-text-secondary">{detail}</p></Card>;
+}
+
+function AnalyticsDashboard({ data, onRetry }: { data: DashboardAnalytics; onRetry: () => void }) {
+  const riskRows = data.portfolio.byRisk.filter((entry) => ['low', 'medium', 'high'].includes(entry.risk));
+  const points = data.watchActivity.points;
+  return <div className="space-y-6"><header><h1 className="text-2xl font-bold text-text-primary">Console Overview</h1><p className="text-sm text-text-secondary">Portfolio and watch activity for the last {data.range.replace('d', ' days')}.</p><p className="mt-1 text-xs text-text-secondary">Generated {new Date(data.generatedAt).toLocaleString()} · {data.cacheStatus === 'hit' ? 'Cached aggregate' : 'Fresh aggregate'} · Not real-time.</p></header>
+    <section className="grid grid-cols-2 gap-4 md:grid-cols-4" aria-label="Portfolio analytics summary"><MetricCard label="Total marks" value={String(data.portfolio.total)} detail="Firm-scoped portfolio" icon={<BriefcaseBusiness className="h-5 w-5" aria-hidden="true" />} /><MetricCard label="Renewals due soon" value={String(data.portfolio.renewalsDueSoon)} detail="Within 30 days" icon={<CalendarDays className="h-5 w-5" aria-hidden="true" />} /><MetricCard label="Enabled watches" value={String(data.watchActivity.enabled)} detail="Polling configured" icon={<Eye className="h-5 w-5" aria-hidden="true" />} /><MetricCard label="Paused watches" value={String(data.watchActivity.disabled)} detail="Not polling" icon={<EyeOff className="h-5 w-5" aria-hidden="true" />} /></section>
+    <section className="grid gap-6 xl:grid-cols-2"><ChartCard title="Portfolio risk distribution" description="Risk ratings are research signals, not legal conclusions.">{riskRows.length ? <div className="space-y-3">{riskRows.map((entry) => <div key={entry.risk} className="flex items-center justify-between gap-3"><RiskBadge rating={entry.risk} /><span className="font-semibold text-text-primary">{entry.count} marks</span></div>)}<AccessibleDataTable caption="Portfolio risk distribution" rows={riskRows.map((entry) => ({ label: `${entry.risk} risk`, value: String(entry.count), detail: 'marks' }))} /></div> : <ChartEmptyState message="No portfolio risk data is available yet." />}</ChartCard><ChartCard title="Watch activity" description="Polls and alerts recorded by day; partial and unavailable polls remain visible.">{points.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">Watch activity by day</caption><thead><tr className="border-b border-forge-silver-300"><th scope="col" className="py-2">Date</th><th scope="col" className="py-2">Polls</th><th scope="col" className="py-2">Alerts</th><th scope="col" className="py-2">Partial</th><th scope="col" className="py-2">Unavailable</th></tr></thead><tbody>{points.slice(-14).map((point) => <tr key={point.date} className="border-b border-forge-silver-100"><th scope="row" className="py-2 font-normal">{point.date}</th><td className="py-2">{point.polls}</td><td className="py-2">{point.alerts}</td><td className="py-2">{point.partial}</td><td className="py-2">{point.unavailable}</td></tr>)}</tbody></table></div> : <ChartEmptyState message="No watch activity in this range." />}</ChartCard></section>
+    {points.some((point) => point.partial || point.unavailable) && <div className="rounded border border-forge-silver-300 bg-surface-base p-3 text-sm" role="status">Some watch polls were partial or unavailable. Valid activity remains shown; retry after checking source configuration.</div>}
+    <button type="button" className="text-sm font-semibold text-forge-teal-700 underline" onClick={onRetry}>Refresh aggregate</button>
+  </div>;
 }
 
 function PartialDataNotice({ unavailableSections, onRetry }: { unavailableSections: string[]; onRetry: () => void }) {

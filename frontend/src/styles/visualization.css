@@ -1,0 +1,7 @@
+.risk-low { color: #166B46; border-color: #166B46; background: #E8F3ED; }
+.risk-medium { color: #765400; border-color: #765400; background: #FFF7D6; }
+.risk-high { color: #B3261E; border-color: #B3261E; background: #FDECEA; }
+.source-complete { color: #146575; border-color: #75AEB7; background: #EDF8FA; }
+.source-pending, .source-delayed { color: #5B6470; border-color: #B9C1CA; background: #F5F7F9; }
+.source-unavailable { color: #7A4E00; border-color: #B18442; background: #FFF8E8; }
+.renewal-overdue, .renewal-due-soon, .renewal-upcoming, .renewal-normal, .renewal-no-date { color: #4A5568; border-color: #B9C1CA; background: #F5F7F9; }

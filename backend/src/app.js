@@ -15,6 +15,7 @@ import { createOfficeActionRefRouter, createOfficeActionSearchRouter } from './r
 import { createAuditRequestContextMiddleware } from './audit/request-context.js';
 import { createExportRouter } from './routes/export-routes.js';
 import { createHealthRouter } from './routes/health-routes.js';
+import { createDashboardRouter } from './routes/dashboard-routes.js';
 import {
   createRequestBoundsMiddleware,
   createSecurityHeadersMiddleware,
@@ -36,6 +37,7 @@ export function createApp({
   authRateLimiter = null,
   trustProxyHops = 0,
   readinessChecks = [],
+  dashboardAnalyticsService = null,
 }) {
   if (!Number.isSafeInteger(trustProxyHops) || trustProxyHops < 0 || trustProxyHops > 10) {
     throw new Error('trustProxyHops must be an integer between 0 and 10.');
@@ -56,6 +58,7 @@ export function createApp({
     createProvisioningRouter(authenticateIdentity, provisioningService, { authRateLimiter }),
   );
   app.use('/api/v1', createProtectedRouter(authenticate, authService, { authRateLimiter }));
+  if (dashboardAnalyticsService) app.use('/api/v1', createDashboardRouter(authenticate, dashboardAnalyticsService));
   if (searchService && searchResultService) {
     app.use('/api/v1', createSearchRouter(authenticate, searchService, { searchResultService }));
   }

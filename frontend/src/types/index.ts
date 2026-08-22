@@ -26,13 +26,13 @@ export interface User {
 export interface PortfolioMark {
   id: string;
   firmId: string;
-  ownerUserId: string;
+  ownerUserId: string | null;
   markText: string;
   jurisdiction: string;
   niceClasses: number[];
   status: string;
-  filingDate: string;
-  renewalDate: string;
+  filingDate: string | null;
+  renewalDate: string | null;
   sourceRegistry: string;
   mocked?: boolean;
 }
@@ -177,6 +177,14 @@ export interface DashboardSummary {
   unavailableSections: string[];
 }
 
+export interface DashboardAnalytics {
+  generatedAt: string;
+  cacheStatus: 'hit' | 'miss' | 'bypass';
+  range: string;
+  portfolio: { total: number; byRisk: Array<{ risk: string; count: number }>; byStatus: Array<{ status: string; count: number }>; renewalsDueSoon: number };
+  watchActivity: { points: Array<{ date: string; polls: number; alerts: number; partial: number; unavailable: number }>; enabled: number; disabled: number };
+}
+
 /** Describes the algorithm version and evidence attribution for a risk score. */
 export interface ScoringMethodology {
   /** Short version identifier, e.g. "v2.1.0" */
@@ -196,6 +204,8 @@ export interface RiskScore {
   alertId?: string;
   phoneticScore: number;
   visualScore: number;
+  classOverlapScore?: number;
+  compositeScore?: number;
   /** null = conceptual scoring not supported for this source/version */
   conceptualScore: number | null;
   classOverlap: boolean;
