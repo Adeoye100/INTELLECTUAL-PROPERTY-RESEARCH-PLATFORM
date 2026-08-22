@@ -45,18 +45,18 @@ and environment configuration.
 | `GET /api/v1/search` | Query: `mark`, repeated `jurisdiction`, comma-separated `class`, `status`, `owner`, `filedFrom`, `filedTo`; `resultId` is rejected by the authenticated search boundary (snapshot retrieval remains BE-19) | `SearchResponse` with `results`, per-source statuses, `partial?`, `requestId?`; every result includes transient `riskAnalysis` with BE-10B component scores, `conceptualScore: null`, methodology, provenance, and Visual/Phonetic/Class evidence. `owner` and `filingDate` may be `null` when the registry has no value. Elasticsearch `relevanceScore`, persistent risk IDs, and legal conclusions are not exposed. | Admin, Attorney, Viewer; usage limits server-enforced | GET vs search-job POST, pagination, progressive polling/streaming, canonical result-detail route, source timeout semantics, query limits; frontend `SearchResult` currently types nullable fields and the new `riskAnalysis` contract differently and requires reconciliation before live integration |
 | `POST /api/v1/portfolio/import` | `{ searchResultId: string }` | `201 PortfolioMark` | Admin, Attorney | Idempotency, source snapshot, ownership/firm selection, renewal derivation |
 | `GET /api/v1/portfolio-marks` | Implemented canonical list; see BE-11 contract below | `200 { items, pagination }` | Admin, Attorney, Viewer within firm | Frontend must migrate old `/portfolio` mock calls before live use |
-| `POST /api/v1/portfolio-marks` | Implemented canonical create; see BE-11 contract below | `201 PortfolioMark` | Admin, Attorney | BE-16 audit event required before production activation |
+| `POST /api/v1/portfolio-marks` | Implemented canonical create; see BE-11 contract below | `201 PortfolioMark` | Admin, Attorney | Transactional BE-16 audit event included |
 | `GET /api/v1/portfolio-marks/:id` | UUID path parameter | `200 PortfolioMark` | Admin, Attorney, Viewer in same firm | No status-history endpoint in BE-11 |
-| `PATCH /api/v1/portfolio-marks/:id` | Non-empty mutable-field subset | `200 PortfolioMark` | Admin, Attorney | BE-16 audit event required before production activation |
-| `DELETE /api/v1/portfolio-marks/:id` | UUID path parameter | `204` | Admin, Attorney | Transactional hard delete pending a documented retention policy |
+| `PATCH /api/v1/portfolio-marks/:id` | Non-empty mutable-field subset | `200 PortfolioMark` | Admin, Attorney | Transactional BE-16 audit event included |
+| `DELETE /api/v1/portfolio-marks/:id` | UUID path parameter | `204` | Admin, Attorney | Transactional hard delete and audit event |
 | `GET /api/v1/portfolio/:markId/attachments` | Mark ID in path | `PortfolioAttachment[]` | Admin, Attorney, Viewer in same firm | Storage metadata, malware state, pagination, retention |
 | `GET /api/v1/portfolio/:markId/attachments/:attachmentId/download` | IDs in path | Current mock shape `{ downloadUrl, fileName, mocked? }` | Admin, Attorney, Viewer in same firm | Direct authenticated blob vs short-lived URL, content-type/disposition, URL TTL, download audit; current frontend fixture is not a live contract |
 | `POST /api/v1/portfolio/:markId/watch` | Not implemented; no convenience alias | — | — | Canonical BE-12 route is `/api/v1/watches` |
 | `GET /api/v1/watches` | Implemented; see BE-12 contract below | `200 { items, pagination }` | Admin, Attorney, Viewer within firm | Frontend contract migration remains separate work |
-| `POST /api/v1/watches` | Implemented; see BE-12 contract below | `201 Watch` | Admin, Attorney | BE-16 audit event required before production activation |
+| `POST /api/v1/watches` | Implemented; see BE-12 contract below | `201 Watch` | Admin, Attorney | Transactional BE-16 audit event included |
 | `PATCH /api/v1/watches/:id` | Non-empty state/interval subset | `200 Watch` | Admin, Attorney | No alert policy is configured here |
 | `GET /api/v1/watches/:id` | UUID path parameter | `200 Watch` | Admin, Attorney, Viewer within firm | Implemented BE-12 |
-| `DELETE /api/v1/watches/:id` | UUID path parameter | `204` | Admin, Attorney | Transactional hard delete; BE-16 audit gate applies |
+| `DELETE /api/v1/watches/:id` | UUID path parameter | `204` | Admin, Attorney | Transactional hard delete and audit event |
 | `GET /api/v1/alerts` | Implemented canonical list; see BE-13 contract below | `200 { items, pagination }` | Admin, Attorney, Viewer within firm | No outbound delivery behavior in BE-13 |
 | `GET /api/v1/alerts/:id` | UUID path parameter | `200 Alert` | Admin, Attorney, Viewer within firm | Implemented BE-13 |
 | `PATCH /api/v1/alerts/:id` | `{ action: 'read' \| 'dismiss' }` | `200 Alert` | Admin, Attorney | Strict state transitions only |
@@ -147,7 +147,7 @@ Stable errors are `VALIDATION_ERROR` (400), `UNAUTHORIZED` (401), `FORBIDDEN`
 `sourceRegistry`/`registryReference`; SQL and tenant details are not exposed.
 
 Deletion is a transactional hard delete because the schema specifies no
-soft-delete or retention policy. BE-16 must add redacted audit entries for
+soft-delete or retention policy. BE-16 adds redacted audit entries for
 successful Portfolio Mark mutations before production activation. This ticket
 does not connect marks to risk analyses, watches, alerts, or exports.
 
@@ -315,7 +315,7 @@ The product documents require these capabilities, but selecting HTTP methods or 
 
 ## PDF ownership boundary
 
-The frontend only submits typed screen context, waits, validates `application/pdf`, derives a safe fallback filename or uses the server `Content-Disposition` filename, creates a temporary browser object URL, and exposes loading/failure/retry states. The backend owns authoritative data reconstruction, generation, storage, encryption, tenant/object authorization, retention/expiry, rate limiting, and immutable `export.generate` audit logging. Browser-supplied IDs or display values must never be treated as authorization or authoritative legal data.
+The frontend only submits typed screen context, waits, validates `application/pdf`, derives a safe fallback filename or uses the server `Content-Disposition` filename, creates a temporary browser object URL, and exposes loading/failure/retry states. The backend owns authoritative data reconstruction, generation, storage, encryption, tenant/object authorization, retention/expiry, rate limiting, and immutable export lifecycle audit logging. Browser-supplied IDs or display values must never be treated as authorization or authoritative legal data.
 
 ## Verification gates before any live integration is declared
 
@@ -324,3 +324,76 @@ The frontend only submits typed screen context, waits, validates `application/pd
 3. Backend route and authorization tests pass, including cross-tenant non-disclosure.
 4. The frontend contract module is reconciled to that specification rather than to MSW fixtures.
 5. Integration tests pass against seeded staging data, and the tested environment/version is recorded.
+
+## BE-16 implemented audit and role contracts
+
+BE-16 is code-complete; its migration has not been applied. It changes no
+frontend code and adds two backend contracts.
+
+| Method and path | Request | Response | Roles | Notes |
+|---|---|---|---|---|
+| `GET /api/v1/audit-logs` | Optional `actorUserId`, `action`, `entityType`, `entityId`, `occurredFrom`, `occurredTo`, `pageSize`, `cursor` | `{ auditLogs, nextCursor }` | Admin | Firm is always inferred from verified membership |
+| `PATCH /api/v1/users/:id/role` | Exactly `{ "role": "admin" \| "attorney" \| "viewer" }` | `{ id, role, active }` | Admin | Target is firm-scoped; cross-firm targets are hidden |
+
+Audit logs are newest first by `occurredAt DESC, id DESC`. `pageSize` defaults
+to 25 and is at most 100. `nextCursor` is opaque and must be supplied unchanged
+to continue. Every optional UUID, timestamp, action, entity type, cursor, and
+page-size value is strictly validated; malformed requests use the stable audit
+validation codes and never expose database failures. Attorney and Viewer access
+to the list receives the standard `403 FORBIDDEN`. There are no client-facing
+audit creation, update, or deletion routes.
+
+Each list item is:
+
+```json
+{
+  "id": "uuid",
+  "actorUserId": "uuid",
+  "action": "watch.disabled",
+  "entityType": "watch",
+  "entityId": "uuid or null",
+  "beforeState": {},
+  "afterState": {},
+  "metadata": { "changedFields": ["state"] },
+  "requestId": "string or null",
+  "ipAddress": "string or null",
+  "userAgent": "string or null",
+  "occurredAt": "ISO-8601"
+}
+```
+
+Supported actions are `portfolio_mark.created`, `portfolio_mark.updated`,
+`portfolio_mark.deleted`, `watch.created`, `watch.updated`, `watch.deleted`,
+`watch.enabled`, `watch.disabled`, `alert.read`, `alert.dismissed`,
+`user.role_changed`, `export.requested`, `export.completed`, and
+`export.failed`. Supported entity types are `portfolio_mark`, `watch`, `alert`,
+`user`, and `export`. The current alert API cannot reopen alerts, so it has no
+`alert.reopened` event.
+
+All current Portfolio Mark, Watch, and Alert status mutations are audited
+transactionally. Rejected validation, authorization, missing-resource, and
+cross-firm requests create no event. Actor and firm are never read from request
+bodies. Audit snapshots preserve relevant legal state (including real registry
+references), contain no complete request body, and redact password/token/header/
+cookie/secret/key/JWT/session values recursively. The request context preserves
+a valid existing request ID or uses a generated one. Its IP uses Express proxy
+trust configuration only; raw `X-Forwarded-For` is never trusted.
+
+Role changes update the authoritative `users.role` column. Supabase claims are
+not used for application roles, so the response does not wait for an external
+identity-provider update; the existing Redis role/firm resolver is invalidated
+inside the successful workflow. A no-op role is rejected. The firm must retain
+one active Admin; an Admin may demote themselves only if another active Admin
+remains. `USER_NOT_FOUND` intentionally covers cross-firm target IDs.
+
+There is no BE-20 export endpoint or PDF generation in this release. BE-20 must
+call the server-only `ExportAuditService.requested`, `.completed`, and `.failed`
+hooks. It must pass only export/job UUID, type, output format, a bounded safe
+filter summary, and a stable failure code. Files, generated content, signed URLs,
+tokens, and result sets are not accepted by that hook. Retention/archival of the
+append-only audit table remains an operational decision.
+
+The remaining operational gates are controlled migration application, database
+permission/backup review, exact reverse-proxy trust configuration, audit-write
+monitoring, and a retention/archive policy. They are deployment gates, not
+additional BE-16 implementation work.

@@ -16,6 +16,7 @@ export function createWatchRouter(authenticate, watchService) {
     createValidateWatchCreate(watchService.defaultPollIntervalMinutes),
     async (request, response) => response.status(201).json(await watchService.createWatch({
       firmId: request.auth.firmId, actorUserId: request.auth.userId, input: request.watchInput,
+      requestContext: request.auditContext,
     })));
   router.get('/watches', authenticate, requireRole(READ_ROLES), validateWatchList,
     async (request, response) => response.json(await watchService.listWatches({
@@ -27,11 +28,15 @@ export function createWatchRouter(authenticate, watchService) {
     })));
   router.patch('/watches/:id', authenticate, requireRole(WRITE_ROLES), validateWatchPatch,
     async (request, response) => response.json(await watchService.updateWatch({
-      firmId: request.auth.firmId, watchId: request.watchId, input: request.watchInput,
+      firmId: request.auth.firmId, actorUserId: request.auth.userId,
+      watchId: request.watchId, input: request.watchInput, requestContext: request.auditContext,
     })));
   router.delete('/watches/:id', authenticate, requireRole(WRITE_ROLES), validateWatchId,
     async (request, response) => {
-      await watchService.deleteWatch({ firmId: request.auth.firmId, watchId: request.watchId });
+      await watchService.deleteWatch({
+        firmId: request.auth.firmId, actorUserId: request.auth.userId,
+        watchId: request.watchId, requestContext: request.auditContext,
+      });
       response.status(204).end();
     });
   return router;

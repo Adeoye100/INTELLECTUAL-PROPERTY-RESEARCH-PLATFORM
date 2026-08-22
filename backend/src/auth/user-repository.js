@@ -33,6 +33,21 @@ export class UserRepository {
     this.pool = pool;
   }
 
+  async withTransaction(work) {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await work(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async findBySupabaseUserId(supabaseUserId) {
     const result = await this.pool.query(
       `SELECT role, firm_id
@@ -246,6 +261,51 @@ export class UserRepository {
       [id],
     );
     return result.rowCount ? mapUser(result.rows[0]) : null;
+  }
+
+  async findRoleTargetForUpdate({ firmId, userId, transaction }) {
+    const result = await transaction.query(
+      `SELECT id, firm_id, role, supabase_user_id
+       FROM users
+       WHERE firm_id = $1 AND id = $2
+       FOR UPDATE`,
+      [firmId, userId],
+    );
+    if (!result.rowCount) return null;
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      firmId: row.firm_id,
+      role: row.role,
+      supabaseUserId: row.supabase_user_id,
+      active: true,
+    };
+  }
+
+  async listActiveAdminsForUpdate({ firmId, transaction }) {
+    const result = await transaction.query(
+      `SELECT id FROM users WHERE firm_id = $1 AND role = 'admin' FOR UPDATE`,
+      [firmId],
+    );
+    return result.rows.map((row) => row.id);
+  }
+
+  async updateRole({ firmId, userId, role, transaction }) {
+    const result = await transaction.query(
+      `UPDATE users SET role = $3
+       WHERE firm_id = $1 AND id = $2
+       RETURNING id, firm_id, role, supabase_user_id`,
+      [firmId, userId, role],
+    );
+    if (!result.rowCount) return null;
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      firmId: row.firm_id,
+      role: row.role,
+      supabaseUserId: row.supabase_user_id,
+      active: true,
+    };
   }
 
   async recordLogin(id) {

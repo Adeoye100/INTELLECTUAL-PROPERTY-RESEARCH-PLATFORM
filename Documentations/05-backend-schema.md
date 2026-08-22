@@ -173,10 +173,40 @@ methodology.
 | Column | Type | Notes |
 |---|---|---|
 | id | uuid PK | |
-| user_id | uuid FK | |
-| action | text | e.g. "portfolio.update", "export.generate" |
-| target_ref | text | |
-| created_at | timestamptz | |
+| firm_id | uuid FK → firms, non-null | immutable tenant boundary |
+| actor_user_id | uuid FK → users, non-null | resolved from verified Supabase subject during scoped insert |
+| action | varchar(80) | constrained frozen BE-16 action taxonomy |
+| entity_type | varchar(40) | constrained `portfolio_mark` / `watch` / `alert` / `user` / `export` |
+| entity_id | uuid, nullable | genuine mutated resource/job ID; never fabricated |
+| before_state | jsonb, nullable | sanitized JSON object only |
+| after_state | jsonb, nullable | sanitized JSON object only |
+| metadata | jsonb, non-null | sanitized JSON object, default `{}` |
+| request_id | varchar(128), nullable | valid request trace ID only |
+| ip_address | varchar(64), nullable | normalized trusted client address only |
+| user_agent | varchar(512), nullable | bounded user agent only |
+| occurred_at | timestamptz, non-null | UTC action time |
+| created_at | timestamptz, non-null | UTC insert time |
+
+Migration `009_create_audit_logs.sql` adds the table and is intentionally
+repeatable (`IF NOT EXISTS` indexes, guarded constraints, and a replaced
+append-only trigger). The trigger rejects all update/delete attempts, and no
+application repository operation updates or deletes audit rows. Constraints
+require a supported action and entity type, object-only JSON values, and at
+least a before state, after state, or non-empty metadata. The list indexes are
+`(firm_id, occurred_at DESC, id DESC)`, actor/time, entity/time, action/time,
+and non-null request ID. The migration was not applied by BE-16.
+
+The supported actions are portfolio mark create/update/delete; watch
+create/update/delete/enable/disable; alert read/dismiss; role change; and export
+requested/completed/failed. No alert reopen action exists because the current
+alert state machine does not support reopening.
+
+Snapshots and metadata are copied through the bounded recursive sanitizer:
+case-insensitive credentials/tokens/headers/secrets become `[REDACTED]`,
+pollution keys are dropped, and circular/non-JSON/deep/oversized data is
+rejected. The sanitizer preserves genuine registry references. `audit_logs` is
+firm-isolated at every write/read query; retention and archival are operational
+decisions because this table has no deletion path.
 
 ## 3. Redis Usage
 

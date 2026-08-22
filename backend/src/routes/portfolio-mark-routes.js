@@ -23,6 +23,7 @@ export function createPortfolioMarkRouter(authenticate, portfolioMarkService) {
         firmId: request.auth.firmId,
         actorUserId: request.auth.userId,
         input: request.portfolioMarkInput,
+        requestContext: request.auditContext,
       });
       response.status(201).json(portfolioMark);
     });
@@ -44,14 +45,17 @@ export function createPortfolioMarkRouter(authenticate, portfolioMarkService) {
     async (request, response) => {
       response.json(await portfolioMarkService.updatePortfolioMark({
         firmId: request.auth.firmId,
+        actorUserId: request.auth.userId,
         portfolioMarkId: request.portfolioMarkId,
         input: request.portfolioMarkInput,
+        requestContext: request.auditContext,
       }));
     });
   router.delete('/portfolio-marks/:id', authenticate, requireRole(WRITE_ROLES), validatePortfolioMarkId,
     async (request, response) => {
       await portfolioMarkService.deletePortfolioMark({
-        firmId: request.auth.firmId, portfolioMarkId: request.portfolioMarkId,
+        firmId: request.auth.firmId, actorUserId: request.auth.userId,
+        portfolioMarkId: request.portfolioMarkId, requestContext: request.auditContext,
       });
       response.status(204).end();
     });

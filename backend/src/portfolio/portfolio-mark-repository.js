@@ -50,6 +50,10 @@ function whereForFilters({ firmId, filters }) {
   return { clauses, values };
 }
 
+function executor(repository, transaction) {
+  return transaction ?? repository.database;
+}
+
 export class PortfolioMarkRepository {
   constructor(database) {
     if (!database || typeof database.query !== 'function' || typeof database.connect !== 'function') {
@@ -58,8 +62,23 @@ export class PortfolioMarkRepository {
     this.database = database;
   }
 
-  async create({ firmId, actorUserId, input }) {
-    const result = await this.database.query(
+  async withTransaction(work) {
+    const client = await this.database.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await work(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async create({ firmId, actorUserId, input, transaction = null }) {
+    const result = await executor(this, transaction).query(
       `INSERT INTO portfolio_marks (
         firm_id, owner_user_id, mark_text, jurisdiction, source_registry, registry_reference,
         nice_classes, status, filing_date, registration_date, renewal_date
@@ -99,8 +118,8 @@ export class PortfolioMarkRepository {
     };
   }
 
-  async get({ firmId, portfolioMarkId }) {
-    const result = await this.database.query(
+  async get({ firmId, portfolioMarkId, transaction = null }) {
+    const result = await executor(this, transaction).query(
       `SELECT ${SELECT_COLUMNS}
        FROM portfolio_marks
        WHERE firm_id = $1 AND id = $2`,
@@ -109,7 +128,7 @@ export class PortfolioMarkRepository {
     return result.rowCount ? portfolioMarkFromRow(result.rows[0]) : null;
   }
 
-  async update({ firmId, portfolioMarkId, input }) {
+  async update({ firmId, portfolioMarkId, input, transaction = null }) {
     const columns = {
       markText: 'mark_text', jurisdiction: 'jurisdiction', sourceRegistry: 'source_registry',
       registryReference: 'registry_reference', niceClasses: 'nice_classes', status: 'status',
@@ -120,7 +139,7 @@ export class PortfolioMarkRepository {
       values.push(value);
       return `${columns[field]} = $${values.length}`;
     });
-    const result = await this.database.query(
+    const result = await executor(this, transaction).query(
       `UPDATE portfolio_marks
        SET ${assignments.join(', ')}, updated_at = now()
        WHERE firm_id = $1 AND id = $2
@@ -130,7 +149,14 @@ export class PortfolioMarkRepository {
     return result.rowCount ? portfolioMarkFromRow(result.rows[0]) : null;
   }
 
-  async delete({ firmId, portfolioMarkId }) {
+  async delete({ firmId, portfolioMarkId, transaction = null }) {
+    if (transaction) {
+      const result = await transaction.query(
+        'DELETE FROM portfolio_marks WHERE firm_id = $1 AND id = $2 RETURNING id',
+        [firmId, portfolioMarkId],
+      );
+      return result.rowCount > 0;
+    }
     const client = await this.database.connect();
     try {
       await client.query('BEGIN');

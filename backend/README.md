@@ -2,7 +2,8 @@
 
 This service implements the `/api/v1` authentication foundation on the locked
 Node.js + Express, PostgreSQL, and Redis stack. It intentionally does not contain
-business APIs, password-reset/email-verification logic, or audit logging.
+business APIs or password-reset/email-verification logic. BE-16 adds the
+server-side audit boundary described below.
 
 It also contains the BE-07/BE-08 USPTO registry adapters and the explicitly
 Postgres-first trademark ingestion/projection commands described below.
@@ -425,8 +426,8 @@ DATABASE_URL='postgresql://USER:PASSWORD@HOST:5432/DATABASE' pnpm migrate
 
 Deletion is currently a transactional hard delete because the authoritative
 schema has no retention or soft-delete policy. Before production activation,
-BE-16 must capture successful create, update, and delete actions in the
-redacted audit log. Portfolio Marks do not yet create risks, watches, alerts,
+BE-16 captures successful create, update, and delete actions in the redacted
+audit log. Portfolio Marks do not yet create risks, watches, alerts,
 or exports automatically.
 
 ## Watch API and polling worker (BE-12)
@@ -526,8 +527,8 @@ is not run automatically:
 DATABASE_URL='postgresql://USER:PASSWORD@HOST:5432/DATABASE' pnpm migrate
 ```
 
-Before production sign-off, BE-16 must record redacted successful Watch
-mutations. Retryable search/database/queue failures are returned with stable
+Before production sign-off, deploy the BE-16 migration and verify redacted
+successful Watch mutations. Retryable search/database/queue failures are returned with stable
 internal codes for deployment-queue retry policy; invalid, missing, stale, and
 duplicate jobs are terminal skips.
 
@@ -574,8 +575,8 @@ to the intended database—it is not run automatically:
 DATABASE_URL='postgresql://USER:PASSWORD@HOST:5432/DATABASE' pnpm migrate
 ```
 
-BE-16 must add redacted audit logging for alert read/dismiss actions before
-production sign-off. Email, push, and other outbound notification delivery are
+BE-16 records redacted audit logging for alert read/dismiss actions. Email,
+push, and other outbound notification delivery are
 not part of BE-13.
 
 ## RBAC demonstration routes
@@ -624,11 +625,9 @@ PostgreSQL row does not rewrite the cache entry. Role/seat mutation endpoints
 must call `RedisRoleFirmResolver.invalidate(supabaseUserId)` after committing the
 change.
 
-There is currently no backend endpoint that changes or removes an existing
-user's role/seat. Invitation acceptance creates a new local user but does not
-change an already linked membership, so there is no role-cache invalidation hook
-to wire yet. SB-04 or the future membership-management endpoint must add it when
-that state change is implemented.
+`PATCH /api/v1/users/:id/role` is the Admin-only role mutation. It updates
+`users.role` in the same PostgreSQL transaction as its audit row and explicitly
+invalidates the target's role cache before the transaction reports success.
 
 Protected routes use Supabase verification. The local token verifier and
 `PROTECTED_AUTH_MODE` have been retired.
@@ -717,7 +716,112 @@ For a deployed reverse-proxy chain, set it to the exact number of trusted hops
 true)`. Construction performs no Redis operation; the existing system Redis
 client lifecycle is reused. BE-15 has no database migration.
 
-BE-14 billing remains deferred. **BE-16** must add redacted audit events after
-successful auth state changes and, specifically, after invitation issuance and
-redemption. The hook points are marked in `src/auth/auth-service.js`; the error
-handler intentionally logs no request body or password.
+BE-14 billing remains deferred. The error handler intentionally logs no request
+body or password.
+
+## BE-16 immutable audit log
+
+BE-16 is code-complete. Migration `009_create_audit_logs.sql` is additive and
+idempotent but **has not been applied** by this work. It creates firm-scoped
+`audit_logs` with the actor's local `users.id`, UTC `occurred_at`/`created_at`,
+JSON object checks, a meaningful-data check, list-query indexes, and a database
+trigger which rejects every `UPDATE` and `DELETE`. The application repository
+has only `insert`, `list`, and `findById` operations.
+
+The frozen taxonomy is:
+
+- Portfolio marks: `portfolio_mark.created`, `.updated`, `.deleted`
+- Watches: `watch.created`, `.updated`, `.deleted`, `.enabled`, `.disabled`
+- Alerts: `alert.read`, `alert.dismissed` (there is no reopen transition)
+- Roles: `user.role_changed`
+- Exports: `export.requested`, `.completed`, `.failed`
+
+Entity types are `portfolio_mark`, `watch`, `alert`, `user`, and `export`.
+Unsupported actions or entity types fail with `AUDIT_ACTION_INVALID` or
+`AUDIT_ENTITY_TYPE_INVALID`. The public mutation routes take firm and actor
+identity only from verified server context; neither is accepted from a body.
+
+Portfolio create/update/delete, Watch create/update/delete (including distinct
+enabled/disabled transitions), Alert read/dismiss, and user-role changes write
+their audit event through the same PostgreSQL client transaction. Failed audit
+inserts roll back mutations; failed/missing/cross-firm mutations emit no success
+event. Snapshot projections retain useful legal fields such as genuine registry
+references, but omit unnecessary profile data and complete nested alert evidence.
+
+The `AuditService` accepts:
+
+```js
+auditService.record({
+  transaction, firmId, actorUserId, action, entityType, entityId,
+  beforeState, afterState, metadata, requestContext, occurredAt,
+})
+```
+
+It accepts a caller-owned transaction without committing it, and also supports
+direct server-side lifecycle recording when no enclosing transaction exists.
+`AuditLogRepository` maps the verified Supabase subject to the current local
+`users.id` inside its scoped insert, satisfying the audit foreign key without
+trusting a client-supplied actor ID. Stable codes include
+`AUDIT_ACTION_INVALID`, `AUDIT_ENTITY_TYPE_INVALID`, `AUDIT_ENTITY_ID_INVALID`,
+`AUDIT_ACTOR_INVALID`, `AUDIT_FIRM_INVALID`, `AUDIT_PAYLOAD_INVALID`,
+`AUDIT_PAYLOAD_TOO_LARGE`, `AUDIT_TRANSACTION_REQUIRED`, `AUDIT_WRITE_FAILED`,
+and `AUDIT_LOG_NOT_FOUND`.
+
+Audit state and metadata are recursively copied, key-sorted, depth/array/size
+bounded JSON. Case-insensitive password, token, authorization, cookie, secret,
+API/private/client key, JWT, and session-token fields become `[REDACTED]`.
+Prototype-pollution keys are omitted; circular references, functions, symbols,
+bigints, non-finite numbers, accessors, and non-JSON objects are rejected. The
+backend never automatically records a request body, raw Authorization header,
+Cookie header, generated export data, signed URL, or stack trace, and never logs
+audit payloads.
+
+Every request receives an audit request context containing a valid existing
+`X-Request-ID` or generated UUID, a normalized client IP, and a bounded
+User-Agent. Forwarded IP resolution uses Express's configured
+`TRUST_PROXY_HOPS`; raw `X-Forwarded-For` is never read. Absent/oversized values
+become `null`.
+
+`GET /api/v1/audit-logs` is authenticated and Admin-only. It always takes the
+firm from membership and returns `{ auditLogs, nextCursor }` ordered
+`occurredAt DESC, id DESC`. Optional filters are `actorUserId`, `action`,
+`entityType`, `entityId`, `occurredFrom`, and `occurredTo`; cursor and page size
+are bounded (default 25, maximum 100). Attorney and Viewer callers receive the
+standard `403 FORBIDDEN`; there are no audit-log mutation routes.
+
+`PATCH /api/v1/users/:id/role` accepts exactly
+`{ "role": "admin" | "attorney" | "viewer" }`, is Admin-only, hides
+cross-firm users with `USER_NOT_FOUND`, rejects unsupported/no-op roles, and
+prevents demoting the last active Admin. A self-demotion is allowed only if a
+different active Admin remains. `users.role` is the sole authoritative source;
+Supabase custom claims are not used by this architecture, so no Supabase write
+or token refresh is needed. The resolver cache invalidation means the next
+request reloads membership/role from PostgreSQL.
+
+No export endpoint or BE-20 pipeline exists. `ExportAuditService` is a
+server-internal hook with `requested`, `completed`, and `failed` methods. BE-20
+must call the matching hook for every export lifecycle transition using its
+internal job/export UUID, format, type, bounded safe filter summary, and (on
+failure) stable error code. It must never pass generated files, result sets,
+URLs, or credentials. Clients cannot create audit events.
+
+The reviewed but deliberately excluded mutations are firm provisioning,
+invitation issuance/redemption, watch-worker poll bookkeeping, registry
+ingestion/projection, and BE-13 system-generated risk/alert persistence. They
+are identity bootstrap or unattended operational work without an authenticated
+firm actor and have no approved BE-16 taxonomy action; they create no fake human
+audit event. Retention/archival duration is an operational policy decision, not
+implemented as a delete path (which the database forbids).
+
+Operational deployment gates only:
+
+1. Review and apply migration `009_create_audit_logs.sql` through the normal
+   controlled migration process (it was not applied here).
+2. Confirm the application database role has only the required write/read
+   privileges and that backup/retention operations respect append-only policy.
+3. Configure the exact trusted proxy hop count and validate request IDs/IPs in
+   staging.
+4. Monitor audit insertion failures and establish the organization's immutable
+   retention/archive policy.
+5. When BE-20 is deployed, wire every export lifecycle transition to
+   `ExportAuditService` before enabling generation.

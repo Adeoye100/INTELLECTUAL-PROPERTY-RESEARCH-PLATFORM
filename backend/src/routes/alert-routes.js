@@ -13,6 +13,9 @@ export function createAlertRouter(authenticate, alertService) {
   router.get('/alerts/:id', authenticate, requireRole(READ_ROLES), validateAlertId,
     async (request, response) => response.json(await alertService.getAlert({ firmId: request.auth.firmId, alertId: request.alertId })));
   router.patch('/alerts/:id', authenticate, requireRole(WRITE_ROLES), validateAlertAction,
-    async (request, response) => response.json(await alertService.transitionAlert({ firmId: request.auth.firmId, alertId: request.alertId, input: { action: request.alertAction } })));
+    async (request, response) => response.json(await alertService.transitionAlert({
+      firmId: request.auth.firmId, actorUserId: request.auth.userId, alertId: request.alertId,
+      input: { action: request.alertAction }, requestContext: request.auditContext,
+    })));
   return router;
 }

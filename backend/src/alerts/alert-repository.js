@@ -54,6 +54,10 @@ function alertWithRisk(row) {
   };
 }
 
+function executor(repository, transaction) {
+  return transaction ?? repository.database;
+}
+
 const JOINED_ALERT_COLUMNS = `
   a.id, a.firm_id, a.watch_id, a.portfolio_mark_id, a.risk_score_id, a.severity, a.status,
   a.policy_version, a.created_at, a.read_at, a.dismissed_at, a.updated_at,
@@ -69,6 +73,19 @@ export class AlertRepository {
       throw new TypeError('AlertRepository needs a PostgreSQL pool-like database.');
     }
     this.database = database;
+  }
+
+  async withTransaction(work) {
+    const client = await this.database.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await work(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
+    } finally { client.release(); }
   }
 
   async persistSnapshotAndAlert({ snapshot, alertPolicy }) {
@@ -156,8 +173,8 @@ export class AlertRepository {
     return { items: result.rows.map(alertWithRisk), total: counted.rows[0].total };
   }
 
-  async get({ firmId, alertId }) {
-    const result = await this.database.query(
+  async get({ firmId, alertId, transaction = null }) {
+    const result = await executor(this, transaction).query(
       `SELECT ${JOINED_ALERT_COLUMNS} FROM alerts a JOIN risk_scores r
        ON r.id = a.risk_score_id AND r.firm_id = a.firm_id
        WHERE a.firm_id = $1 AND a.id = $2`, [firmId, alertId],
@@ -165,10 +182,10 @@ export class AlertRepository {
     return result.rowCount ? alertWithRisk(result.rows[0]) : null;
   }
 
-  async transition({ firmId, alertId, action, at }) {
+  async transition({ firmId, alertId, action, at, transaction = null }) {
     const target = action === 'read' ? 'read' : 'dismissed';
     const allowed = action === 'read' ? ['unread'] : ['unread', 'read'];
-    const result = await this.database.query(
+    const result = await executor(this, transaction).query(
       `UPDATE alerts SET status = $3,
        read_at = CASE WHEN $3 = 'read' THEN $4 ELSE read_at END,
        dismissed_at = CASE WHEN $3 = 'dismissed' THEN $4 ELSE dismissed_at END,

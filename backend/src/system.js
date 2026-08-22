@@ -22,6 +22,10 @@ import { createWatchRuntime } from './watch/watch-runtime.js';
 import { AlertRepository } from './alerts/alert-repository.js';
 import { AlertGenerationService } from './alerts/alert-generation-service.js';
 import { AlertService } from './alerts/alert-service.js';
+import { AuditLogRepository } from './audit/audit-log-repository.js';
+import { AuditService } from './audit/audit-service.js';
+import { ExportAuditService } from './audit/export-audit-service.js';
+import { UserRoleService } from './users/user-role-service.js';
 
 export async function createSystem(config) {
   const { searchSources, federatedSearchService, searchService } = createSearchRuntime(config);
@@ -67,6 +71,9 @@ export async function createSystem(config) {
     userRepository,
     supabaseAdminUserService,
   });
+  const auditLogRepository = new AuditLogRepository(pool);
+  const auditService = new AuditService({ repository: auditLogRepository });
+  const exportAuditService = new ExportAuditService({ auditService });
   const authenticate = [
     createSupabaseAuthenticate(supabaseVerifier),
     createResolveRoleAndFirm(roleFirmResolver),
@@ -74,13 +81,16 @@ export async function createSystem(config) {
   const authenticateIdentity = createSupabaseAuthenticate(supabaseVerifier);
   const provisioningService = new ProvisioningService({ userRepository, roleFirmResolver });
   const portfolioMarkRepository = new PortfolioMarkRepository(pool);
-  const portfolioMarkService = new PortfolioMarkService({ repository: portfolioMarkRepository });
+  const portfolioMarkService = new PortfolioMarkService({
+    repository: portfolioMarkRepository, auditService,
+  });
   const watchRepository = new WatchRepository(pool);
   const watchService = new WatchService({
-    repository: watchRepository, defaultPollIntervalMinutes: config.watchPollIntervalMinutes,
+    repository: watchRepository, defaultPollIntervalMinutes: config.watchPollIntervalMinutes, auditService,
   });
   const alertRepository = new AlertRepository(pool);
-  const alertService = new AlertService({ repository: alertRepository });
+  const alertService = new AlertService({ repository: alertRepository, auditService });
+  const userRoleService = new UserRoleService({ userRepository, auditService, roleFirmResolver });
   const alertGenerationService = config.watchEnabled
     ? new AlertGenerationService({ repository: alertRepository }) : null;
   const watchRuntime = createWatchRuntime({
@@ -97,6 +107,8 @@ export async function createSystem(config) {
       portfolioMarkService,
       watchService,
       alertService,
+      auditService,
+      userRoleService,
       authRateLimiter,
       trustProxyHops: config.trustProxyHops,
     }),
@@ -112,6 +124,10 @@ export async function createSystem(config) {
     watchRuntime,
     alertRepository,
     alertService,
+    auditLogRepository,
+    auditService,
+    exportAuditService,
+    userRoleService,
     alertGenerationService,
     roleFirmResolver,
     supabaseAdminUserService,

@@ -6,6 +6,8 @@ import {
   parsePortfolioMarkPagination,
   parsePortfolioMarkPatch,
 } from './portfolio-mark-validation.js';
+import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../audit/audit-taxonomy.js';
+import { portfolioMarkAuditSnapshot } from '../audit/audit-snapshots.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -38,7 +40,7 @@ function notFound() {
 }
 
 export class PortfolioMarkService {
-  constructor({ repository }) {
+  constructor({ repository, auditService = null }) {
     if (!repository
       || typeof repository.create !== 'function'
       || typeof repository.list !== 'function'
@@ -47,15 +49,37 @@ export class PortfolioMarkService {
       || typeof repository.delete !== 'function') {
       throw new TypeError('PortfolioMarkService needs a portfolio mark repository.');
     }
+    if (auditService && (typeof auditService.record !== 'function' || typeof repository.withTransaction !== 'function')) {
+      throw new TypeError('Audited portfolio mark mutations need an audit service and transaction-capable repository.');
+    }
     this.repository = repository;
+    this.auditService = auditService;
   }
 
-  async createPortfolioMark({ firmId, actorUserId, input }) {
+  async createPortfolioMark({ firmId, actorUserId, input, requestContext = null }) {
     const scopedFirmId = firmScope(firmId);
     const scopedActorUserId = actor(actorUserId);
     const parsed = parsePortfolioMarkCreate(input);
     try {
-      return await this.repository.create({ firmId: scopedFirmId, actorUserId: scopedActorUserId, input: parsed });
+      if (!this.auditService) {
+        return await this.repository.create({ firmId: scopedFirmId, actorUserId: scopedActorUserId, input: parsed });
+      }
+      return await this.repository.withTransaction(async (transaction) => {
+        const record = await this.repository.create({
+          firmId: scopedFirmId, actorUserId: scopedActorUserId, input: parsed, transaction,
+        });
+        await this.auditService.record({
+          transaction, requireTransaction: true, firmId: scopedFirmId, actorUserId: scopedActorUserId,
+          action: AUDIT_ACTIONS.PORTFOLIO_MARK_CREATED,
+          entityType: AUDIT_ENTITY_TYPES.PORTFOLIO_MARK,
+          entityId: record?.id ?? null,
+          beforeState: null,
+          afterState: portfolioMarkAuditSnapshot(record),
+          metadata: { changedFields: Object.keys(parsed) },
+          requestContext,
+        });
+        return record;
+      });
     } catch (error) {
       throw normalizeDatabaseError(error);
     }
@@ -87,26 +111,70 @@ export class PortfolioMarkService {
     return record;
   }
 
-  async updatePortfolioMark({ firmId, portfolioMarkId, input }) {
+  async updatePortfolioMark({ firmId, actorUserId, portfolioMarkId, input, requestContext = null }) {
     const scopedFirmId = firmScope(firmId);
     const parsedId = parsePortfolioMarkId(portfolioMarkId);
     const parsed = parsePortfolioMarkPatch(input);
     try {
-      const record = await this.repository.update({
-        firmId: scopedFirmId, portfolioMarkId: parsedId, input: parsed,
+      if (!this.auditService) {
+        const record = await this.repository.update({
+          firmId: scopedFirmId, portfolioMarkId: parsedId, input: parsed,
+        });
+        if (!record) throw notFound();
+        return record;
+      }
+      const scopedActorUserId = actor(actorUserId);
+      return await this.repository.withTransaction(async (transaction) => {
+        const before = await this.repository.get({
+          firmId: scopedFirmId, portfolioMarkId: parsedId, transaction,
+        });
+        if (!before) throw notFound();
+        const record = await this.repository.update({
+          firmId: scopedFirmId, portfolioMarkId: parsedId, input: parsed, transaction,
+        });
+        if (!record) throw notFound();
+        await this.auditService.record({
+          transaction, requireTransaction: true, firmId: scopedFirmId, actorUserId: scopedActorUserId,
+          action: AUDIT_ACTIONS.PORTFOLIO_MARK_UPDATED,
+          entityType: AUDIT_ENTITY_TYPES.PORTFOLIO_MARK,
+          entityId: record.id,
+          beforeState: portfolioMarkAuditSnapshot(before),
+          afterState: portfolioMarkAuditSnapshot(record),
+          metadata: { changedFields: Object.keys(parsed) },
+          requestContext,
+        });
+        return record;
       });
-      if (!record) throw notFound();
-      return record;
     } catch (error) {
       throw normalizeDatabaseError(error);
     }
   }
 
-  async deletePortfolioMark({ firmId, portfolioMarkId }) {
-    const deleted = await this.repository.delete({
-      firmId: firmScope(firmId), portfolioMarkId: parsePortfolioMarkId(portfolioMarkId),
+  async deletePortfolioMark({ firmId, actorUserId, portfolioMarkId, requestContext = null }) {
+    const scopedFirmId = firmScope(firmId);
+    const parsedId = parsePortfolioMarkId(portfolioMarkId);
+    if (!this.auditService) {
+      const deleted = await this.repository.delete({ firmId: scopedFirmId, portfolioMarkId: parsedId });
+      if (!deleted) throw notFound();
+      return;
+    }
+    const scopedActorUserId = actor(actorUserId);
+    await this.repository.withTransaction(async (transaction) => {
+      const before = await this.repository.get({ firmId: scopedFirmId, portfolioMarkId: parsedId, transaction });
+      if (!before) throw notFound();
+      const deleted = await this.repository.delete({ firmId: scopedFirmId, portfolioMarkId: parsedId, transaction });
+      if (!deleted) throw notFound();
+      await this.auditService.record({
+        transaction, requireTransaction: true, firmId: scopedFirmId, actorUserId: scopedActorUserId,
+        action: AUDIT_ACTIONS.PORTFOLIO_MARK_DELETED,
+        entityType: AUDIT_ENTITY_TYPES.PORTFOLIO_MARK,
+        entityId: before.id,
+        beforeState: portfolioMarkAuditSnapshot(before),
+        afterState: null,
+        metadata: { changedFields: [] },
+        requestContext,
+      });
     });
-    if (!deleted) throw notFound();
   }
 }
 

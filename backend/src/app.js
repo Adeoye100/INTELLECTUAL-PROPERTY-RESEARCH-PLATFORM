@@ -8,12 +8,17 @@ import { createSearchRouter } from './routes/search-routes.js';
 import { createPortfolioMarkRouter } from './routes/portfolio-mark-routes.js';
 import { createWatchRouter } from './routes/watch-routes.js';
 import { createAlertRouter } from './routes/alert-routes.js';
+import { createAuditLogRouter } from './routes/audit-log-routes.js';
+import { createUserRouter } from './routes/user-routes.js';
+import { createAuditRequestContextMiddleware } from './audit/request-context.js';
 
 export function createApp({
   authService, authenticate, authenticateIdentity, provisioningService, searchService = null,
   portfolioMarkService = null,
   watchService = null,
   alertService = null,
+  auditService = null,
+  userRoleService = null,
   authRateLimiter = null,
   trustProxyHops = 0,
 }) {
@@ -23,6 +28,7 @@ export function createApp({
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', trustProxyHops);
+  app.use(createAuditRequestContextMiddleware());
   app.use(createCorsMiddleware());
   app.use(express.json({ limit: '16kb' }));
 
@@ -43,6 +49,12 @@ export function createApp({
   }
   if (alertService) {
     app.use('/api/v1', createAlertRouter(authenticate, alertService));
+  }
+  if (auditService) {
+    app.use('/api/v1', createAuditLogRouter(authenticate, auditService));
+  }
+  if (userRoleService) {
+    app.use('/api/v1', createUserRouter(authenticate, userRoleService));
   }
 
   app.use((_request, response) => {

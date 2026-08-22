@@ -32,6 +32,10 @@ function watchWhere(firmId, filters) {
   return { values, where: clauses.join(' AND ') };
 }
 
+function executor(repository, transaction) {
+  return transaction ?? repository.database;
+}
+
 export class WatchRepository {
   constructor(database) {
     if (!database || typeof database.query !== 'function' || typeof database.connect !== 'function') {
@@ -40,15 +44,28 @@ export class WatchRepository {
     this.database = database;
   }
 
-  async portfolioMarkExists({ firmId, portfolioMarkId }) {
-    const result = await this.database.query(
+  async withTransaction(work) {
+    const client = await this.database.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await work(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
+    } finally { client.release(); }
+  }
+
+  async portfolioMarkExists({ firmId, portfolioMarkId, transaction = null }) {
+    const result = await executor(this, transaction).query(
       'SELECT id FROM portfolio_marks WHERE firm_id = $1 AND id = $2', [firmId, portfolioMarkId],
     );
     return result.rowCount > 0;
   }
 
-  async create({ firmId, actorUserId, input, nextPollAt }) {
-    const result = await this.database.query(
+  async create({ firmId, actorUserId, input, nextPollAt, transaction = null }) {
+    const result = await executor(this, transaction).query(
       `INSERT INTO watches (
         firm_id, portfolio_mark_id, owner_user_id, state, poll_interval_minutes, next_poll_at
       ) VALUES (
@@ -72,21 +89,21 @@ export class WatchRepository {
     return { items: listed.rows.map(watchFromRow), total: counted.rows[0].total };
   }
 
-  async get({ firmId, watchId }) {
-    const result = await this.database.query(
+  async get({ firmId, watchId, transaction = null }) {
+    const result = await executor(this, transaction).query(
       `SELECT ${WATCH_COLUMNS} FROM watches WHERE firm_id = $1 AND id = $2`, [firmId, watchId],
     );
     return result.rowCount ? watchFromRow(result.rows[0]) : null;
   }
 
-  async update({ firmId, watchId, input }) {
+  async update({ firmId, watchId, input, transaction = null }) {
     const names = { state: 'state', pollIntervalMinutes: 'poll_interval_minutes', nextPollAt: 'next_poll_at' };
     const values = [firmId, watchId];
     const assignments = Object.entries(input).map(([field, value]) => {
       values.push(value);
       return `${names[field]} = $${values.length}`;
     });
-    const result = await this.database.query(
+    const result = await executor(this, transaction).query(
       `UPDATE watches SET ${assignments.join(', ')}, updated_at = now()
        WHERE firm_id = $1 AND id = $2 RETURNING ${WATCH_COLUMNS}`,
       values,
@@ -94,7 +111,13 @@ export class WatchRepository {
     return result.rowCount ? watchFromRow(result.rows[0]) : null;
   }
 
-  async delete({ firmId, watchId }) {
+  async delete({ firmId, watchId, transaction = null }) {
+    if (transaction) {
+      const result = await transaction.query(
+        'DELETE FROM watches WHERE firm_id = $1 AND id = $2 RETURNING id', [firmId, watchId],
+      );
+      return result.rowCount > 0;
+    }
     const client = await this.database.connect();
     try {
       await client.query('BEGIN');
