@@ -31,8 +31,9 @@ import { UserRoleService } from './users/user-role-service.js';
 import { createOfficeActionSearchRuntime } from './office-actions/office-action-search-runtime.js';
 import { OfficeActionRefRepository } from './office-actions/office-action-ref-repository.js';
 import { OfficeActionRefService } from './office-actions/office-action-ref-service.js';
+import { createPdfExportRuntime } from './exports/pdf-export-runtime.js';
 
-export async function createSystem(config, { officeActionSources = [] } = {}) {
+export async function createSystem(config, { officeActionSources = [], exportStorage = null } = {}) {
   const { searchSources, federatedSearchService, searchService } = createSearchRuntime(config);
   const {
     officeActionSources: configuredOfficeActionSources,
@@ -110,6 +111,12 @@ export async function createSystem(config, { officeActionSources = [] } = {}) {
   const watchRuntime = createWatchRuntime({
     config, redisClient, watchRepository, searchService, alertGenerationService,
   });
+  // This runtime constructs its Redis queue and private storage only when the
+  // explicitly disabled-by-default PDF flag is enabled.
+  const pdfExportRuntime = createPdfExportRuntime({
+    config, redisClient, database: pool, exportAuditService, searchResultService, portfolioMarkService,
+    officeActionRefService, watchService, alertService, storage: exportStorage,
+  });
 
   return {
     app: createApp({
@@ -127,6 +134,7 @@ export async function createSystem(config, { officeActionSources = [] } = {}) {
       officeActionSearchService,
       officeActionSearchMaxResults: config.officeActionSearchMaxResults,
       officeActionRefService,
+      exportService: pdfExportRuntime?.exportService ?? null,
       authRateLimiter,
       trustProxyHops: config.trustProxyHops,
     }),
@@ -140,6 +148,9 @@ export async function createSystem(config, { officeActionSources = [] } = {}) {
     watchRepository,
     watchService,
     watchRuntime,
+    pdfExportRuntime,
+    exportRepository: pdfExportRuntime?.repository ?? null,
+    exportService: pdfExportRuntime?.exportService ?? null,
     alertRepository,
     alertService,
     auditLogRepository,

@@ -13,6 +13,7 @@ import { createAuditLogRouter } from './routes/audit-log-routes.js';
 import { createUserRouter } from './routes/user-routes.js';
 import { createOfficeActionRefRouter, createOfficeActionSearchRouter } from './routes/office-action-routes.js';
 import { createAuditRequestContextMiddleware } from './audit/request-context.js';
+import { createExportRouter } from './routes/export-routes.js';
 
 export function createApp({
   authService, authenticate, authenticateIdentity, provisioningService, searchService = null,
@@ -25,6 +26,7 @@ export function createApp({
   officeActionSearchService = null,
   officeActionSearchMaxResults = 25,
   officeActionRefService = null,
+  exportService = null,
   authRateLimiter = null,
   trustProxyHops = 0,
 }) {
@@ -72,6 +74,9 @@ export function createApp({
   }
   if (officeActionRefService) {
     app.use('/api/v1', createOfficeActionRefRouter(authenticate, officeActionRefService));
+  }
+  if (exportService) {
+    app.use('/api/v1', createExportRouter(authenticate, exportService));
   }
 
   app.use((_request, response) => {

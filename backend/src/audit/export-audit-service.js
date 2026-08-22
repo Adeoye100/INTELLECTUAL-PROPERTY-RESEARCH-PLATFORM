@@ -35,7 +35,7 @@ function safeFilterSummary(value) {
   return prune(sanitized);
 }
 
-function safeMetadata({ exportType, outputFormat, filterSummary, errorCode }) {
+function safeMetadata({ exportType, outputFormat, filterSummary, errorCode, byteSize, checksumSha256 }) {
   const metadata = {
     exportType: text(exportType, 'exportType', 80),
     outputFormat: text(outputFormat, 'outputFormat', 30),
@@ -47,6 +47,19 @@ function safeMetadata({ exportType, outputFormat, filterSummary, errorCode }) {
       throw badRequest('AUDIT_PAYLOAD_INVALID', 'errorCode must be a stable error code.');
     }
     metadata.errorCode = normalized;
+  }
+  if (byteSize !== undefined) {
+    if (!Number.isSafeInteger(byteSize) || byteSize < 0 || byteSize > 100 * 1024 * 1024) {
+      throw badRequest('AUDIT_PAYLOAD_INVALID', 'byteSize is invalid.');
+    }
+    metadata.byteSize = byteSize;
+  }
+  if (checksumSha256 !== undefined) {
+    const normalized = text(checksumSha256, 'checksumSha256', 64);
+    if (!/^[a-f0-9]{64}$/.test(normalized)) {
+      throw badRequest('AUDIT_PAYLOAD_INVALID', 'checksumSha256 is invalid.');
+    }
+    metadata.checksumSha256 = normalized;
   }
   return metadata;
 }
@@ -77,6 +90,9 @@ export class ExportAuditService {
         outputFormat: input?.outputFormat,
         filterSummary: input?.filterSummary,
         ...(failed ? { errorCode: input?.errorCode } : {}),
+        ...(action === AUDIT_ACTIONS.EXPORT_COMPLETED ? {
+          byteSize: input?.byteSize, checksumSha256: input?.checksumSha256,
+        } : {}),
       }),
       requestContext: input?.requestContext,
       occurredAt: input?.occurredAt,

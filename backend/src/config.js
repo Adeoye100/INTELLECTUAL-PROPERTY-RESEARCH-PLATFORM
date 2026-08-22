@@ -210,6 +210,31 @@ function loadOfficeActionSearchConfig(env) {
   };
 }
 
+function loadPdfExportConfig(env) {
+  const pdfExportEnabled = strictBoolean(env, 'PDF_EXPORT_ENABLED', false);
+  const pdfExportMaxBytes = boundedPositiveInteger(env, 'PDF_EXPORT_MAX_BYTES', 10 * 1024 * 1024, 32 * 1024, 100 * 1024 * 1024);
+  const pdfExportMaxPages = boundedPositiveInteger(env, 'PDF_EXPORT_MAX_PAGES', 100, 1, 500);
+  const pdfExportMaxResults = boundedPositiveInteger(env, 'PDF_EXPORT_MAX_RESULTS', 50, 1, 100);
+  const pdfExportMaxAttempts = boundedPositiveInteger(env, 'PDF_EXPORT_MAX_ATTEMPTS', 3, 1, 10);
+  const pdfExportWorkerIntervalMs = boundedPositiveInteger(env, 'PDF_EXPORT_WORKER_INTERVAL_MS', 1_000, 100, 60_000);
+  const pdfExportWorkerMaxJobs = boundedPositiveInteger(env, 'PDF_EXPORT_WORKER_MAX_JOBS', 5, 1, 100);
+  if (!pdfExportEnabled) return {
+    pdfExportEnabled: false, pdfExportQueueKey: 'queue:pdf_export', pdfExportMaxBytes, pdfExportMaxPages,
+    pdfExportMaxResults, pdfExportMaxAttempts, pdfExportWorkerIntervalMs, pdfExportWorkerMaxJobs,
+    pdfExportStorageProvider: undefined, pdfExportStorageRoot: undefined,
+  };
+  const pdfExportQueueKey = env.PDF_EXPORT_QUEUE_KEY?.trim() || 'queue:pdf_export';
+  if (!/^queue:[a-z0-9:_-]{1,100}$/.test(pdfExportQueueKey)) throw new Error('PDF_EXPORT_QUEUE_KEY is invalid.');
+  const pdfExportStorageProvider = env.PDF_EXPORT_STORAGE_PROVIDER?.trim();
+  if (pdfExportStorageProvider !== 'filesystem') throw new Error('PDF_EXPORT_STORAGE_PROVIDER must be filesystem when PDF export is enabled.');
+  const pdfExportStorageRoot = env.PDF_EXPORT_STORAGE_ROOT?.trim();
+  if (!pdfExportStorageRoot || !pdfExportStorageRoot.startsWith('/')) throw new Error('PDF_EXPORT_STORAGE_ROOT must be an absolute private storage path.');
+  return {
+    pdfExportEnabled: true, pdfExportQueueKey, pdfExportMaxBytes, pdfExportMaxPages, pdfExportMaxResults,
+    pdfExportMaxAttempts, pdfExportWorkerIntervalMs, pdfExportWorkerMaxJobs, pdfExportStorageProvider, pdfExportStorageRoot,
+  };
+}
+
 function supabaseUrl(env) {
   const raw = required(env, 'SUPABASE_URL');
   let url;
@@ -284,6 +309,7 @@ export function loadConfig(env = process.env) {
   }
   const searchConfig = loadSearchConfig(env);
   const officeActionSearchConfig = loadOfficeActionSearchConfig(env);
+  const pdfExportConfig = loadPdfExportConfig(env);
   const watchConfig = loadWatchConfig(env);
   if (watchConfig.watchEnabled && !searchConfig.searchEnabled) {
     throw new Error('WATCH_ENABLED requires SEARCH_ENABLED=true.');
@@ -302,6 +328,7 @@ export function loadConfig(env = process.env) {
     ...supabaseConfig,
     ...searchConfig,
     ...officeActionSearchConfig,
+    ...pdfExportConfig,
     ...watchConfig,
     ...authRateLimitConfig,
   };

@@ -244,6 +244,32 @@ rejected. The sanitizer preserves genuine registry references. `audit_logs` is
 firm-isolated at every write/read query; retention and archival are operational
 decisions because this table has no deletion path.
 
+### `exports`
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | Server-generated export ID |
+| firm_id | uuid FK → firms | Mandatory tenant boundary |
+| requested_by_user_id | uuid FK → users | Resolved from authenticated requester |
+| export_type | varchar(40) | `search_results`, `risk_report`, or `portfolio_summary` only |
+| status | varchar(20) | `queued`, `processing`, `completed`, or `failed` only |
+| source_entity_id | uuid | Persisted search snapshot or firm portfolio-mark source |
+| request_id / idempotency_key | varchar(128) | Bounded trace/retry identity; unique by `(firm_id, idempotency_key)` |
+| parameters | jsonb | Bounded object-only type-specific parameters |
+| storage_key | varchar(512), nullable | Private server-only key; never returned by API |
+| mime_type / byte_size / checksum_sha256 | nullable | Required together for completed `application/pdf` output |
+| failure_code | varchar(100), nullable | Stable bounded code, required for failed state only |
+| queued_at / processing_started_at / completed_at / failed_at | timestamptz | UTC lifecycle evidence |
+| created_at / updated_at | timestamptz | UTC timestamps |
+
+Migration `012_create_exports.sql` is additive/repeat-safe and **was not
+applied**. It supplies firm/requester foreign keys, type/status/object/size/
+checksum/failure-code checks, idempotency uniqueness, state-consistency checks,
+and indexes for firm/status/time, requester/time, and source lookup. It never
+stores PDF bytes or signed URLs. Unlike immutable audit/search snapshots,
+exports are intentionally mutable only through the server's legal lifecycle
+transitions; there is no API delete route. Retention and any authorized storage
+cleanup remain operational/legal policy decisions.
+
 ## 3. Redis Usage
 
 | Key pattern | Purpose | TTL |
@@ -252,6 +278,7 @@ decisions because this table has no deletion path.
 | `ratelimit:{ip or user}` | Auth/brute-force protection (TRD §3.3) | rolling window |
 | `search:cache:{query_hash}` | Federated search result cache | short (minutes) — balances freshness vs. registry load |
 | `queue:watch_ingest` | Job queue for scheduled watch/registry polling | n/a (queue, not cache) |
+| `queue:pdf_export` | Feature-gated PDF export job queue | n/a (queue, not cache) |
 
 ## 4. Elasticsearch Indices
 

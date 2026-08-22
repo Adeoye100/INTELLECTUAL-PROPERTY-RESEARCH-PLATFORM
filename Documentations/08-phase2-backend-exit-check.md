@@ -238,3 +238,9 @@ exception status.
 BE-19 adds immutable search snapshot code and an unapplied migration `011`. It
 does not resolve, execute, or change any existing Phase 2/BE-18 staging gate or
 the BE-14 exception status.
+
+BE-20 adds feature-gated PDF export code and unapplied migration `012`. It does
+not resolve, execute, or change any existing Phase 2/BE-18 staging gate or the
+explicitly deferred BE-14 billing exception. PDF export staging additionally
+requires controlled migration application, private storage permissions, Redis,
+the separate worker process, and authenticated firm-isolation/download checks.

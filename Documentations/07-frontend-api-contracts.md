@@ -564,3 +564,57 @@ and existing `ExportAuditService` lifecycle hook; it must not recalculate the
 historical search or create a client-facing export-event endpoint. Migration
 `011_create_search_results.sql` was not applied. Snapshot retention and any
 authorized cleanup process remain operational/legal policy decisions.
+
+## BE-20 PDF export contract
+
+PDF export is disabled by default. When deployment explicitly enables it,
+authenticated Admin and Attorney users may call:
+
+| Method and path | Request / response | Access |
+|---|---|---|
+| `POST /api/v1/exports` | `{ "type": "search_results\|risk_report\|portfolio_summary", "sourceEntityId": "uuid", "parameters": {}, "idempotencyKey": "bounded-key" }`; `202` newly queued, `200` equivalent retry | Admin, Attorney |
+| `GET /api/v1/exports` | `{ exports: [summary], nextCursor }`; optional `status`, `type`, bounded `pageSize`, opaque `cursor` | Admin, Attorney |
+| `GET /api/v1/exports/:id` | Full safe lifecycle record | Admin, Attorney |
+| `GET /api/v1/exports/:id/download` | `application/pdf` attachment only after completion | Admin, Attorney |
+
+Viewer receives the standard `403 FORBIDDEN`. Firm and requester values are
+never accepted from the request body. Every read/download is firm-scoped;
+missing or cross-firm records are `404 EXPORT_NOT_FOUND`. Attorney lists are
+limited to that attorney's own requests; Admin lists are firm-wide. Disabled
+routes return the existing `404 NOT_FOUND` feature-gate behavior.
+
+For `search_results`, `sourceEntityId` is a BE-19 persistent `searchId` and
+parameters must be `{}`. For `risk_report`, it is the persisted `searchId` and
+parameters must be exactly `{ "resultId": "stored-result-identifier" }`. For
+`portfolio_summary`, it is a firm portfolio-mark UUID and optional boolean
+`includeWatches`/`includeAlerts` parameters select only bounded current
+summaries. The server never trusts a frontend `searchId` as a newly calculated
+result, never reruns Elasticsearch/risk scoring, and never constructs legal
+advice. Risk report evidence is the exact historical persisted Visual,
+Phonetic, and Class evidence; partial searches visibly disclose unavailable
+sources. Registry/Office Action provenance is retained, while null values are
+shown as “Not available.”
+
+A safe export record contains `id`, `type`, `status`, `sourceEntityId`,
+`requestId`, safe `parameters`, `mimeType`, `byteSize`, `checksumSha256`, stable
+`failureCode`, and lifecycle timestamps. List summaries omit parameter and
+checksum detail. Neither response includes a storage key, filesystem path,
+signed URL, token, PDF bytes, stack trace, raw result data, or infrastructure
+error. Downloads are streamed from server-private storage and only when status
+is `completed`.
+
+Clients should retry a timed-out `POST` using the exact same idempotency key and
+semantically identical request. A reused key with different type/source/
+parameters or requester returns `409 EXPORT_IDEMPOTENCY_CONFLICT`. Other stable
+errors include `EXPORT_REQUEST_INVALID`, `EXPORT_CURSOR_INVALID`,
+`EXPORT_QUEUE_UNAVAILABLE`, `EXPORT_NOT_READY`,
+`EXPORT_DOWNLOAD_UNAVAILABLE`, and `EXPORT_SOURCE_NOT_FOUND`. There are no
+export update/delete routes and no client-facing audit-event route.
+
+The export worker audits `export.requested`, `export.completed`, and
+`export.failed` without raw PDF/source/storage data. PDFs are research
+assistance—not legal advice or conclusions—and include a disclaimer, source
+attribution, generation time, export ID, and page numbers. Migration
+`012_create_exports.sql` was not applied. Redis, private storage permissions,
+the worker process, migration application, and disposable staging verification
+remain operational gates; BE-14 billing remains explicitly deferred.

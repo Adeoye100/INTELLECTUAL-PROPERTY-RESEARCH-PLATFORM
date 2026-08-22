@@ -799,12 +799,11 @@ Supabase custom claims are not used by this architecture, so no Supabase write
 or token refresh is needed. The resolver cache invalidation means the next
 request reloads membership/role from PostgreSQL.
 
-No export endpoint or BE-20 pipeline exists. `ExportAuditService` is a
-server-internal hook with `requested`, `completed`, and `failed` methods. BE-20
-must call the matching hook for every export lifecycle transition using its
-internal job/export UUID, format, type, bounded safe filter summary, and (on
-failure) stable error code. It must never pass generated files, result sets,
-URLs, or credentials. Clients cannot create audit events.
+`ExportAuditService` is the server-internal lifecycle hook for `requested`,
+`completed`, and `failed` events. BE-20 calls it transactionally for each
+export transition with only the internal export UUID, type, PDF format, bounded
+summary, byte size/checksum on completion, and a stable error code on failure.
+It never receives a PDF, result set, storage key, signed URL, or credential.
 
 The reviewed but deliberately excluded mutations are firm provisioning,
 invitation issuance/redemption, watch-worker poll bookkeeping, registry
@@ -992,3 +991,103 @@ applied here. Search snapshots can contain client research information, so their
 retention/expiry and any authorized cleanup process remain operational/legal
 policy decisions. BE-19 does not resolve existing BE-17/BE-18 staging gates or
 the deferred BE-14 billing exception.
+
+## BE-20 asynchronous PDF exports
+
+BE-20 adds a feature-gated, firm-scoped PDF export pipeline. Migration
+`012_create_exports.sql` is additive/repeat-safe and **was not applied**. It
+creates lifecycle records only; PDF bytes, signed URLs, and public storage
+locations are never stored in PostgreSQL. The `(firm_id, idempotency_key)`
+constraint makes safe client retries deterministic. Export rows move only
+`queued → processing → completed|failed`; completed rows require a private PDF
+key, MIME type, byte size, SHA-256 checksum, and completion time, while failed
+rows require only a stable bounded failure code.
+
+The API is available only when `PDF_EXPORT_ENABLED=true`:
+
+- `POST /api/v1/exports` accepts `{ type, sourceEntityId, parameters,
+  idempotencyKey }` and returns `202` for newly queued work or the existing
+  equivalent export for a retry.
+- `GET /api/v1/exports` returns bounded cursor-paginated summaries ordered
+  `createdAt DESC, id DESC`.
+- `GET /api/v1/exports/:id` returns one firm-scoped lifecycle record.
+- `GET /api/v1/exports/:id/download` streams only a completed private PDF.
+
+Admin and Attorney may create, inspect, and download exports; Viewer is denied.
+Firm identity and requester identity always derive from verified membership;
+missing/cross-firm exports are `404 EXPORT_NOT_FOUND`. Attorney listing is
+restricted to that attorney's own requested exports, while Admin listing is
+firm-wide. The API never returns storage keys, filesystem paths, signed URLs,
+credentials, or raw storage/worker errors. Stable errors include
+`EXPORT_NOT_FOUND`, `EXPORT_REQUEST_INVALID`, `EXPORT_CURSOR_INVALID`,
+`EXPORT_IDEMPOTENCY_CONFLICT`, `EXPORT_QUEUE_UNAVAILABLE`,
+`EXPORT_NOT_READY`, `EXPORT_DOWNLOAD_UNAVAILABLE`, `EXPORT_SOURCE_NOT_FOUND`,
+`EXPORT_JOB_INVALID`, `EXPORT_RENDER_INVALID`, and
+`EXPORT_PROCESSING_FAILED`.
+
+Supported source loaders are deliberately evidence-first. `search_results` and
+`risk_report` use BE-19's server-only `loadSearchSnapshotForExport()` boundary,
+select the exact stored result evidence where requested, and never rerun
+Elasticsearch or risk scoring. `portfolio_summary` uses only firm-scoped
+portfolio, attributed Office Action, and bounded current watch/alert records.
+The document model is plain bounded data—not request-built HTML—and preserves
+genuine registry references and nullable values as “Not available.” It makes no
+legal conclusion or recommendation. PDFs visibly disclose partial/unavailable
+sources, separate Visual/Phonetic/Class evidence, use text risk labels in
+addition to any presentation color, include source attribution, export ID,
+UTC generation time, page numbers, and the research-assistance/not-legal-advice
+disclaimer.
+
+No PDF package was present in the locked dependency set and this work does not
+make network/package-manager calls. The injected `PdfRenderer` therefore uses a
+small static server-side PDF 1.4 text emitter with built-in Helvetica rather
+than a browser, remote HTML renderer, CDN, remote font/image/CSS fetch, active
+content, JavaScript, or attachments. It normalizes/escapes text and bounds
+result, line, page, and byte counts. This is deterministic at the document-model
+layer and has no external rendering dependency.
+
+Storage is injected behind `{ put, get, delete }`. The enabled runtime defaults
+only to an explicitly configured absolute private filesystem root; it has no
+public-bucket fallback. Server-generated keys are exactly
+`exports/<firm UUID>/<export UUID>.pdf`; traversal and arbitrary-file paths are
+rejected. The worker computes SHA-256 and validates PDF byte bounds before
+marking completion. Tests use `InMemoryPdfStorage` only.
+
+The dedicated Redis queue is `queue:pdf_export` by default. Its version-1 job
+is `{ version, jobId, exportId, firmId, scheduledFor, attempt }`; it validates
+every field, uses a bounded lock/dedupe pattern, atomically claims queued rows,
+and supports at-least-once delivery without duplicate rendering. The separate
+worker is started only with:
+
+```bash
+pnpm --dir backend pdf-export:worker
+```
+
+Retryable queue/render/storage/audit failures are bounded by
+`PDF_EXPORT_MAX_ATTEMPTS`; invalid, missing-source, and invalid-render inputs
+are terminal. Failed rows retain only a stable code, never a stack trace. On a
+completion-persistence failure the worker removes a just-uploaded private
+object where safely possible. `export.requested` is inserted in the same
+transaction as export creation; `export.completed` and `export.failed` share
+their corresponding transition transactions. Audit metadata excludes PDFs,
+storage keys, URLs, tokens, cookies, raw search data, and stack traces.
+
+Configuration is strict and disabled by default:
+
+```text
+PDF_EXPORT_ENABLED=false
+PDF_EXPORT_QUEUE_KEY=queue:pdf_export
+PDF_EXPORT_MAX_BYTES=10485760
+PDF_EXPORT_MAX_PAGES=100
+PDF_EXPORT_MAX_RESULTS=50
+PDF_EXPORT_MAX_ATTEMPTS=3
+PDF_EXPORT_STORAGE_PROVIDER=filesystem       # required when enabled
+PDF_EXPORT_STORAGE_ROOT=/private/exports     # required when enabled
+```
+
+Disabled mode constructs no PDF queue or storage runtime and all export paths
+return the existing terminal `404 NOT_FOUND`. Enabling requires a private
+filesystem root, Redis, PostgreSQL migration application, and worker process.
+Live Redis/storage permissions and disposable-staging export verification are
+operational gates. BE-20 does not change the deferred BE-14 billing decision or
+any existing Phase 2/BE-18 staging gate.
