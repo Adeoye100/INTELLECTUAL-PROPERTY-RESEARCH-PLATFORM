@@ -11,7 +11,7 @@ can use the locked `frontend/` project and dynamic CSP configuration.
 Required environment variables in Vercel:
 - `VITE_API_BASE_URL`: The absolute URL of the API (e.g., `https://api.example.com/api/v1`).
 - `VITE_API_MODE`: Set to `live` (default) or omit it.
-- `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`: browser-safe Supabase
+- `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`: browser-safe Supabase
   project values only.
 
 When importing the project to Vercel:

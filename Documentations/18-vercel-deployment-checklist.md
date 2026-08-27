@@ -31,7 +31,7 @@ Production; never promote a preview URL automatically into production settings.
 | Variable | Preview | Production | Safe in browser? |
 | --- | --- | --- | --- |
 | `VITE_SUPABASE_URL` | Intended Supabase project HTTPS origin | Intended Supabase project HTTPS origin | Yes |
-| `VITE_SUPABASE_ANON_KEY` | Matching publishable/anon key | Matching publishable/anon key | Yes |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Matching browser publishable key | Matching browser publishable key | Yes |
 | `VITE_API_BASE_URL` | Exact approved Render preview/staging HTTPS origin ending `/api/v1` | Exact Render production HTTPS origin ending `/api/v1` | Yes |
 | `VITE_API_MODE` | `live` | `live` | Yes |
 

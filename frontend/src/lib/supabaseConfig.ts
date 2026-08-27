@@ -1,6 +1,6 @@
 export interface SupabaseEnvironment {
   VITE_SUPABASE_URL?: string;
-  VITE_SUPABASE_ANON_KEY?: string;
+  VITE_SUPABASE_PUBLISHABLE_KEY?: string;
 }
 
 const placeholder = (value: string) => /your[-_]|placeholder|replace[-_]?me|change[-_]?me|\.invalid|<[^>]+>/i.test(value);
@@ -10,9 +10,9 @@ export function resolveSupabaseConfig(
   runtime: { isDevelopment: boolean },
 ) {
   const urlValue = environment.VITE_SUPABASE_URL?.trim();
-  const publishableKey = environment.VITE_SUPABASE_ANON_KEY?.trim();
+  const publishableKey = environment.VITE_SUPABASE_PUBLISHABLE_KEY?.trim();
   if (!urlValue || !publishableKey) {
-    throw new Error('VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are required.');
+    throw new Error('VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY are required.');
   }
   let url: URL;
   try {
@@ -30,7 +30,7 @@ export function resolveSupabaseConfig(
     throw new Error('Supabase browser configuration must not use placeholder values outside development.');
   }
   if (/service[_-]?role|sb_secret/i.test(publishableKey)) {
-    throw new Error('VITE_SUPABASE_ANON_KEY must be a browser publishable/anon key, never a secret key.');
+    throw new Error('VITE_SUPABASE_PUBLISHABLE_KEY must be a browser publishable key, never a secret key.');
   }
   return Object.freeze({ url: url.origin, publishableKey });
 }
