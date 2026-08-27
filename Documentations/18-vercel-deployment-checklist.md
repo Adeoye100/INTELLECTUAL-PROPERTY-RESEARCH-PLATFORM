@@ -10,6 +10,7 @@ Vercel must use the **repository root** so this file can install/build the
 | Setting | Value |
 | --- | --- |
 | Root Directory | Repository root (leave Vercel’s project root at the repository, not `frontend`). |
+| Node runtime | Select the currently supported **22.x** line in **Project Settings → Build and Deployment → Node.js Version**. The repository’s `.node-version` and Render target are 22.14.0; Vercel manages minor/patch updates, so record the selected major and build evidence. |
 | Install Command | `corepack enable && cd frontend && pnpm install --frozen-lockfile` |
 | Build Command | `cd frontend && pnpm run build` |
 | Output Directory | `frontend/dist` |

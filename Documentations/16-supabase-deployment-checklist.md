@@ -11,14 +11,16 @@ record connection strings, keys, tokens, row data, or customer information.
 - [ ] In **Project Settings → Database**, use SSL for every deployed
   connection. The API validation requires `DATABASE_SSL=true`; its `pg` pool
   uses certificate verification and never disables it.
-- [ ] In **Connect**, choose the actual Render connection string rather than
-  guessing. For a long-running Render API on an IPv4-only service, Supabase’s
-  shared **session pooler** is normally the compatible starting point; direct
-  connection is appropriate for a controlled migration process where reachable.
-  Transaction pooler is intended for transient/serverless clients and has
-  prepared-statement constraints. Confirm the chosen mode and certificate
-  behavior against [Supabase’s connection guide](https://supabase.com/docs/guides/database/connecting-to-postgres)
-  and [prepared-statement guidance](https://supabase.com/docs/guides/troubleshooting/disabling-prepared-statements-qL8lEL).
+- [ ] The repository’s initial connection profile is **Supavisor shared session
+  pooler on port 5432 for the persistent Render API**, with the bounded local
+  `pg` pool retained. Use a short-lived TLS-verified **direct** connection only
+  for the controlled migration/backup process if network reachability is
+  confirmed. Do not use transaction-pooler port 6543 for this long-running API:
+  Supabase documents that mode for transient/serverless clients and it has
+  prepared-statement restrictions. Confirm the actual dashboard connection
+  string and certificate/CA behavior before entering `DATABASE_URL`; the
+  repository does not guess a project hostname or certificate. See
+  [Supabase’s connection guide](https://supabase.com/docs/guides/database/connecting-to-postgres).
 - [ ] Do not enable `rejectUnauthorized: false`, `sslmode=disable`, or a
   per-request database client. The deployed pool is capped by
   `DATABASE_POOL_MAX` (1–30), uses connection/idle/statement timeouts, and is
@@ -83,7 +85,8 @@ a tested restore/recovery decision.
 These queries return metadata/counts only; they never select business rows.
 
 ```sql
--- UUID function and extension prerequisite for gen_random_uuid().
+-- UUID generator prerequisite. PostgreSQL 16 may provide gen_random_uuid()
+-- without an installed pgcrypto extension, so the function result is decisive.
 SELECT extname FROM pg_extension WHERE extname = 'pgcrypto';
 SELECT to_regprocedure('gen_random_uuid()') IS NOT NULL AS uuid_function_available;
 
@@ -133,9 +136,10 @@ WHERE conrelid = 'exports'::regclass
 ORDER BY conname;
 ```
 
-Before migration, confirm `pgcrypto`/`gen_random_uuid()` availability with the
-first query. If missing, use an approved Supabase database change to enable the
-extension before 001; do not rewrite historical migration files. Verify role
+Before migration, confirm `gen_random_uuid()` availability with the first
+query. `pgcrypto` may be installed but is not itself the decisive prerequisite
+on PostgreSQL 16. If the function is missing, use an approved Supabase database
+change before 001; do not rewrite historical migration files. Verify role
 changes with the application’s transactional `FOR UPDATE` last-Admin guard in
 staging; it is a service-level concurrency protection, not a reason to weaken
 RLS. Verify the audit/search append-only triggers and export lifecycle checks

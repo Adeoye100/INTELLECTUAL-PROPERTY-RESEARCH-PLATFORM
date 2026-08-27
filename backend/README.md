@@ -514,11 +514,15 @@ WATCH_SCHEDULER_BATCH_SIZE=50
 
 `WATCH_ENABLED=true` requires the existing `SEARCH_ENABLED=true` search runtime.
 Disabled mode constructs no watch scheduler/processor runtime and makes no watch
-Redis calls. The HTTP server never starts the scheduler. Run it separately:
+Redis calls. The HTTP server never starts the scheduler. Render starts it
+separately from its service environment:
 
 ```sh
 pnpm watch:worker
 ```
+
+For a local `.env` file, use `pnpm watch:worker:dev`; production workers must
+not depend on a repository-local environment file.
 
 The worker stops accepting new work before releasing Redis and PostgreSQL on
 SIGINT/SIGTERM. Apply the additive migration only to the intended database; it
@@ -1057,11 +1061,13 @@ The dedicated Redis queue is `queue:pdf_export` by default. Its version-1 job
 is `{ version, jobId, exportId, firmId, scheduledFor, attempt }`; it validates
 every field, uses a bounded lock/dedupe pattern, atomically claims queued rows,
 and supports at-least-once delivery without duplicate rendering. The separate
-worker is started only with:
+worker is started from its deployment environment with:
 
 ```bash
 pnpm --dir backend pdf-export:worker
 ```
+
+For a local `.env` file, use `pnpm --dir backend pdf-export:worker:dev`.
 
 Retryable queue/render/storage/audit failures are bounded by
 `PDF_EXPORT_MAX_ATTEMPTS`; invalid, missing-source, and invalid-render inputs

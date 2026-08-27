@@ -1,5 +1,5 @@
 const DEFAULT_ALLOWED_ORIGINS = new Set(['http://localhost:5173']);
-const ALLOWED_METHODS = 'DELETE, GET, OPTIONS, PATCH, POST, PUT';
+const ALLOWED_METHODS = 'DELETE, GET, OPTIONS, PATCH, POST';
 const ALLOWED_HEADERS = 'Authorization, Content-Type';
 const MAX_AGE_SECONDS = '600';
 
@@ -33,13 +33,10 @@ export function createCorsMiddleware({ allowedOrigins = DEFAULT_ALLOWED_ORIGINS 
     if (!origin) return next();
 
     if (!origins.has(origin)) {
-      if (request.method === 'OPTIONS') {
-        return response.status(403).json({
-          code: 'CORS_ORIGIN_DENIED',
-          message: 'This origin is not allowed to access the API.',
-        });
-      }
-      return next();
+      return response.status(403).json({
+        code: 'CORS_ORIGIN_DENIED',
+        message: 'This origin is not allowed to access the API.',
+      });
     }
 
     response.set({

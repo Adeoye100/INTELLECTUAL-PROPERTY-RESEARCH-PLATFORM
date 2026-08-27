@@ -87,6 +87,10 @@ function databaseConfig(env, environment) {
   if (!['postgres:', 'postgresql:'].includes(parsed.protocol) || !parsed.hostname) {
     throw new Error('DATABASE_URL must use the postgres or postgresql protocol.');
   }
+  const sslMode = parsed.searchParams.get('sslmode')?.toLowerCase();
+  if (['disable', 'allow', 'prefer', 'no-verify'].includes(sslMode)) {
+    throw new Error('DATABASE_URL must not disable or weaken TLS verification.');
+  }
   const databaseSsl = strictBoolean(env, 'DATABASE_SSL', false);
   if (environment === 'production') {
     rejectProductionPlaceholder(databaseUrl, 'DATABASE_URL', environment);
@@ -100,6 +104,27 @@ function databaseConfig(env, environment) {
     databaseIdleTimeoutMs: boundedPositiveInteger(env, 'DATABASE_IDLE_TIMEOUT_MS', 30_000, 1_000, 300_000),
     databaseConnectionTimeoutMs: boundedPositiveInteger(env, 'DATABASE_CONNECTION_TIMEOUT_MS', 5_000, 1_000, 60_000),
     databaseStatementTimeoutMs: boundedPositiveInteger(env, 'DATABASE_STATEMENT_TIMEOUT_MS', 15_000, 1_000, 60_000),
+  };
+}
+
+function loadHttpServerConfig(env) {
+  const httpKeepAliveTimeoutMs = boundedPositiveInteger(
+    env, 'HTTP_KEEP_ALIVE_TIMEOUT_MS', 5_000, 1_000, 60_000,
+  );
+  const httpHeadersTimeoutMs = boundedPositiveInteger(
+    env, 'HTTP_HEADERS_TIMEOUT_MS', 10_000, 1_000, 60_000,
+  );
+  const httpRequestTimeoutMs = boundedPositiveInteger(
+    env, 'HTTP_REQUEST_TIMEOUT_MS', 30_000, 5_000, 120_000,
+  );
+  if (httpHeadersTimeoutMs > httpRequestTimeoutMs) {
+    throw new Error('HTTP_HEADERS_TIMEOUT_MS must not exceed HTTP_REQUEST_TIMEOUT_MS.');
+  }
+  return {
+    httpKeepAliveTimeoutMs,
+    httpHeadersTimeoutMs,
+    httpRequestTimeoutMs,
+    httpMaxHeadersCount: boundedPositiveInteger(env, 'HTTP_MAX_HEADERS_COUNT', 100, 10, 200),
   };
 }
 
@@ -141,6 +166,16 @@ function strictBoolean(env, name, fallback) {
   const value = env[name] === undefined ? String(fallback) : env[name].trim();
   if (value !== 'true' && value !== 'false') throw new Error(`${name} must be either true or false.`);
   return value === 'true';
+}
+
+/** Worker entrypoints read this narrow gate before constructing their complete
+ * runtime. A disabled worker must not require database, Redis, Auth, search,
+ * or storage credentials simply to report that it is disabled. */
+export function loadWorkerFeatureGate(env = process.env, name) {
+  if (!['WATCH_ENABLED', 'PDF_EXPORT_ENABLED'].includes(name)) {
+    throw new Error('Worker feature gate must be WATCH_ENABLED or PDF_EXPORT_ENABLED.');
+  }
+  return strictBoolean(env, name, false);
 }
 
 function nonNegativeBoundedInteger(env, name, fallback, maximum) {
@@ -433,6 +468,7 @@ export function loadConfig(env = process.env) {
     env, jwtAccessSecret, supabaseConfig.supabaseSecretKey, environment,
   );
   const database = databaseConfig(env, environment);
+  const httpServer = loadHttpServerConfig(env);
   const configuredRedisUrl = redisUrl(env, environment);
   if (environment === 'production') {
     rejectProductionPlaceholder(jwtAccessSecret, 'JWT_ACCESS_SECRET', environment);
@@ -445,6 +481,7 @@ export function loadConfig(env = process.env) {
     environment,
     port: positiveInteger(env, 'PORT', 3000),
     ...database,
+    ...httpServer,
     redisUrl: configuredRedisUrl,
     corsAllowedOrigins: corsAllowedOrigins(env, environment),
     jwtAccessSecret,

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { authRequest, toAuthApiError } from './authApi';
+import { authErrorMessage, authRequest, toAuthApiError } from './authApi';
+import { ApiError } from '../../lib/api/client';
 
 const auth = vi.hoisted(() => ({ signOut: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { auth } }));
@@ -25,5 +26,16 @@ describe('authRequest logout', () => {
       code: 'SESSION_EXPIRED',
       status: 401,
     });
+  });
+
+  it('retains an allowlisted provisioning error code without rendering its server message', () => {
+    const error = toAuthApiError(new ApiError({
+      code: 'VALIDATION_ERROR',
+      message: 'The request could not be completed.',
+      serverCode: 'FIRM_ALREADY_EXISTS',
+      status: 409,
+    }));
+    expect(error).toMatchObject({ code: 'FIRM_ALREADY_EXISTS', status: 409 });
+    expect(authErrorMessage(error)).toBe('This firm may already exist. Request an invitation from your firm administrator.');
   });
 });

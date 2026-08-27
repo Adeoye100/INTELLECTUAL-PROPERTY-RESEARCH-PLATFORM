@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { loadConfig, loadSupabaseConfig } from '../../src/config.js';
+import { loadConfig, loadSupabaseConfig, loadWorkerFeatureGate } from '../../src/config.js';
 
 const jwksEnvironment = {
   SUPABASE_URL: 'https://project-ref.supabase.co',
@@ -239,11 +239,17 @@ describe('production deployment configuration', () => {
     assert.equal(config.trustProxyHops, 1);
     assert.equal(config.databasePoolMax, 12);
     assert.equal(config.databaseStatementTimeoutMs, 12_000);
+    assert.equal(config.httpHeadersTimeoutMs, 10_000);
+    assert.equal(config.httpRequestTimeoutMs, 30_000);
+    assert.equal(config.httpMaxHeadersCount, 100);
   });
 
   it('rejects unsafe production dependencies, placeholder values, and enabled filesystem exports', () => {
     for (const overrides of [
       { DATABASE_SSL: 'false' },
+      { DATABASE_URL: 'postgresql://app:password@aws-region.pooler.supabase.com:5432/postgres?sslmode=disable' },
+      { DATABASE_URL: 'postgresql://app:password@aws-region.pooler.supabase.com:5432/postgres?sslmode=prefer' },
+      { DATABASE_URL: 'postgresql://app:password@aws-region.pooler.supabase.com:5432/postgres?sslmode=no-verify' },
       { REDIS_URL: 'redis://redis.provider.test:6379/0' },
       { CORS_ALLOWED_ORIGINS: 'https://app.iprp.test,https://app.iprp.test' },
       { CORS_ALLOWED_ORIGINS: 'http://app.iprp.test' },
@@ -251,5 +257,25 @@ describe('production deployment configuration', () => {
       { DATABASE_URL: 'postgresql://app:password@your-project.invalid:5432/postgres' },
       { PDF_EXPORT_ENABLED: 'true', PDF_EXPORT_STORAGE_PROVIDER: 'filesystem', PDF_EXPORT_STORAGE_ROOT: '/private/exports' },
     ]) assert.throws(() => loadConfig(productionEnvironment(overrides)));
+  });
+
+  it('bounds HTTP connection limits and rejects an unsafe timeout relationship', () => {
+    for (const overrides of [
+      { HTTP_KEEP_ALIVE_TIMEOUT_MS: '999' },
+      { HTTP_HEADERS_TIMEOUT_MS: '61000' },
+      { HTTP_REQUEST_TIMEOUT_MS: '4000' },
+      { HTTP_MAX_HEADERS_COUNT: '9' },
+      { HTTP_MAX_HEADERS_COUNT: '201' },
+      { HTTP_HEADERS_TIMEOUT_MS: '30001', HTTP_REQUEST_TIMEOUT_MS: '30000' },
+    ]) assert.throws(() => loadConfig(productionEnvironment(overrides)));
+  });
+});
+
+describe('disabled worker gates', () => {
+  it('do not require the full runtime configuration while disabled', () => {
+    assert.equal(loadWorkerFeatureGate({}, 'WATCH_ENABLED'), false);
+    assert.equal(loadWorkerFeatureGate({}, 'PDF_EXPORT_ENABLED'), false);
+    assert.throws(() => loadWorkerFeatureGate({ WATCH_ENABLED: 'yes' }, 'WATCH_ENABLED'));
+    assert.throws(() => loadWorkerFeatureGate({}, 'SEARCH_ENABLED'));
   });
 });

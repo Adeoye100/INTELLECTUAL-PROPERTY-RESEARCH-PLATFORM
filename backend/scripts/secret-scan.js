@@ -1,11 +1,12 @@
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const tracked = execFileSync('git', ['-C', root, 'ls-files', '-z'], { encoding: 'buffer' })
-  .toString('utf8').split('\0').filter(Boolean);
+const tracked = readFileSync(0, 'utf8').split('\0').filter(Boolean);
+if (tracked.length === 0) {
+  throw new Error('Tracked file list is required on standard input; run through pnpm security:secrets.');
+}
 const ignored = /^(backend\/test\/|Documentations\/|.*\.example$|.*lock$)/;
 const patterns = [
   ['private-key', /-----BEGIN(?: [A-Z]+)? PRIVATE KEY-----/],

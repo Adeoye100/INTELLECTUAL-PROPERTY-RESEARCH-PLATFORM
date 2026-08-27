@@ -1,5 +1,5 @@
 import { createClient } from 'redis';
-import { loadConfig } from '../config.js';
+import { loadConfig, loadWorkerFeatureGate } from '../config.js';
 import { createPool } from '../db/pool.js';
 import { createSearchRuntime } from '../search/search-runtime.js';
 import { WatchRepository } from './watch-repository.js';
@@ -8,10 +8,11 @@ import { AlertRepository } from '../alerts/alert-repository.js';
 import { AlertGenerationService } from '../alerts/alert-generation-service.js';
 import { WorkerHeartbeat } from '../operations/worker-heartbeat.js';
 
-const config = loadConfig();
-if (!config.watchEnabled) {
+const enabled = loadWorkerFeatureGate(process.env, 'WATCH_ENABLED');
+if (!enabled) {
   console.log('Watch worker is disabled.');
 } else {
+  const config = loadConfig();
   const pool = createPool(config.databaseUrl, config);
   const redisClient = createClient({ url: config.redisUrl });
   redisClient.on('error', (error) => {

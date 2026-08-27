@@ -32,7 +32,7 @@ group, not in Git.
 | Category | Names | Notes |
 | --- | --- | --- |
 | Required server secrets | `DATABASE_URL`, `REDIS_URL`, `SUPABASE_SECRET_KEY`, `JWT_ACCESS_SECRET`, `AUTH_RATE_LIMIT_KEY_SECRET` | Server-only; mark secret; do not share with Vercel. |
-| Required configuration | `NODE_ENV=production`, `DATABASE_SSL=true`, pool timeouts, `CORS_ALLOWED_ORIGINS`, `TRUST_PROXY_HOPS=1`, `SUPABASE_URL`, `SUPABASE_JWT_VERIFICATION_MODE=jwks`, `SUPABASE_JWT_ALGORITHMS=ES256` | Startup rejects production TLS/proxy/origin violations and placeholder values. |
+| Required configuration | `NODE_ENV=production`, `DATABASE_SSL=true`, PostgreSQL pool timeouts, `HTTP_KEEP_ALIVE_TIMEOUT_MS`, `HTTP_HEADERS_TIMEOUT_MS`, `HTTP_REQUEST_TIMEOUT_MS`, `HTTP_MAX_HEADERS_COUNT`, `CORS_ALLOWED_ORIGINS`, `TRUST_PROXY_HOPS=1`, `SUPABASE_URL`, `SUPABASE_JWT_VERIFICATION_MODE=jwks`, `SUPABASE_JWT_ALGORITHMS=ES256` | Startup rejects production TLS/proxy/origin violations and placeholder values. |
 | Initial feature gates | `SEARCH_ENABLED=false`, `OFFICE_ACTION_SEARCH_ENABLED=false`, `WATCH_ENABLED=false`, `PDF_EXPORT_ENABLED=false` | Leave every optional credential absent while the matching gate is false. |
 | Future-only secrets | Elasticsearch credentials, Office Action provider key, storage credentials, Redis queue worker credentials | Do not add until a separate change and staging gate authorizes the feature. |
 
@@ -49,6 +49,12 @@ Render is the single trusted proxy, production requires exactly
   before adding `DATABASE_URL`. The `pg` pool is bounded (default 10) with
   5-second connection, 30-second idle, and 15-second statement/query limits;
   adjust from observed staging load only.
+- [ ] Keep the initial API on Supabase shared **session pooler** port 5432. Use
+  direct only for the one-off migration/backup process after reachability is
+  confirmed; transaction pooler is not part of this persistent API profile.
+- [ ] Confirm the server’s 5-second keep-alive, 10-second header, 30-second
+  request, and 100-header defaults are compatible with staging traffic. They
+  are bounded and validated rather than relying on Node defaults.
 - [ ] Configure a TLS Redis endpoint (`rediss:` in production). Redis is
   required for the API’s role/firm cache and brute-force/rate controls even
   though queue workers are disabled.
@@ -57,7 +63,8 @@ Render is the single trusted proxy, production requires exactly
   beyond that boundary.
 - [ ] Confirm body, header, URL, request-ID, and JSON limits; multipart and
   other non-JSON bodies are rejected with safe 415 behavior. There is no upload
-  endpoint in the initial release.
+  endpoint in the initial release. An unapproved browser `Origin` receives a
+  safe 403 response rather than an origin-reflected API response.
 - [ ] Verify API headers include no-sniff, CSP deny-by-default, frame denial,
   HSTS, referrer, permissions, and cross-origin policies without interfering
   with the approved Vercel CORS flow.

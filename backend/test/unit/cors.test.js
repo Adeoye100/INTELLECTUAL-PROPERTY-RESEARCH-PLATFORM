@@ -64,4 +64,13 @@ describe('CORS middleware', () => {
     assert.equal(denied.status, 403);
     assert.equal(denied.headers['access-control-allow-origin'], undefined);
   });
+
+  it('rejects non-preflight requests from an unapproved browser origin', async () => {
+    const response = await request(configuredTestApp(['https://app.iprp.test']))
+      .get('/protected')
+      .set('Origin', 'https://attacker.example.test');
+    assert.equal(response.status, 403);
+    assert.equal(response.body.code, 'CORS_ORIGIN_DENIED');
+    assert.equal(response.headers['access-control-allow-origin'], undefined);
+  });
 });

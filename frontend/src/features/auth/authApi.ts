@@ -95,6 +95,7 @@ interface SupabaseErrorLike {
 export function toAuthApiError(error: unknown): AuthApiError {
   if (error instanceof AuthApiError) return error;
   const candidate = error && typeof error === 'object' ? error as SupabaseErrorLike : {};
+  const serverCode = error instanceof ApiError ? error.serverCode : candidate.code;
   const detail = `${candidate.code ?? ''} ${candidate.name ?? ''} ${candidate.message ?? ''}`.toLowerCase();
 
   if (/fetch|network|offline|retryable/.test(detail) || candidate.status === 0) {
@@ -106,7 +107,7 @@ export function toAuthApiError(error: unknown): AuthApiError {
   if (/invalid[_ ]?credentials|invalid login credentials/.test(detail)) {
     return new AuthApiError('INVALID_CREDENTIALS', 'Invalid credentials.', candidate.status);
   }
-  if (candidate.code === 'FIRM_ALREADY_EXISTS') {
+  if (serverCode === 'FIRM_ALREADY_EXISTS') {
     return new AuthApiError('FIRM_ALREADY_EXISTS', 'This firm may already exist.', candidate.status);
   }
   if (/already[_ ]?(?:registered|exists)|identity_already_exists|user_already_exists/.test(detail)) {

@@ -1,5 +1,5 @@
 import { createClient } from 'redis';
-import { loadConfig } from '../config.js';
+import { loadConfig, loadWorkerFeatureGate } from '../config.js';
 import { createPool } from '../db/pool.js';
 import { AuditLogRepository } from '../audit/audit-log-repository.js';
 import { AuditService } from '../audit/audit-service.js';
@@ -17,10 +17,11 @@ import { AlertService } from '../alerts/alert-service.js';
 import { createPdfExportRuntime } from './pdf-export-runtime.js';
 import { WorkerHeartbeat } from '../operations/worker-heartbeat.js';
 
-const config = loadConfig();
-if (!config.pdfExportEnabled) {
+const enabled = loadWorkerFeatureGate(process.env, 'PDF_EXPORT_ENABLED');
+if (!enabled) {
   console.log('PDF export worker is disabled.');
 } else {
+  const config = loadConfig();
   const pool = createPool(config.databaseUrl, config);
   const redisClient = createClient({ url: config.redisUrl });
   redisClient.on('error', (error) => console.error('PDF export worker Redis error', { name: error.name, code: error.code ?? 'UNKNOWN' }));

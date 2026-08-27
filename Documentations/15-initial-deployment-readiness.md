@@ -16,7 +16,7 @@ their network clients while disabled.
 | Item | Status | Repository preparation | External gate / evidence still required |
 | --- | --- | --- | --- |
 | Supabase | Code-ready, configuration pending | TLS pool, JWT verification, server-only admin key boundary, RLS corrective migration, and runbook are present. | Create/select project; configure SSL, backups, Auth, keys, and access controls. |
-| Render API | Code-ready, configuration pending | `render.yaml`, Node 22.14 target, `/healthz`, `/readyz`, graceful shutdown, secure config validation, CORS and headers are present. | Supply secrets, select verified Supabase session-pooler/direct connection, configure exact origins, deploy. |
+| Render API | Code-ready, configuration pending | `render.yaml`, Node 22.14 target, `/healthz`, `/readyz`, graceful shutdown, bounded PostgreSQL and HTTP connection limits, strict CORS, and headers are present. | Supply secrets, choose the documented Supabase connection path, configure exact origins, deploy. |
 | Render watch worker | Disabled for initial deployment | Separate `pnpm watch:worker` command exists; API no longer mounts watch/alert routes when disabled. | Redis, search, migrations, monitoring, staging worker proof, then separate worker service. |
 | Render PDF-export worker | Disabled for initial deployment | Separate `pnpm pdf-export:worker` command and integrity checks exist. | Redis, migrations, malware/storage design, shared private storage adapter, monitoring, staging proof. |
 | Redis | Code-ready, configuration pending | Production validation requires `rediss:` and bounded use; no in-memory fallback. | Provision TLS Redis and least-privilege credential; validate API readiness. |
@@ -40,12 +40,12 @@ evidence exists.
 | Core API and Dashboard | Enabled after core configuration | Authenticated users reach `/dashboard`; authorization remains server-side. |
 | Supabase Auth / PostgreSQL | Enabled after configuration and migration verification | Browser uses only the publishable/anon key; API verifies the Bearer token then resolves firm and role from server-side state. |
 | Portfolio workflow | Disabled for initial deployment | The current frontend uses a different portfolio contract from the API. `/portfolio` explicitly reports unavailable rather than issuing broken requests. |
-| Federated search and risk detail | Disabled | Search routes are unmounted and return the existing JSON 404; frontend explains that provisioning/reprojection is pending. |
-| Office Action search | Disabled | Provider route is unmounted; no licensed source is configured. Existing manual reference APIs remain server-only API functionality, not frontend navigation. |
-| Watches and alerts | Disabled | Watch/alert routes are unmounted, workers are not deployed, and the frontend reports unavailable. |
-| PDF exports | Disabled | Export routes are unmounted. No queue, storage, or worker is constructed. |
-| Billing / BE-14 | Disabled / not implemented | Administration/billing navigation is unavailable; demonstration billing data is not shipped as an enabled workflow. |
-| Diagnostics and detailed errors | Disabled | Legacy ping routes are absent by default; safe error codes/messages exclude `details`, stack traces, SQL, and configuration. |
+| Federated search and risk detail | Disabled for initial deployment | Search routes are unmounted and return the existing JSON 404; frontend explains that provisioning/reprojection is pending. |
+| Office Action search | Disabled for initial deployment | Provider route is unmounted; no licensed source is configured. Existing manual reference APIs remain server-only API functionality, not frontend navigation. |
+| Watches and alerts | Disabled for initial deployment | Watch/alert routes are unmounted, workers are not deployed, and the frontend reports unavailable. |
+| PDF exports | Disabled for initial deployment | Export routes are unmounted. No queue, storage, or worker is constructed. |
+| Billing / BE-14 | Disabled for initial deployment | Billing is not implemented; administration/billing navigation is unavailable and demonstration billing data is not shipped as an enabled workflow. |
+| Diagnostics and detailed errors | Disabled for initial deployment | Legacy ping routes are absent by default; safe error codes/messages exclude `details`, stack traces, SQL, and configuration. |
 
 Disabled routes deliberately produce the application’s normal `404` response,
 not a substitute in-memory integration. Disabled frontend pages are explicit
@@ -73,7 +73,7 @@ environment loader; Render and Vercel receive their own scoped values.
 | --- | --- | --- |
 | Frontend-public, build/runtime | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_API_BASE_URL`, optional development-only `VITE_API_MODE` and `VITE_MOCK_ADAPTER_DELAY` | Public project URL, publishable/anon key, and explicit HTTPS API URL only. The production resolver rejects placeholders, localhost, root-relative API URLs, service-role-shaped keys, and mock mode. |
 | Backend-secret, runtime | `DATABASE_URL`, `REDIS_URL`, `SUPABASE_SECRET_KEY`, `JWT_ACCESS_SECRET`, `AUTH_RATE_LIMIT_KEY_SECRET`, optional `USPTO_TSDR_API_KEY` | Render-only. Never use a `VITE_*` name, browser bundle, source map, `render.yaml` value, log message, or documentation value. |
-| Backend runtime configuration | `NODE_ENV`, `PORT`, `DATABASE_SSL`, pool/timeout variables, `CORS_ALLOWED_ORIGINS`, `TRUST_PROXY_HOPS`, Supabase verification variables, invitation/worker and rate-limit bounds | Startup validates protocol, integer bounds, production TLS, exact origins, proxy hops, and placeholder values without echoing secrets. Render supplies `PORT`. |
+| Backend runtime configuration | `NODE_ENV`, `PORT`, `DATABASE_SSL`, PostgreSQL and HTTP timeout/bound variables, `CORS_ALLOWED_ORIGINS`, `TRUST_PROXY_HOPS`, Supabase verification variables, invitation/worker and rate-limit bounds | Startup validates protocol, integer bounds, production TLS, exact origins, proxy hops, request/header timeouts, and placeholder values without echoing secrets. Render supplies `PORT`. |
 | Optional feature-gated runtime | `SEARCH_*`, `ELASTICSEARCH_URL`, `ELASTICSEARCH_INDEX`, `OFFICE_ACTION_*`, `WATCH_*`, `PDF_EXPORT_*` | Not required while their feature flag is false. `WATCH_ENABLED` requires search; production PDF exports are rejected until shared private storage exists. |
 | One-off operational/test secrets | `TEST_DATABASE_URL`, `TEST_REDIS_URL`, `TEST_ELASTICSEARCH_URL`, `SUPABASE_TEST_ACCESS_TOKEN`, `STAGING_*`, `LOAD_TEST_*`, `ALLOW_*` | Never deploy as application variables. Tests require explicit non-production opt-in and are not run by this preparation. |
 | Generated by hosting | `PORT` (Render), `NODE_VERSION` (Blueprint setting) | Do not hard-code a production listening port. |
@@ -81,6 +81,38 @@ environment loader; Render and Vercel receive their own scoped values.
 The bundle check fails if known backend-secret variable names occur in frontend
 source or `frontend/dist`, and also fails a production build that contains
 localhost or placeholder endpoint markers.
+
+### Exhaustive variable inventory
+
+The committed [`backend/.env.example`](../backend/.env.example) and
+[`frontend/.env.example`](../frontend/.env.example) are the safe value
+templates. This is the complete name-only inventory, including deliberately
+separate operator/test commands.
+
+| Classification | Variables | Deployment rule |
+| --- | --- | --- |
+| 1. Frontend-public | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_API_BASE_URL` | Vercel build values only; all are intentionally browser-visible and must be HTTPS, non-placeholder production values. |
+| 3. Build-time frontend | `VITE_API_MODE`, `VITE_MOCK_ADAPTER_DELAY` | `VITE_API_MODE=live` for preview/production; `mock` is accepted only by Vite development. The delay is development-only. |
+| 2. Backend-secret runtime | `DATABASE_URL`, `REDIS_URL`, `SUPABASE_SECRET_KEY`, `JWT_ACCESS_SECRET`, `AUTH_RATE_LIMIT_KEY_SECRET`, `USPTO_TSDR_API_KEY` | Render/approved operator only. Never prefix with `VITE_`, add to browser source maps, or print their values. |
+| 4. Backend runtime | `NODE_ENV`, `PORT`, `DATABASE_SSL`, `DATABASE_POOL_MAX`, `DATABASE_IDLE_TIMEOUT_MS`, `DATABASE_CONNECTION_TIMEOUT_MS`, `DATABASE_STATEMENT_TIMEOUT_MS`, `CORS_ALLOWED_ORIGINS`, `TRUST_PROXY_HOPS`, `HTTP_KEEP_ALIVE_TIMEOUT_MS`, `HTTP_HEADERS_TIMEOUT_MS`, `HTTP_REQUEST_TIMEOUT_MS`, `HTTP_MAX_HEADERS_COUNT`, `SUPABASE_URL`, `SUPABASE_JWT_VERIFICATION_MODE`, `SUPABASE_JWT_ALGORITHMS`, `SUPABASE_PUBLISHABLE_KEY`, `AUTH_RATE_LIMIT_ENABLED`, `AUTH_LOGIN_IP_LIMIT`, `AUTH_LOGIN_IDENTITY_LIMIT`, `AUTH_LOGIN_WINDOW_SECONDS`, `AUTH_RECOVERY_LIMIT`, `AUTH_RECOVERY_WINDOW_SECONDS`, `AUTH_REFRESH_LIMIT`, `AUTH_REFRESH_WINDOW_SECONDS`, `INVITE_TOKEN_TTL_SECONDS`, `WORKER_HEARTBEAT_TTL_SECONDS` | Backend-only; production validation is fail-closed. `SUPABASE_PUBLISHABLE_KEY` is needed only for `auth-server` JWT verification mode. |
+| 5. Optional feature-gated runtime | `SEARCH_ENABLED`, `ELASTICSEARCH_URL`, `ELASTICSEARCH_INDEX`, `SEARCH_SOURCE_REGISTRIES`, `SEARCH_SOURCE_TIMEOUT_MS`, `SEARCH_MAX_RESULTS`, `OFFICE_ACTION_SEARCH_ENABLED`, `OFFICE_ACTION_SOURCE_REGISTRIES`, `OFFICE_ACTION_SOURCE_TIMEOUT_MS`, `OFFICE_ACTION_SEARCH_MAX_RESULTS`, `WATCH_ENABLED`, `WATCH_SCHEDULER_INTERVAL_MS`, `WATCH_POLL_INTERVAL_MINUTES`, `WATCH_SCHEDULER_BATCH_SIZE`, `PDF_EXPORT_ENABLED`, `PDF_EXPORT_QUEUE_KEY`, `PDF_EXPORT_STORAGE_PROVIDER`, `PDF_EXPORT_STORAGE_ROOT`, `PDF_EXPORT_MAX_BYTES`, `PDF_EXPORT_MAX_PAGES`, `PDF_EXPORT_MAX_RESULTS`, `PDF_EXPORT_MAX_ATTEMPTS`, `PDF_EXPORT_WORKER_INTERVAL_MS`, `PDF_EXPORT_WORKER_MAX_JOBS`, `USPTO_BULK_LISTING_URL` | Leave feature flags false for the initial launch and omit matching credentials/endpoints. Disabled worker entrypoints now stop without constructing or requiring their full runtime. |
+| 6. Hosting-generated | `PORT` (Render), `NODE_VERSION` (Blueprint runtime selection) | Never hard-code Render’s listening port; the Blueprint pins Node 22.14.0. |
+| One-off test/verification only | `TEST_DATABASE_URL`, `TEST_REDIS_URL`, `TEST_ELASTICSEARCH_URL`, `SUPABASE_TEST_ACCESS_TOKEN`, `IPRP_ALLOW_STAGING_AUTH_TEST`, `STAGING_API_URL`, `STAGING_ACCESS_TOKEN`, `STAGING_ADMIN_ACCESS_TOKEN`, `STAGING_MUTATION_ACCESS_TOKEN`, `STAGING_INVITATION_TOKEN`, `STAGING_SMOKE_ALLOW_MUTATIONS`, `STAGING_SMOKE_ALLOW_UNSAFE_URL`, `STAGING_SMOKE_TIMEOUT_MS`, `LOAD_TEST_BASE_URL`, `LOAD_TEST_ACCESS_TOKEN`, `LOAD_TEST_TOKEN`, `LOAD_TEST_PROFILE`, `ALLOW_PRODUCTION_LOAD_TEST`, `ALLOW_LOCAL_MOCK_LOAD_TEST`, `ALLOW_LARGER_LOAD_TEST`, `DASHBOARD_API_PATH` | Never set as application deployment variables. They are explicit, opt-in controls for isolated test environments and are outside this no-live-testing preparation. |
+
+There is intentionally no root `.env.example`: the root has no environment
+loader. Frontend and backend values have separate authority and delivery paths.
+
+## Future upload gate
+
+No upload endpoint is mounted, `multipart/form-data` is rejected globally, and
+the frontend has no enabled upload navigation. A future upload feature must not
+be enabled until a separately reviewed server-side implementation verifies
+authentication and firm scope; business extension allowlists; magic bytes and
+untrusted declared MIME; streamed size/count bounds; generated storage keys;
+private quarantine storage; malware-scanner integration where required;
+archive/SVG/HTML rejection; bounded parsers; safe attachment download headers;
+audit events without object paths; rejected-file cleanup; and cross-firm
+download tests. Browser validation alone is never a release control.
 
 ## Review findings retained as gates
 

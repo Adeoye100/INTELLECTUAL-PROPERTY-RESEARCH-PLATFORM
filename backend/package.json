@@ -10,8 +10,10 @@
   "scripts": {
     "dev": "node --env-file=.env --watch src/server.js",
     "start": "node src/server.js",
-    "watch:worker": "node --env-file=.env src/watch/run-watch-worker.js",
-    "pdf-export:worker": "node --env-file=.env src/exports/run-pdf-export-worker.js",
+    "watch:worker": "node src/watch/run-watch-worker.js",
+    "watch:worker:dev": "node --env-file=.env src/watch/run-watch-worker.js",
+    "pdf-export:worker": "node src/exports/run-pdf-export-worker.js",
+    "pdf-export:worker:dev": "node --env-file=.env src/exports/run-pdf-export-worker.js",
     "migrate": "node src/db/migrate.js",
     "indices:elasticsearch": "node scripts/create-elasticsearch-indices.js",
     "ingest:uspto": "node src/ingestion/run-uspto-ingestion.js",
@@ -25,7 +27,7 @@
     "test:staging-smoke": "node scripts/staging-smoke-test.js",
     "check": "node scripts/check-source.js",
     "migration:check": "node scripts/check-migrations.js",
-    "security:secrets": "node scripts/secret-scan.js",
+    "security:secrets": "git ls-files -z | node scripts/secret-scan.js",
     "security:frontend-secrets": "node scripts/check-frontend-secrets.js",
     "openapi:check": "node scripts/check-openapi.js"
   },

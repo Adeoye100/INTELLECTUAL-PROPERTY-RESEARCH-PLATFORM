@@ -26,16 +26,22 @@ USER iprp
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD ["node", "docker/healthcheck.js"]
 
 FROM runtime-base AS api
+USER root
 COPY --chown=iprp:iprp docker/entrypoints/api.sh /usr/local/bin/iprp-api
 RUN chmod 0555 /usr/local/bin/iprp-api
+USER iprp
 ENTRYPOINT ["/usr/local/bin/iprp-api"]
 
 FROM runtime-base AS watch-worker
+USER root
 COPY --chown=iprp:iprp docker/entrypoints/watch-worker.sh /usr/local/bin/iprp-watch-worker
 RUN chmod 0555 /usr/local/bin/iprp-watch-worker
+USER iprp
 ENTRYPOINT ["/usr/local/bin/iprp-watch-worker"]
 
 FROM runtime-base AS pdf-export-worker
+USER root
 COPY --chown=iprp:iprp docker/entrypoints/pdf-export-worker.sh /usr/local/bin/iprp-pdf-export-worker
 RUN chmod 0555 /usr/local/bin/iprp-pdf-export-worker
+USER iprp
 ENTRYPOINT ["/usr/local/bin/iprp-pdf-export-worker"]
