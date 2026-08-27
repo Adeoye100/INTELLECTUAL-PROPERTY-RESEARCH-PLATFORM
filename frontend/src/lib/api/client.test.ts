@@ -55,11 +55,11 @@ describe('ApiClient', () => {
     expect(error).toMatchObject({
       code: 'VALIDATION_ERROR',
       status: 422,
-      message: 'One or more filters are invalid.',
-      details: { field: 'jurisdiction' },
+      message: 'The request could not be completed.',
       requestId: 'request-123',
       serverCode: 'INVALID_FILTERS',
     });
+    expect(error).not.toHaveProperty('details');
   });
 
   it('normalizes network failures without leaking fetch implementation errors', async () => {

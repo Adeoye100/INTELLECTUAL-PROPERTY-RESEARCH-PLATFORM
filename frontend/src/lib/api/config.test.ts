@@ -22,21 +22,11 @@ describe('API mode selection', () => {
     expect(shouldEnableMocking(config)).toBe(true);
   });
 
-  it('enables MSW when demo mode is enabled with allowance', () => {
-    const config = resolveApiConfig(
-      { VITE_API_MODE: 'demo', VITE_ALLOW_DEMO_BUILD: 'true' },
-      { isDevelopment: false },
-    );
-
-    expect(config).toEqual({ baseUrl: '/api/v1', mode: 'demo' });
-    expect(shouldEnableMocking(config)).toBe(true);
-  });
-
-  it('rejects demo mode without allowance', () => {
+  it('rejects unsupported production demo modes', () => {
     expect(() => resolveApiConfig(
       { VITE_API_MODE: 'demo' },
       { isDevelopment: false },
-    )).toThrow(/requires VITE_ALLOW_DEMO_BUILD=true/i);
+    )).toThrow(/must be either/i);
   });
 
   it('rejects mock mode outside development', () => {
@@ -60,5 +50,13 @@ describe('API mode selection', () => {
       { VITE_API_BASE_URL: 'http://api.example.test/api/v1' },
       { isDevelopment: false },
     )).toThrow(/must use HTTPS/i);
+    expect(() => resolveApiConfig(
+      { VITE_API_BASE_URL: '/api/v1' },
+      { isDevelopment: false },
+    )).toThrow(/explicit HTTPS API URL/i);
+    expect(() => resolveApiConfig(
+      { VITE_API_BASE_URL: 'https://localhost/api/v1' },
+      { isDevelopment: false },
+    )).toThrow(/must not use a placeholder or local host/i);
   });
 });

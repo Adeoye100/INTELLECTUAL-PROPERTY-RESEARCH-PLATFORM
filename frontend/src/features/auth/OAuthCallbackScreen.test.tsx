@@ -53,5 +53,6 @@ describe('OAuthCallbackScreen', () => {
     const alert = await screen.findByRole('alert');
     await waitFor(() => expect(alert).toHaveFocus());
     expect(screen.getByRole('heading', { name: 'Could not complete sign in' })).toBeVisible();
+    expect(screen.queryByText('OAuth code invalid')).toBeNull();
   });
 });

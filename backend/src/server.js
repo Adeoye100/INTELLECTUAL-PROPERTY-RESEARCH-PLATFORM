@@ -3,7 +3,7 @@ import { createSystem } from './system.js';
 
 const config = loadConfig();
 const system = await createSystem(config);
-const server = system.app.listen(config.port, () => {
+const server = system.app.listen(config.port, '0.0.0.0', () => {
   console.log(`IPRP API listening on port ${config.port}.`);
 });
 

@@ -93,7 +93,7 @@ describe('SignupScreen', () => {
       <MemoryRouter initialEntries={['/auth/signup']}>
         <Routes>
           <Route path="/auth/signup" element={<SignupScreen />} />
-          <Route path="/admin" element={<h1>Admin workspace</h1>} />
+          <Route path="/dashboard" element={<h1>Dashboard workspace</h1>} />
         </Routes>
       </MemoryRouter>,
     );
@@ -101,7 +101,7 @@ describe('SignupScreen', () => {
     await completeSignupForm(user);
     await user.click(screen.getByRole('button', { name: 'Request access' }));
 
-    expect(await screen.findByRole('heading', { name: 'Admin workspace' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Dashboard workspace' })).toBeVisible();
     expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/provisioning/firm');
     expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('Authorization')).toBe('Bearer verified-signup-token');
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ firmName: 'Forge Legal' });

@@ -1,20 +1,17 @@
 import React from 'react';
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Logo } from '../components/Logo';
 import { 
-  Search, 
   Briefcase, 
-  Eye, 
-  Settings, 
   LayoutDashboard, 
-  LogOut,
-  Bell
+  LogOut
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from '../components/Button';
 import { useAuthStore } from '../features/auth/authStore';
 import { authRequest } from '../features/auth/authApi';
 import { SessionExpiryMonitor } from '../features/auth/SessionExpiryMonitor';
+import { appQueryClient } from '../lib/queryClient';
 
 export const MainLayout: React.FC = () => {
   const navigate = useNavigate();
@@ -34,6 +31,7 @@ export const MainLayout: React.FC = () => {
     } catch {
       // Local logout must still succeed when server revocation is unavailable.
     } finally {
+      appQueryClient.clear();
       clearSession();
       navigate('/auth/login', { replace: true, state: { reason: 'signed-out' } });
     }
@@ -47,15 +45,6 @@ export const MainLayout: React.FC = () => {
       <header className="h-16 bg-forge-gradient flex items-center justify-between px-4 md:px-6 sticky top-0 z-40">
         <Logo />
         <div className="flex items-center gap-4 text-white">
-          <Link
-            to="/watches"
-            className="p-2 hover:bg-white/10 rounded-full relative"
-            aria-label="Notifications — alerts pending"
-          >
-            <Bell className="w-5 h-5" aria-hidden="true" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-risk-high rounded-full border border-forge-navy-950" aria-hidden="true"></span>
-            <span className="sr-only">You have pending alerts</span>
-          </Link>
           <div className="flex items-center gap-2 border-l border-white/20 pl-4">
             <div className="w-8 h-8 rounded-full bg-forge-teal-700 flex items-center justify-center font-bold text-sm">
               {initials}
@@ -73,12 +62,7 @@ export const MainLayout: React.FC = () => {
         <aside className="w-20 xl:w-64 bg-forge-navy-800 text-white flex flex-col sticky top-16 h-[calc(100vh-64px)] overflow-y-auto transition-[width]">
           <nav className="flex-1 p-3 xl:p-4 space-y-1" aria-label="Application">
             <NavItem to="/dashboard" icon={<LayoutDashboard size={20} />} label="Dashboard" />
-            <NavItem to="/search" icon={<Search size={20} />} label="Trademark Search" />
-            <NavItem to="/portfolio" icon={<Briefcase size={20} />} label="Portfolio" />
-            <NavItem to="/watches" icon={<Eye size={20} />} label="Watch Lists" />
-            {user?.role === 'admin' && (
-              <NavItem to="/admin" icon={<Settings size={20} />} label="Administration" />
-            )}
+            <NavItem to="/portfolio" icon={<Briefcase size={20} />} label="Portfolio (unavailable)" />
           </nav>
           
           <div className="p-4 border-t border-white/10">

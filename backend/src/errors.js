@@ -20,9 +20,7 @@ export const gone = (code, message) => new AppError(410, code, message);
 
 export function errorHandler(error, _request, response, _next) {
   if (error instanceof AppError) {
-    const body = { code: error.code, message: error.message };
-    if (error.details !== undefined) body.details = error.details;
-    return response.status(error.status).json(body);
+    return response.status(error.status).json({ code: error.code, message: error.message });
   }
 
   if (error?.type === 'entity.parse.failed') {

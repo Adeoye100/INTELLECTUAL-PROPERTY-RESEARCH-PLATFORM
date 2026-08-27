@@ -3,7 +3,8 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { AuthLayout } from './AuthLayout';
 import { MainLayout } from './MainLayout';
 import { RouteErrorScreen, RouteLoading } from './RouteFeedback';
-import { RequireAdmin, RequireAuthentication, RequireRole, RoleHomeRedirect } from '../features/auth/RouteGuards';
+import { RequireAuthentication, RoleHomeRedirect } from '../features/auth/RouteGuards';
+import { FeatureUnavailable } from './FeatureUnavailable';
 
 type RouteModule = Record<string, ComponentType>;
 
@@ -43,26 +44,14 @@ const router = createBrowserRouter([
     children: [
       { path: 'dashboard', lazy: lazyComponent(() => import('../features/dashboard/DashboardScreen'), 'DashboardScreen') },
       { path: 'app', element: <RoleHomeRedirect /> },
-      { path: 'search', lazy: lazyComponent(() => import('../features/search/SearchScreen'), 'SearchScreen') },
-      { path: 'search/risk/:id', lazy: lazyComponent(() => import('../features/search/RiskDetailScreen'), 'RiskDetailScreen') },
-      {
-        path: 'office-actions',
-        lazy: async () => {
-          const { OfficeActionResearchScreen } = await import('../features/office-action/OfficeActionResearchScreen');
-          return { Component: () => <RequireRole allowedRoles={['admin', 'attorney']}><OfficeActionResearchScreen /></RequireRole> };
-        },
-      },
-      { path: 'portfolio', lazy: lazyComponent(() => import('../features/portfolio/PortfolioScreen'), 'PortfolioScreen') },
-      { path: 'portfolio/:markId', lazy: lazyComponent(() => import('../features/portfolio/PortfolioDetailScreen'), 'PortfolioDetailScreen') },
-      { path: 'watches', lazy: lazyComponent(() => import('../features/watches/WatchesScreen'), 'WatchesScreen') },
+      { path: 'search', element: <FeatureUnavailable title="Federated trademark search is not available" detail="It remains disabled until Elasticsearch is provisioned and the attributed registry documents are fully reprojected." /> },
+      { path: 'search/risk/:id', element: <FeatureUnavailable title="Risk analysis is not available" detail="Search-backed risk analysis is disabled with the federated search integration." /> },
+      { path: 'office-actions', element: <FeatureUnavailable title="Office Action search is not available" detail="It remains disabled until a licensed provider and its server-side integration are configured and verified." /> },
+      { path: 'portfolio', element: <FeatureUnavailable title="Portfolio management is not available" detail="The existing frontend and backend portfolio contracts require reconciliation before this workflow can be safely enabled." /> },
+      { path: 'portfolio/:markId', element: <FeatureUnavailable title="Portfolio management is not available" detail="The existing frontend and backend portfolio contracts require reconciliation before this workflow can be safely enabled." /> },
+      { path: 'watches', element: <FeatureUnavailable title="Watch monitoring is not available" detail="It remains disabled until Redis and the separate watch worker are configured and verified." /> },
       { path: 'permission-denied', lazy: lazyComponent(() => import('../features/auth/PermissionDeniedScreen'), 'PermissionDeniedScreen') },
-      {
-        path: 'admin',
-        lazy: async () => {
-          const { AdminScreen } = await import('../features/billing/AdminScreen');
-          return { Component: () => <RequireAdmin><AdminScreen /></RequireAdmin> };
-        },
-      },
+      { path: 'admin', element: <FeatureUnavailable title="Billing and administration are not available" detail="The current administration screen contains demonstration billing data. Billing is not implemented for the initial deployment." /> },
     ],
   },
 ]);

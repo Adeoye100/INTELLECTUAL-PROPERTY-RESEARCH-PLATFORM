@@ -27,7 +27,9 @@ jobs:
         working-directory: frontend
     env:
       VITE_API_MODE: live
-      VITE_API_BASE_URL: https://api.example.invalid/api/v1
+      VITE_API_BASE_URL: https://api.ci.iprp.test/api/v1
+      VITE_SUPABASE_URL: https://ci-project.supabase.co
+      VITE_SUPABASE_ANON_KEY: sb_publishable_ci_build_only
     steps:
       - name: Check out repository
         uses: actions/checkout@v4

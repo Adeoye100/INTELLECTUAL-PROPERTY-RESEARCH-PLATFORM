@@ -3,7 +3,7 @@ import { AlertTriangle } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { authErrorMessage, toAuthApiError } from './authApi';
-import { roleHomePath, safeAppRedirect } from './roleRouting';
+import { clearSensitiveAuthUrl, roleHomePath, safeAppRedirect } from './roleRouting';
 import { syncSupabaseSession } from './authStore';
 
 export function OAuthCallbackScreen() {
@@ -18,22 +18,24 @@ export function OAuthCallbackScreen() {
     exchangeStarted.current = true;
 
     const completeSignIn = async () => {
-      const providerError = searchParams.get('error_description');
-      if (providerError) throw new Error(providerError);
+      if (searchParams.get('error_description')) throw new Error('Authentication provider rejected the sign-in request.');
 
       const code = searchParams.get('code');
+      const requestedDestination = searchParams.get('next');
       const result = code
         ? await supabase.auth.exchangeCodeForSession(code)
         : await supabase.auth.getSession();
       if (result.error) throw result.error;
       if (!result.data.session) throw new Error('Supabase did not return a session for this sign-in.');
 
+      clearSensitiveAuthUrl();
       const user = await syncSupabaseSession(result.data.session);
-      const destination = safeAppRedirect(searchParams.get('next'), roleHomePath(user.role));
+      const destination = safeAppRedirect(requestedDestination, roleHomePath(user.role));
       navigate(destination === '/app' ? roleHomePath(user.role) : destination, { replace: true });
     };
 
     void completeSignIn().catch(async (error) => {
+      clearSensitiveAuthUrl();
       await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
       setErrorMessage(authErrorMessage(toAuthApiError(error)));
     });

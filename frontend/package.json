@@ -6,11 +6,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && pnpm security:bundle",
     "lint": "eslint .",
     "test": "vitest run",
     "preview": "vite preview",
-    "verify:supabase-live-auth": "node --env-file=../backend/.env scripts/verify-supabase-live-auth.mjs"
+    "security:bundle": "node ../backend/scripts/check-frontend-secrets.js --require-dist",
+    "verify:supabase-staging-auth": "node scripts/verify-supabase-live-auth.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

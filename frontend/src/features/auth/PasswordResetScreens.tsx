@@ -7,7 +7,7 @@ import * as z from 'zod';
 import { Button } from '../../components/Button';
 import { supabase } from '../../lib/supabase';
 import { AuthApiError, authErrorMessage, toAuthApiError } from './authApi';
-import { authRedirectUrl } from './roleRouting';
+import { authRedirectUrl, clearSensitiveAuthUrl } from './roleRouting';
 
 const emailSchema = z.object({ email: z.string().trim().email('Enter a valid email address.') });
 type EmailValues = z.infer<typeof emailSchema>;
@@ -81,8 +81,12 @@ export function PasswordUpdateScreen() {
     if (!validationPromise.current) {
       validationPromise.current = (async () => {
         if (recoveryCode) {
-          const { error } = await supabase.auth.exchangeCodeForSession(recoveryCode);
-          if (error) throw error;
+          try {
+            const { error } = await supabase.auth.exchangeCodeForSession(recoveryCode);
+            if (error) throw error;
+          } finally {
+            clearSensitiveAuthUrl();
+          }
           return;
         }
         const { data, error } = await supabase.auth.getSession();

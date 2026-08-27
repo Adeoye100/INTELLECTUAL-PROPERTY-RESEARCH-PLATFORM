@@ -213,3 +213,43 @@ describe('authentication rate-limit configuration', () => {
     })), /only in development or test/);
   });
 });
+
+describe('production deployment configuration', () => {
+  const productionEnvironment = (overrides = {}) => applicationEnvironment({
+    NODE_ENV: 'production',
+    DATABASE_URL: 'postgresql://app:password@aws-region.pooler.supabase.com:5432/postgres',
+    DATABASE_SSL: 'true',
+    REDIS_URL: 'rediss://default:password@redis.provider.test:6380/0',
+    CORS_ALLOWED_ORIGINS: 'https://app.iprp.test,https://preview.iprp.test',
+    TRUST_PROXY_HOPS: '1',
+    SUPABASE_URL: 'https://project-ref.supabase.co',
+    SUPABASE_SECRET_KEY: 'server-only-key-sufficiently-long-for-production',
+    JWT_ACCESS_SECRET: 'production-access-secret-that-is-at-least-32-bytes',
+    AUTH_RATE_LIMIT_KEY_SECRET: 'different-production-rate-limit-secret-32-bytes',
+    ...overrides,
+  });
+
+  it('requires TLS, exact CORS origins, a Render proxy hop, and a bounded database pool', () => {
+    const config = loadConfig(productionEnvironment({
+      DATABASE_POOL_MAX: '12', DATABASE_IDLE_TIMEOUT_MS: '20000',
+      DATABASE_CONNECTION_TIMEOUT_MS: '4000', DATABASE_STATEMENT_TIMEOUT_MS: '12000',
+    }));
+    assert.equal(config.databaseSsl, true);
+    assert.deepEqual(config.corsAllowedOrigins, ['https://app.iprp.test', 'https://preview.iprp.test']);
+    assert.equal(config.trustProxyHops, 1);
+    assert.equal(config.databasePoolMax, 12);
+    assert.equal(config.databaseStatementTimeoutMs, 12_000);
+  });
+
+  it('rejects unsafe production dependencies, placeholder values, and enabled filesystem exports', () => {
+    for (const overrides of [
+      { DATABASE_SSL: 'false' },
+      { REDIS_URL: 'redis://redis.provider.test:6379/0' },
+      { CORS_ALLOWED_ORIGINS: 'https://app.iprp.test,https://app.iprp.test' },
+      { CORS_ALLOWED_ORIGINS: 'http://app.iprp.test' },
+      { TRUST_PROXY_HOPS: '0' },
+      { DATABASE_URL: 'postgresql://app:password@your-project.invalid:5432/postgres' },
+      { PDF_EXPORT_ENABLED: 'true', PDF_EXPORT_STORAGE_PROVIDER: 'filesystem', PDF_EXPORT_STORAGE_ROOT: '/private/exports' },
+    ]) assert.throws(() => loadConfig(productionEnvironment(overrides)));
+  });
+});

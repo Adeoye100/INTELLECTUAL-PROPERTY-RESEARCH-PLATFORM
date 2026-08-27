@@ -1,5 +1,10 @@
 # Deployment and operations runbook
 
+> Historical multi-cloud operations material. The selected initial topology is
+> Supabase, Render, and Vercel; use [15](15-initial-deployment-readiness.md)
+> through [20](20-post-deployment-smoke-checklist.md) for its controlled launch
+> sequence. This document remains relevant only for later multi-AZ/IaC work.
+
 ## Preconditions
 
 AWS versus Google Cloud remains unselected (ADR-001); no deployment may begin

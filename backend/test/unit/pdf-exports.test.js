@@ -216,6 +216,7 @@ describe('Renderer, private storage, queue job, and worker boundaries', () => {
     const storage = new InMemoryPdfStorage({ maxBytes: 1024 * 1024 }); const key = exportStorageKey({ firmId, exportId });
     const saved = await storage.put({ key, contentType: 'application/pdf', body: Buffer.from('%PDF-safe') });
     assert.equal(saved.byteSize, 9); assert.match(saved.checksumSha256, /^[a-f0-9]{64}$/); assert.deepEqual(await storage.get({ key }), Buffer.from('%PDF-safe'));
+    await assert.rejects(() => storage.put({ key, contentType: 'application/pdf', body: Buffer.from('%PDF-replacement') }), /immutable/);
     assert.throws(() => validateExportStorageKey('../secrets.pdf'));
     await assert.rejects(() => storage.put({ key, contentType: 'application/pdf', body: Buffer.from('not-a-pdf') }));
   });

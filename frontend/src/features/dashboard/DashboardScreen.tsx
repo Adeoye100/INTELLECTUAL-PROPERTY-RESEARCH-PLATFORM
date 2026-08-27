@@ -1,30 +1,23 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, ArrowRight, BriefcaseBusiness, CalendarDays, Eye, EyeOff, RefreshCw, Search } from 'lucide-react';
+import { AlertCircle, BriefcaseBusiness, CalendarDays, Eye, EyeOff, RefreshCw, Search } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { Link } from 'react-router-dom';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
 import type { DashboardAnalytics, DashboardSummary } from '../../types';
 import { useAuthStore } from '../auth/authStore';
-import { OnboardingChecklist } from '../onboarding/OnboardingChecklist';
-import { useOnboardingStore } from '../onboarding/onboardingStore';
 import { getDashboardAnalytics } from './dashboardApi';
 import { ChartCard, ChartEmptyState, AccessibleDataTable, RiskBadge } from '../../components/visualization/ChartPrimitives';
 
 export const DashboardScreen: React.FC = () => {
   const user = useAuthStore((state) => state.user);
-  const clientProgress = useOnboardingStore((state) => user ? state.progressByUser[user.id] : undefined);
-  const showOnboarding = user?.onboardingRequired === true && !clientProgress?.completedPath;
   const dashboard = useQuery<DashboardAnalytics | DashboardSummary>({
     queryKey: ['dashboard', 'analytics', '30d'],
     queryFn: getDashboardAnalytics,
-    enabled: !showOnboarding,
+    enabled: Boolean(user),
     retry: false,
   });
-
-  if (showOnboarding) return <OnboardingChecklist />;
 
   if (dashboard.isLoading) {
     return (
@@ -63,7 +56,7 @@ export const DashboardScreen: React.FC = () => {
       <div className="space-y-6">
         <header><h1 className="text-2xl font-bold text-text-primary">Console Overview</h1><p className="text-sm text-text-secondary">Welcome, {user?.fullName ?? 'researcher'}.</p></header>
         {summary.partial && <PartialDataNotice unavailableSections={summary.unavailableSections} onRetry={() => void dashboard.refetch()} />}
-        <section className="rounded-lg border-2 border-dashed border-forge-silver-300 bg-surface-card p-12 text-center"><BriefcaseBusiness className="mx-auto mb-3 h-10 w-10 text-forge-silver-500" aria-hidden="true" /><h2 className="text-xl font-bold text-text-primary">No firm activity yet</h2><p className="mx-auto mt-2 max-w-lg text-text-secondary">Run a trademark search, add a portfolio mark, or configure a watch to populate this dashboard with authoritative activity.</p><div className="mt-5 flex justify-center gap-3"><Link to="/search" className="rounded bg-accent px-4 py-2 font-medium text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2">Start a search</Link><Link to="/portfolio" className="rounded border border-forge-silver-500 px-4 py-2 font-medium text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2">Open portfolio</Link></div></section>
+        <section className="rounded-lg border-2 border-dashed border-forge-silver-300 bg-surface-card p-12 text-center"><BriefcaseBusiness className="mx-auto mb-3 h-10 w-10 text-forge-silver-500" aria-hidden="true" /><h2 className="text-xl font-bold text-text-primary">No firm activity yet</h2><p className="mx-auto mt-2 max-w-lg text-text-secondary">Portfolio, search, and watch workflows are unavailable in the initial deployment. They will appear only after their service contracts and infrastructure are verified.</p></section>
       </div>
     );
   }
@@ -77,7 +70,7 @@ export const DashboardScreen: React.FC = () => {
       {urgentAlerts.length > 0 && (
         <section className="rounded-lg border-2 border-risk-high bg-white p-5" aria-labelledby="urgent-alerts-heading">
           <div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wider text-risk-high">Requires attention</p><h2 id="urgent-alerts-heading" className="text-xl font-bold text-text-primary">Unresolved High-risk alerts</h2></div><Badge risk="high">{urgentAlerts.length} unresolved</Badge></div>
-          <div className="overflow-x-auto"><table className="w-full min-w-[46rem] text-left"><caption className="sr-only">Unresolved High-risk trademark alerts</caption><thead><tr className="border-b border-forge-silver-300 bg-surface-base">{['Matched mark', 'Protected mark', 'Jurisdiction', 'Detected', 'Reference', 'Action'].map((heading) => <th key={heading} scope="col" className="px-3 py-2 text-xs font-bold uppercase text-text-secondary">{heading}</th>)}</tr></thead><tbody>{urgentAlerts.map((alert) => <tr key={alert.id} className="border-b border-forge-silver-100 last:border-0"><th scope="row" className="px-3 py-3 font-mono text-sm font-bold uppercase text-text-primary">{alert.matchedMarkText}</th><td className="px-3 py-3 text-sm text-text-primary">{alert.protectedMarkText}</td><td className="px-3 py-3 text-sm text-text-primary">{alert.jurisdiction}</td><td className="px-3 py-3 text-sm text-text-primary">{alert.detectedAt}</td><td className="px-3 py-3 font-mono text-xs text-text-secondary">{alert.candidateRef}</td><td className="px-3 py-3"><Link to={`/search/risk/${alert.id}`} className="font-bold text-risk-high underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">Review now</Link></td></tr>)}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[46rem] text-left"><caption className="sr-only">Unresolved High-risk trademark alerts</caption><thead><tr className="border-b border-forge-silver-300 bg-surface-base">{['Matched mark', 'Protected mark', 'Jurisdiction', 'Detected', 'Reference', 'Action'].map((heading) => <th key={heading} scope="col" className="px-3 py-2 text-xs font-bold uppercase text-text-secondary">{heading}</th>)}</tr></thead><tbody>{urgentAlerts.map((alert) => <tr key={alert.id} className="border-b border-forge-silver-100 last:border-0"><th scope="row" className="px-3 py-3 font-mono text-sm font-bold uppercase text-text-primary">{alert.matchedMarkText}</th><td className="px-3 py-3 text-sm text-text-primary">{alert.protectedMarkText}</td><td className="px-3 py-3 text-sm text-text-primary">{alert.jurisdiction}</td><td className="px-3 py-3 text-sm text-text-primary">{alert.detectedAt}</td><td className="px-3 py-3 font-mono text-xs text-text-secondary">{alert.candidateRef}</td><td className="px-3 py-3 text-sm text-text-secondary">Risk detail unavailable</td></tr>)}</tbody></table></div>
         </section>
       )}
 
@@ -102,11 +95,11 @@ export const DashboardScreen: React.FC = () => {
       </section>
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <Card title="Recent alerts" footer={<Link to="/watches" className="flex items-center gap-1 text-sm font-bold text-forge-teal-700 hover:underline">View all alerts <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>}>
+        <Card title="Recent alerts" footer={<p className="text-sm text-text-secondary">Watch monitoring is disabled in the initial deployment.</p>}>
           {summary.recentAlerts.length === 0 ? <p className="py-8 text-center text-sm text-text-secondary">No recent alerts.</p> : <div className="overflow-x-auto"><table className="w-full min-w-[42rem] text-left"><caption className="sr-only">Recent trademark alerts</caption><thead><tr className="border-b border-forge-silver-300"><th scope="col" className="px-3 py-2 text-xs font-bold uppercase text-text-secondary">Risk</th><th scope="col" className="px-3 py-2 text-xs font-bold uppercase text-text-secondary">Matched mark</th><th scope="col" className="px-3 py-2 text-xs font-bold uppercase text-text-secondary">Protected mark</th><th scope="col" className="px-3 py-2 text-xs font-bold uppercase text-text-secondary">Evidence reference</th><th scope="col" className="px-3 py-2 text-xs font-bold uppercase text-text-secondary">Detected</th></tr></thead><tbody>{summary.recentAlerts.slice(0, 5).map((alert) => <tr key={alert.id} className="border-b border-forge-silver-100 last:border-0"><td className="px-3 py-3"><Badge risk={alert.riskLevel}>{alert.riskLevel}</Badge></td><th scope="row" className="px-3 py-3 font-mono text-sm font-bold uppercase text-text-primary">{alert.matchedMarkText}</th><td className="px-3 py-3 text-sm text-text-primary">{alert.protectedMarkText}</td><td className="px-3 py-3 font-mono text-xs text-text-secondary">{alert.candidateRef}</td><td className="px-3 py-3 text-sm text-text-primary">{alert.detectedAt}</td></tr>)}</tbody></table></div>}
         </Card>
 
-        <Card title="Recent searches" footer={<Link to="/search" className="flex items-center gap-1 text-sm font-bold text-forge-teal-700 hover:underline">New search <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>}>
+        <Card title="Recent searches" footer={<p className="text-sm text-text-secondary">Federated search is disabled in the initial deployment.</p>}>
           {summary.recentSearches.length === 0 ? <p className="py-8 text-center text-sm text-text-secondary">No recent searches.</p> : <div className="overflow-x-auto"><table className="w-full min-w-[34rem] text-left"><caption className="sr-only">Recent trademark searches</caption><thead><tr className="border-b border-forge-silver-300"><th scope="col" className="px-3 py-2 text-xs font-bold uppercase text-text-secondary">Mark</th><th scope="col" className="px-3 py-2 text-xs font-bold uppercase text-text-secondary">Jurisdiction</th><th scope="col" className="px-3 py-2 text-xs font-bold uppercase text-text-secondary">Results</th><th scope="col" className="px-3 py-2 text-xs font-bold uppercase text-text-secondary">High risk</th><th scope="col" className="px-3 py-2 text-xs font-bold uppercase text-text-secondary">Searched</th></tr></thead><tbody>{summary.recentSearches.slice(0, 5).map((search) => <tr key={search.id} className="border-b border-forge-silver-100 last:border-0"><th scope="row" className="px-3 py-3 font-mono text-sm font-bold uppercase text-text-primary">{search.mark}</th><td className="px-3 py-3 text-sm text-text-primary">{search.jurisdictions.join(', ')}</td><td className="px-3 py-3 text-sm text-text-primary">{search.resultCount}</td><td className="px-3 py-3 text-sm text-text-primary">{search.highRiskCount}</td><td className="px-3 py-3 text-sm text-text-primary">{search.searchedAt}</td></tr>)}</tbody></table></div>}
         </Card>
       </section>

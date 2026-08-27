@@ -16,7 +16,8 @@ describe('route feedback', () => {
 
     const heading = await screen.findByRole('heading', { name: 'This page encountered an error' });
     expect(heading).toHaveFocus();
-    expect(screen.getByText('Route module failed to render.')).toBeVisible();
+    expect(screen.getByText('The requested page could not be loaded. Please try again.')).toBeVisible();
+    expect(screen.queryByText('Route module failed to render.')).toBeNull();
     expect(screen.getByRole('button', { name: 'Retry page' })).toBeEnabled();
     expect(screen.getByRole('link', { name: 'Return to your home' })).toHaveAttribute('href', '/app');
   });

@@ -10,6 +10,12 @@
 - [Admin training guide](13-admin-training-guide.md)
 - [Hosting-provider ADR](14-hosting-provider-decision.md) and [IaC interface](../infra/README.md)
 - [Visualization Track audit and delivery index](14-visual-system-and-component-audit.md) and [status](15-visualization-track-status.md)
+- [Initial deployment readiness](15-initial-deployment-readiness.md)
+- [Supabase deployment checklist](16-supabase-deployment-checklist.md)
+- [Render deployment checklist](17-render-deployment-checklist.md)
+- [Vercel deployment checklist](18-vercel-deployment-checklist.md)
+- [Initial deployment runbook](19-initial-deployment-runbook.md)
+- [Post-deployment smoke checklist](20-post-deployment-smoke-checklist.md)
 
 BE-14 billing is deferred. Existing staging, independent-audit, P95, provider,
 and Multi-AZ failover gates remain pending until separately evidenced.

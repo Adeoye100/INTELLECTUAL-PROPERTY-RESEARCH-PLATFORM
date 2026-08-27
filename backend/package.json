@@ -4,6 +4,9 @@
   "packageManager": "pnpm@11.15.1",
   "description": "Express API for the Intellectual Property Research Platform",
   "main": "src/server.js",
+  "engines": {
+    "node": ">=22.13.0 <23"
+  },
   "scripts": {
     "dev": "node --env-file=.env --watch src/server.js",
     "start": "node src/server.js",
@@ -23,6 +26,7 @@
     "check": "node scripts/check-source.js",
     "migration:check": "node scripts/check-migrations.js",
     "security:secrets": "node scripts/secret-scan.js",
+    "security:frontend-secrets": "node scripts/check-frontend-secrets.js",
     "openapi:check": "node scripts/check-openapi.js"
   },
   "keywords": [],

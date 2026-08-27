@@ -1,9 +1,8 @@
-export type ApiMode = 'live' | 'mock' | 'demo';
+export type ApiMode = 'live' | 'mock';
 
 export interface ApiEnvironment {
   VITE_API_BASE_URL?: string;
   VITE_API_MODE?: string;
-  VITE_ALLOW_DEMO_BUILD?: string;
 }
 
 export interface ApiConfig {
@@ -20,19 +19,12 @@ export function resolveApiConfig(
   runtime: { isDevelopment: boolean },
 ): ApiConfig {
   const requestedMode = environment.VITE_API_MODE?.trim() || 'live';
-  if (requestedMode !== 'live' && requestedMode !== 'mock' && requestedMode !== 'demo') {
-    throw new Error('VITE_API_MODE must be one of: "live", "mock", or "demo".');
+  if (requestedMode !== 'live' && requestedMode !== 'mock') {
+    throw new Error('VITE_API_MODE must be either "live" or "mock".');
   }
 
   if (requestedMode === 'mock' && !runtime.isDevelopment) {
     throw new Error('VITE_API_MODE=mock is allowed only by a Vite development build.');
-  }
-
-  if (requestedMode === 'demo') {
-    const allowDemo = environment.VITE_ALLOW_DEMO_BUILD === 'true';
-    if (!allowDemo) {
-      throw new Error('VITE_API_MODE=demo requires VITE_ALLOW_DEMO_BUILD=true.');
-    }
   }
 
   const configuredBaseUrl = environment.VITE_API_BASE_URL?.trim();
@@ -61,6 +53,13 @@ export function resolveApiConfig(
   if (!runtime.isDevelopment && isAbsoluteHttp && parsed.protocol !== 'https:') {
     throw new Error('Absolute VITE_API_BASE_URL values must use HTTPS outside development.');
   }
+  if (!runtime.isDevelopment && isRootRelative) {
+    throw new Error('VITE_API_BASE_URL must be an explicit HTTPS API URL outside development.');
+  }
+  if (!runtime.isDevelopment && (/your[-_]|placeholder|replace[-_]?me|change[-_]?me|\.invalid|<[^>]+>/i.test(baseUrl)
+    || ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname))) {
+    throw new Error('VITE_API_BASE_URL must not use a placeholder or local host outside development.');
+  }
 
   return Object.freeze({ baseUrl, mode: requestedMode });
 }
@@ -71,9 +70,8 @@ export function getApiConfig(): ApiConfig {
   runtimeConfig ??= resolveApiConfig({
     VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
     VITE_API_MODE: import.meta.env.VITE_API_MODE,
-    VITE_ALLOW_DEMO_BUILD: import.meta.env.VITE_ALLOW_DEMO_BUILD,
   }, { isDevelopment: import.meta.env.DEV });
   return runtimeConfig;
 }
 
-export const shouldEnableMocking = (config: ApiConfig) => config.mode === 'mock' || config.mode === 'demo';
+export const shouldEnableMocking = (config: ApiConfig) => config.mode === 'mock';

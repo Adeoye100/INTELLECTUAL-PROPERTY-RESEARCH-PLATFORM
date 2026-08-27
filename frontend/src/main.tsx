@@ -5,9 +5,9 @@ import { initializeAuth } from './features/auth/authStore';
 import { getApiConfig, shouldEnableMocking } from './lib/api/config';
 
 async function enableMocking() {
+  if (!import.meta.env.DEV) return;
   const config = getApiConfig();
   if (!shouldEnableMocking(config)) return;
-  if (config.mode === 'mock' && !import.meta.env.DEV) return;
 
   const { worker } = await import('./lib/mocks/browser');
   return worker.start({
@@ -29,7 +29,7 @@ enableMocking().then(async () => {
   const root = document.getElementById('root');
   if (root) {
     root.textContent = error instanceof Error
-      ? `Application configuration error: ${error.message}`
+      ? 'Application configuration error. Check deployment settings.'
       : 'Application configuration error.';
   }
 });

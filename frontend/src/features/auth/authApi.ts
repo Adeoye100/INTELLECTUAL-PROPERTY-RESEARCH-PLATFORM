@@ -80,7 +80,7 @@ export const authErrorMessage = (error: unknown): string => {
     PERMISSION_DENIED: 'You do not have permission to complete this action.',
     SEAT_LIMIT: 'Your firm has reached its licensed seat limit. Ask an administrator to free a seat or update the plan.',
     SESSION_EXPIRED: 'Your session expired. Sign in again to continue.',
-    UNKNOWN_ERROR: error.message || 'The request could not be completed. Please try again.',
+    UNKNOWN_ERROR: 'The request could not be completed. Please try again.',
   };
   return messages[error.code];
 };
@@ -101,26 +101,26 @@ export function toAuthApiError(error: unknown): AuthApiError {
     return new AuthApiError('NETWORK_ERROR', 'The authentication service could not be reached.', candidate.status);
   }
   if (/email[_ ]?not[_ ]?confirmed|email[_ ]?not[_ ]?verified/.test(detail)) {
-    return new AuthApiError('EMAIL_NOT_VERIFIED', candidate.message ?? 'Email verification is required.', candidate.status);
+    return new AuthApiError('EMAIL_NOT_VERIFIED', 'Email verification is required.', candidate.status);
   }
   if (/invalid[_ ]?credentials|invalid login credentials/.test(detail)) {
-    return new AuthApiError('INVALID_CREDENTIALS', candidate.message ?? 'Invalid credentials.', candidate.status);
+    return new AuthApiError('INVALID_CREDENTIALS', 'Invalid credentials.', candidate.status);
   }
   if (candidate.code === 'FIRM_ALREADY_EXISTS') {
-    return new AuthApiError('FIRM_ALREADY_EXISTS', candidate.message ?? 'This firm may already exist.', candidate.status);
+    return new AuthApiError('FIRM_ALREADY_EXISTS', 'This firm may already exist.', candidate.status);
   }
   if (/already[_ ]?(?:registered|exists)|identity_already_exists|user_already_exists/.test(detail)) {
-    return new AuthApiError('DUPLICATE_ACCOUNT', candidate.message ?? 'An account already exists.', candidate.status);
-  }
-  if (/expired|otp_expired|flow_state_not_found/.test(detail)) {
-    return new AuthApiError('EXPIRED_LINK', candidate.message ?? 'The link has expired.', candidate.status);
+    return new AuthApiError('DUPLICATE_ACCOUNT', 'An account already exists.', candidate.status);
   }
   if (candidate.status === 401) {
-    return new AuthApiError('SESSION_EXPIRED', candidate.message ?? 'Your session expired. Sign in again.', candidate.status);
+    return new AuthApiError('SESSION_EXPIRED', 'Your session expired. Sign in again.', candidate.status);
+  }
+  if (/expired|otp_expired|flow_state_not_found/.test(detail)) {
+    return new AuthApiError('EXPIRED_LINK', 'The link has expired.', candidate.status);
   }
   return new AuthApiError(
     'UNKNOWN_ERROR',
-    candidate.message || 'The request could not be completed. Please try again.',
+    'The request could not be completed. Please try again.',
     candidate.status,
   );
 }

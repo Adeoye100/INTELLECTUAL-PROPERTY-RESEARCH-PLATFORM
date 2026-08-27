@@ -18,6 +18,7 @@ import { createHealthRouter } from './routes/health-routes.js';
 import { createDashboardRouter } from './routes/dashboard-routes.js';
 import {
   createRequestBoundsMiddleware,
+  rejectUnsupportedRequestContent,
   createSecurityHeadersMiddleware,
   MAX_JSON_BODY_BYTES,
 } from './http-security.js';
@@ -36,6 +37,8 @@ export function createApp({
   exportService = null,
   authRateLimiter = null,
   trustProxyHops = 0,
+  corsAllowedOrigins,
+  includeDiagnosticRoutes = false,
   readinessChecks = [],
   dashboardAnalyticsService = null,
 }) {
@@ -48,7 +51,8 @@ export function createApp({
   app.use(createSecurityHeadersMiddleware());
   app.use(createRequestBoundsMiddleware());
   app.use(createAuditRequestContextMiddleware());
-  app.use(createCorsMiddleware());
+  app.use(createCorsMiddleware({ allowedOrigins: corsAllowedOrigins }));
+  app.use(rejectUnsupportedRequestContent());
   app.use(express.json({ limit: MAX_JSON_BODY_BYTES }));
   app.use(createHealthRouter({ readinessChecks }));
 
@@ -57,7 +61,10 @@ export function createApp({
     '/api/v1/provisioning',
     createProvisioningRouter(authenticateIdentity, provisioningService, { authRateLimiter }),
   );
-  app.use('/api/v1', createProtectedRouter(authenticate, authService, { authRateLimiter }));
+  app.use('/api/v1', createProtectedRouter(authenticate, authService, {
+    authRateLimiter,
+    includeDiagnosticRoutes,
+  }));
   if (dashboardAnalyticsService) app.use('/api/v1', createDashboardRouter(authenticate, dashboardAnalyticsService));
   if (searchService && searchResultService) {
     app.use('/api/v1', createSearchRouter(authenticate, searchService, { searchResultService }));

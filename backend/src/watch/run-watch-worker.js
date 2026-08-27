@@ -12,7 +12,7 @@ const config = loadConfig();
 if (!config.watchEnabled) {
   console.log('Watch worker is disabled.');
 } else {
-  const pool = createPool(config.databaseUrl, config.databaseSsl);
+  const pool = createPool(config.databaseUrl, config);
   const redisClient = createClient({ url: config.redisUrl });
   redisClient.on('error', (error) => {
     console.error('Watch worker Redis error', { name: error.name, code: error.code ?? 'UNKNOWN' });

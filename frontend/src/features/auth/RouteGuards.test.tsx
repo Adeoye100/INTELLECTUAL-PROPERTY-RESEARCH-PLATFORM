@@ -55,11 +55,7 @@ describe('role access', () => {
     expect(screen.getByText('Administration content')).toBeVisible();
   });
 
-  it.each([
-    ['admin', true],
-    ['attorney', false],
-    ['viewer', false],
-  ] as const)('shows Administration navigation for %s: %s', (role, expected) => {
+  it.each(['admin', 'attorney', 'viewer'] as const)('does not expose disabled administration navigation for %s', (role) => {
     setRole(role);
     render(
       <MemoryRouter initialEntries={['/dashboard']}>
@@ -71,24 +67,20 @@ describe('role access', () => {
       </MemoryRouter>,
     );
 
-    const administrationLink = screen.queryByRole('link', { name: 'Administration' });
-    if (expected) expect(administrationLink).toBeVisible();
-    else expect(administrationLink).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Administration' })).not.toBeInTheDocument();
   });
 
   it.each([
-    ['admin', 'Admin home'],
-    ['attorney', 'Attorney home'],
-    ['viewer', 'Viewer home'],
+    ['admin', 'Dashboard home'],
+    ['attorney', 'Dashboard home'],
+    ['viewer', 'Dashboard home'],
   ] as const)('routes %s to its role-aware home', (role, destination) => {
     setRole(role);
     render(
       <MemoryRouter initialEntries={['/app']}>
         <Routes>
           <Route path="/app" element={<RoleHomeRedirect />} />
-          <Route path="/admin" element={<div>Admin home</div>} />
-          <Route path="/dashboard" element={<div>Attorney home</div>} />
-          <Route path="/portfolio" element={<div>Viewer home</div>} />
+          <Route path="/dashboard" element={<div>Dashboard home</div>} />
         </Routes>
       </MemoryRouter>,
     );

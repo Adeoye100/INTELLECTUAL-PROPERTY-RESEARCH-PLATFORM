@@ -20,7 +20,8 @@ describe('MainLayout', () => {
     await user.tab();
     expect(screen.getByRole('link', { name: 'Skip to main content' })).toHaveFocus();
     expect(screen.getByRole('navigation', { name: 'Application' })).toBeVisible();
-    expect(screen.getByRole('link', { name: /Notifications/ })).toHaveAttribute('href', '/watches');
+    expect(screen.getByRole('link', { name: /Portfolio \(unavailable\)/ })).toHaveAttribute('href', '/portfolio');
+    expect(screen.queryByRole('link', { name: /Notifications/ })).toBeNull();
     expect(container.querySelector('aside')).toHaveClass('w-20', 'xl:w-64');
     expect(container.querySelector('main')).toHaveClass('p-4', 'md:p-6', 'xl:p-8');
   });

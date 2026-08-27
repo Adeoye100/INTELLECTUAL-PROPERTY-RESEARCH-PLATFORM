@@ -4,16 +4,21 @@
 
 ### Vercel
 
-The frontend is configured for deployment on Vercel using `frontend/vercel.json`.
+The frontend is configured for deployment from the repository root using
+`../vercel.ts`. Leave Vercel's **Root Directory** unset so its build commands
+can use the locked `frontend/` project and dynamic CSP configuration.
 
 Required environment variables in Vercel:
 - `VITE_API_BASE_URL`: The absolute URL of the API (e.g., `https://api.example.com/api/v1`).
 - `VITE_API_MODE`: Set to `live` (default) or omit it.
+- `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`: browser-safe Supabase
+  project values only.
 
 When importing the project to Vercel:
-1. Set the **Root Directory** to `frontend`.
-2. Vercel should automatically detect **Vite** as the Framework Preset.
-3. Configure the environment variables mentioned above.
+1. Keep the **Root Directory** at the repository root.
+2. Vercel uses the explicit Vite configuration in `vercel.ts`.
+3. Configure the browser-safe environment variables mentioned above separately
+   for Preview and Production.
 
 ## API configuration
 

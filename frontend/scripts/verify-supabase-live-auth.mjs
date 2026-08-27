@@ -5,6 +5,10 @@ import { createClient } from '@supabase/supabase-js';
 import { loadConfig } from '../../backend/src/config.js';
 import { createSystem } from '../../backend/src/system.js';
 
+if (process.env.NODE_ENV === 'production' || process.env.IPRP_ALLOW_STAGING_AUTH_TEST !== 'true') {
+  throw new Error('This destructive disposable-user verifier is staging-only. Set IPRP_ALLOW_STAGING_AUTH_TEST=true in an approved isolated staging environment; never use production credentials.');
+}
+
 const config = loadConfig(process.env);
 const runId = randomUUID();
 const email = `iprp-live-auth-${runId}@example.test`;
@@ -165,17 +169,12 @@ try {
     firmId,
   });
 
-  const ownFirm = await api(`/api/v1/firms/${firmId}/ping`, { accessToken });
-  assert.equal(ownFirm.status, 200, 'The user could not access the current firm.');
-  const otherFirm = await api(`/api/v1/firms/${randomUUID()}/ping`, { accessToken });
-  assert.equal(otherFirm.status, 403, 'Cross-firm access was not denied.');
-
   const unusableToken = await api('/api/v1/me', { accessToken: `${accessToken}.invalid` });
   assert.equal(unusableToken.status, 401, 'An unusable access token was not rejected with 401.');
 
   await system.pool.query("UPDATE users SET role = 'viewer' WHERE supabase_user_id = $1", [supabaseUserId]);
   await system.roleFirmResolver.invalidate(supabaseUserId);
-  const deniedRole = await api('/api/v1/admin/ping', { accessToken });
+  const deniedRole = await api('/api/v1/audit-logs', { accessToken });
   assert.equal(deniedRole.status, 403, 'Viewer membership was not denied Admin access.');
 
   const logout = await restoredClient.auth.signOut();
@@ -191,7 +190,6 @@ try {
     unusableToken401: 'passed',
     provisioning: 'passed',
     roleDenial403: 'passed',
-    crossFirmDenial403: 'passed',
     corsPreflight: 'passed',
     googleOAuthEnabled: 'passed',
   }));

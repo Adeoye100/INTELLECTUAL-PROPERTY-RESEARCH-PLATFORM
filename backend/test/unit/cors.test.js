@@ -11,6 +11,13 @@ function testApp() {
   return app;
 }
 
+function configuredTestApp(origins) {
+  const app = express();
+  app.use(createCorsMiddleware({ allowedOrigins: origins }));
+  app.get('/protected', (_request, response) => response.status(401).json({ code: 'UNAUTHORIZED' }));
+  return app;
+}
+
 describe('CORS middleware', () => {
   it('allows the local Vite origin and completes Authorization/Content-Type preflight requests', async () => {
     const response = await request(testApp())
@@ -45,5 +52,16 @@ describe('CORS middleware', () => {
 
     assert.equal(response.status, 401);
     assert.equal(response.headers['access-control-allow-origin'], 'http://localhost:5173');
+  });
+
+  it('uses an exact configured origin allow-list and never reflects an unapproved origin', async () => {
+    const app = configuredTestApp(['https://app.iprp.test']);
+    const allowed = await request(app).get('/protected').set('Origin', 'https://app.iprp.test');
+    const denied = await request(app).options('/protected')
+      .set('Origin', 'https://attacker.example.test')
+      .set('Access-Control-Request-Method', 'GET');
+    assert.equal(allowed.headers['access-control-allow-origin'], 'https://app.iprp.test');
+    assert.equal(denied.status, 403);
+    assert.equal(denied.headers['access-control-allow-origin'], undefined);
   });
 });

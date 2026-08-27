@@ -90,7 +90,7 @@ describe('PdfExport', () => {
     render(<PdfExport request={searchRequest} />);
 
     await user.click(screen.getByRole('button', { name: 'Export PDF' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(/could not generate/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent('The service is temporarily unavailable. Please try again.');
 
     await user.click(screen.getByRole('button', { name: 'Retry export' }));
     expect(await screen.findByRole('link', { name: 'Download PDF' })).toBeVisible();

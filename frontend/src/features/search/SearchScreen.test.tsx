@@ -9,11 +9,11 @@ import { mockSearchResponse } from '../../lib/mocks/handlers';
 import { useAuthStore } from '../auth/authStore';
 import { SearchScreen } from './SearchScreen';
 
-const renderSearch = (initialEntry = '/search') => {
+const renderSearch = (initialEntry = '/search', response = mockSearchResponse) => {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const body = String(input).includes('/api/v1/portfolio/import') && init?.method === 'POST'
       ? { id: 'portfolio-import-1', firmId: 'f1', ownerUserId: 'search-user', markText: 'FORGE TEK', jurisdiction: 'US', niceClasses: [9, 42], status: 'Pending', filingDate: '2025-02-14', renewalDate: '2035-02-14', sourceRegistry: 'USPTO search import (mock)', mocked: true }
-      : mockSearchResponse;
+      : response;
     return new Response(JSON.stringify(body), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -89,6 +89,18 @@ describe('SearchScreen', () => {
 
     expect(await screen.findByText('The end date must be on or after the start date.')).toBeVisible();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('renders reflected query and registry result text as text rather than markup', async () => {
+    const response = structuredClone(mockSearchResponse);
+    response.results[0].candidateMarkText = '<registry-result>';
+    renderSearch('/search', response);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Mark' }), { target: { value: '<reflected-query>' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Search trademarks' }));
+    expect(await screen.findByText('<registry-result>')).toBeVisible();
+    expect(screen.getByRole('textbox', { name: 'Mark' })).toHaveValue('<reflected-query>');
+    expect(document.querySelector('registry-result')).toBeNull();
+    expect(document.querySelector('reflected-query')).toBeNull();
   });
 
   it('restores submitted filters for the same authenticated user', async () => {

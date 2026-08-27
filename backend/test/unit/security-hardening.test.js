@@ -38,6 +38,8 @@ describe('BE-21 HTTP, parser, and safe-error hardening', () => {
     assert.equal(normal.headers['x-content-type-options'], 'nosniff');
     assert.equal(normal.headers['x-frame-options'], 'DENY');
     assert.equal(normal.headers['referrer-policy'], 'no-referrer');
+    assert.equal(normal.headers['permissions-policy'], 'camera=(), geolocation=(), microphone=(), payment=(), usb=()');
+    assert.match(normal.headers['strict-transport-security'], /max-age=31536000/);
     assert.match(normal.headers['content-security-policy'], /default-src 'none'/);
 
     const target = await request(app).get(`/api/v1/portfolio-marks?mark=${'a'.repeat(4_096)}`);
@@ -48,6 +50,12 @@ describe('BE-21 HTTP, parser, and safe-error hardening', () => {
     assert.equal(oversized.status, 413);
     assert.equal(oversized.body.code, 'REQUEST_BODY_TOO_LARGE');
     assert.equal(calls.service, 0);
+
+    const multipart = await request(app).post('/api/v1/portfolio-marks')
+      .set('Content-Type', 'multipart/form-data; boundary=ignored')
+      .send('--ignored--');
+    assert.equal(multipart.status, 415);
+    assert.equal(multipart.body.code, 'UNSUPPORTED_MEDIA_TYPE');
   });
 
   it('runs authentication before RBAC-protected mutation validation or services', async () => {

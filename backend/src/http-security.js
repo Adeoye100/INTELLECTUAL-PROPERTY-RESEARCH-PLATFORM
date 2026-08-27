@@ -13,7 +13,9 @@ export function createSecurityHeadersMiddleware() {
       'Content-Security-Policy': "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Resource-Policy': 'same-origin',
+      'Permissions-Policy': 'camera=(), geolocation=(), microphone=(), payment=(), usb=()',
       'Referrer-Policy': 'no-referrer',
+      'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
       'X-Content-Type-Options': 'nosniff',
       'X-DNS-Prefetch-Control': 'off',
       'X-Frame-Options': 'DENY',
@@ -42,5 +44,18 @@ export function createRequestBoundsMiddleware({
       return next(new AppError(413, 'REQUEST_BODY_TOO_LARGE', 'Request body exceeds the configured limit.'));
     }
     return next();
+  };
+}
+
+/** The initial deployment does not accept uploads or HTML form bodies. Reject
+ * multipart before route validation so no future route accidentally treats an
+ * unbounded upload as JSON. */
+export function rejectUnsupportedRequestContent() {
+  return (request, _response, next) => {
+    const contentType = request.get('content-type');
+    if (!contentType) return next();
+    const mediaType = contentType.split(';', 1)[0].trim().toLowerCase();
+    if (mediaType === 'application/json' || mediaType === 'application/problem+json') return next();
+    return next(new AppError(415, 'UNSUPPORTED_MEDIA_TYPE', 'This API accepts JSON request bodies only.'));
   };
 }

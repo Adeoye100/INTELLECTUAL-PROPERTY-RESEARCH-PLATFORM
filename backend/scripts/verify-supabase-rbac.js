@@ -15,7 +15,7 @@ if (!token) throw new Error('Missing required environment variable: SUPABASE_TES
 
 const config = loadConfig(process.env);
 
-const pool = createPool(config.databaseUrl, config.databaseSsl);
+const pool = createPool(config.databaseUrl, config);
 const redisClient = createClient({ url: config.redisUrl });
 redisClient.on('error', () => {});
 

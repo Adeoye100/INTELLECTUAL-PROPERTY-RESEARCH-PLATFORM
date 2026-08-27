@@ -1,22 +1,14 @@
 import React from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { AppRouter } from './app/AppRouter';
 import { NetworkStatusBanner } from './app/NetworkStatusBanner';
 import { DemoBanner } from './components/DemoBanner';
+import { appQueryClient } from './lib/queryClient';
 import './styles/index.css';
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
 
 const App: React.FC = () => {
   return (
-    <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={appQueryClient}>
       <DemoBanner />
       <NetworkStatusBanner />
       <AppRouter />

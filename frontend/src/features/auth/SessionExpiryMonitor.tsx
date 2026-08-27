@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from './authStore';
 import { SESSION_EXPIRED_EVENT } from '../../lib/api/client';
 import { supabase } from '../../lib/supabase';
+import { appQueryClient } from '../../lib/queryClient';
 
 export function SessionExpiryMonitor() {
   const navigate = useNavigate();
@@ -10,6 +11,7 @@ export function SessionExpiryMonitor() {
 
   useEffect(() => {
     const handleUnauthorized = () => {
+      appQueryClient.clear();
       clearSession();
       void supabase.auth.signOut({ scope: 'local' });
       navigate('/auth/login', {

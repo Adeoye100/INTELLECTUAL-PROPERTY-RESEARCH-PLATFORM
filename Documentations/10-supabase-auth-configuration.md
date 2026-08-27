@@ -31,14 +31,24 @@ Add the same three paths for every deployed frontend origin. Keep the production
 
 The frontend supplies these paths through `authRedirectUrl` for Google sign-in, sign-up confirmation, email verification, and password reset. Query parameters such as `/auth/callback?next=/dashboard` stay on the approved callback path.
 
-## Live verification
+## Staging-only verification
 
-Run this only against the disposable/local PostgreSQL and Redis services referenced by `backend/.env`:
+Do not run this during repository preparation or against production. It creates
+and deletes a disposable Supabase user, so it requires a separately approved,
+isolated staging Supabase/Redis/PostgreSQL environment and dedicated test
+credentials. The current initial-deployment procedure is
+[19](19-initial-deployment-runbook.md); its non-destructive checks are in
+[20](20-post-deployment-smoke-checklist.md).
+
+When that staging gate is explicitly approved, load an isolated environment
+file—not the developer’s general `backend/.env`—and set the explicit staging
+opt-in:
 
 ```sh
-pnpm --dir frontend verify:supabase-live-auth
+IPRP_ALLOW_STAGING_AUTH_TEST=true node --env-file=path/to/isolated-staging.env \
+  frontend/scripts/verify-supabase-live-auth.mjs
 ```
 
-The verifier creates and removes a disposable confirmed Supabase user and local firm. It proves real email/password login, persisted-session restoration, token refresh, logout, CORS preflight, backend `/me`, provisioning, 401 rejection for an unusable bearer, 403 role denial, and cross-firm denial. It prints only pass/fail summaries and never prints credentials, access tokens, email addresses, or firm IDs.
+The verifier creates and removes a disposable confirmed Supabase user and local firm. It proves real email/password login, persisted-session restoration, token refresh, logout, CORS preflight, backend `/me`, provisioning, 401 rejection for an unusable bearer, and 403 role denial. Cross-firm checks remain an injected-fake/unit and staged smoke requirement. It prints only pass/fail summaries and never prints credentials, access tokens, email addresses, or firm IDs.
 
 Supabase's public Auth settings endpoint reports enabled sign-in providers but deliberately does not expose the URL allow-list. The redirect URLs therefore require the dashboard configuration above (or a Supabase Management API token with project-config access) and a final browser redirect check.

@@ -52,7 +52,7 @@ export async function createSystem(config, { officeActionSources = [], exportSto
     secretKey: config.supabaseSecretKey,
   });
 
-  const pool = createPool(config.databaseUrl, config.databaseSsl);
+  const pool = createPool(config.databaseUrl, config);
   const redisClient = createClient({ url: config.redisUrl });
   redisClient.on('error', (error) => {
     console.error('Redis client error', { name: error.name, code: error.code ?? 'UNKNOWN' });
@@ -127,10 +127,10 @@ export async function createSystem(config, { officeActionSources = [], exportSto
       authenticateIdentity,
       provisioningService,
       searchService,
-      searchResultService,
+      searchResultService: config.searchEnabled ? searchResultService : null,
       portfolioMarkService,
-      watchService,
-      alertService,
+      watchService: config.watchEnabled ? watchService : null,
+      alertService: config.watchEnabled ? alertService : null,
       auditService,
       userRoleService,
       officeActionSearchService,
@@ -139,6 +139,7 @@ export async function createSystem(config, { officeActionSources = [], exportSto
       exportService: pdfExportRuntime?.exportService ?? null,
       authRateLimiter,
       trustProxyHops: config.trustProxyHops,
+      corsAllowedOrigins: config.corsAllowedOrigins,
       dashboardAnalyticsService,
       readinessChecks: [
         async () => { await pool.query('SELECT 1'); },

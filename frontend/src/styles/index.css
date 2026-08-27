@@ -1,6 +1,6 @@
 @import "tailwindcss";
-@config "../../tailwind.config.js";
 @import "./visualization.css";
+@config "../../tailwind.config.js";
 
 @font-face {
   font-family: 'Poppins';

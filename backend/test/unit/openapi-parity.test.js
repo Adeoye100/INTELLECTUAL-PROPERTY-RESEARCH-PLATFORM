@@ -10,7 +10,6 @@ const expected = {
   '/api/v1/auth/invitations/{token}': ['get'], '/api/v1/auth/invitations/{token}/accept': ['post'],
   '/api/v1/provisioning/firm': ['post'], '/api/v1/me': ['get'], '/api/v1/admin/invitations': ['post'],
   '/api/v1/dashboard/analytics': ['get'],
-  '/api/v1/admin/ping': ['get'], '/api/v1/attorney/ping': ['get'], '/api/v1/viewer/ping': ['get'], '/api/v1/firms/{firmId}/ping': ['get'],
   '/api/v1/search': ['get'], '/api/v1/search-results': ['get'], '/api/v1/search-results/{id}': ['get'], '/api/v1/office-actions/search': ['get'],
   '/api/v1/portfolio-marks': ['get', 'post'], '/api/v1/portfolio-marks/{id}': ['get', 'patch', 'delete'],
   '/api/v1/watches': ['get', 'post'], '/api/v1/watches/{id}': ['get', 'patch', 'delete'],

@@ -126,6 +126,7 @@ function createTestApp({ calls = [] } = {}) {
       async getExport(payload) { ensureFirm(payload.firmId); return { id: recordId, status: 'completed' }; },
       async download(payload) { ensureFirm(payload.firmId); return { id: recordId, mimeType: 'application/pdf', body: Buffer.from('%PDF-test') }; },
     },
+    includeDiagnosticRoutes: true,
   });
 }
 

@@ -21,11 +21,11 @@ export function RouteErrorScreen() {
   }, []);
 
   const status = isRouteErrorResponse(error) ? error.status : undefined;
-  const message = isRouteErrorResponse(error)
-    ? error.statusText || 'The requested page could not be loaded.'
-    : error instanceof Error
-      ? error.message
-      : 'The requested page could not be loaded.';
+  // Route errors can originate in a loader, network response, or dependency.
+  // Do not surface an arbitrary message or statusText in the browser.
+  const message = status === 404
+    ? 'The requested page could not be found.'
+    : 'The requested page could not be loaded. Please try again.';
 
   return (
     <main id="main-content" className="flex min-h-screen items-center justify-center bg-surface-base p-6">

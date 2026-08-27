@@ -34,6 +34,7 @@ export class InMemoryPdfStorage {
   }
   async put({ key, contentType: type, body }) {
     const safeKey = validateExportStorageKey(key); contentType(type); const bytes = validBody(body, this.maxBytes);
+    if (this.objects.has(safeKey)) throw new Error('Export storage objects are immutable.');
     this.objects.set(safeKey, Buffer.from(bytes));
     return { byteSize: bytes.length, checksumSha256: sha256(bytes) };
   }
@@ -61,7 +62,9 @@ export class FilePdfStorage {
   async put({ key, contentType: type, body }) {
     const bytes = validBody(body, this.maxBytes); contentType(type); const target = this.filePath(key);
     await mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
-    await writeFile(target, bytes, { mode: 0o600 });
+    // Create-only semantics prevent a retry or crafted collision from replacing
+    // an already generated report.
+    await writeFile(target, bytes, { mode: 0o600, flag: 'wx' });
     return { byteSize: bytes.length, checksumSha256: sha256(bytes) };
   }
   async get({ key }) {

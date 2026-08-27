@@ -14,7 +14,7 @@ WORKDIR /app
 ENV NODE_ENV=production \
     TMPDIR=/tmp \
     PORT=3000
-RUN addgroup -S iprp && adduser -S -G iprp -h /app iprp \
+RUN addgroup --system iprp && adduser --system --ingroup iprp --home /app --no-create-home iprp \
   && mkdir -p /var/lib/iprp/exports /tmp \
   && chown -R iprp:iprp /app /var/lib/iprp /tmp
 COPY --from=dependencies --chown=iprp:iprp /app/node_modules ./node_modules

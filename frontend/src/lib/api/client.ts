@@ -18,7 +18,6 @@ export type ApiErrorCode =
 export class ApiError extends Error {
   readonly code: ApiErrorCode;
   readonly status?: number;
-  readonly details?: unknown;
   readonly requestId?: string;
   readonly serverCode?: string;
 
@@ -26,7 +25,6 @@ export class ApiError extends Error {
     code: ApiErrorCode;
     message: string;
     status?: number;
-    details?: unknown;
     requestId?: string;
     serverCode?: string;
   }) {
@@ -34,7 +32,6 @@ export class ApiError extends Error {
     this.name = 'ApiError';
     this.code = options.code;
     this.status = options.status;
-    this.details = options.details;
     this.requestId = options.requestId;
     this.serverCode = options.serverCode;
   }
@@ -43,7 +40,6 @@ export class ApiError extends Error {
 interface ErrorPayload {
   code?: string;
   message?: string;
-  details?: unknown;
   requestId?: string;
 }
 
@@ -180,7 +176,9 @@ export class ApiClient {
         method: options.method ?? (options.body === undefined ? 'GET' : 'POST'),
         headers,
         body: options.body === undefined ? undefined : JSON.stringify(options.body),
-        credentials: 'same-origin',
+        // Authentication is a bearer header for the configured API origin;
+        // cross-origin cookies are never needed or sent.
+        credentials: 'omit',
         signal: controller.signal,
       });
 
@@ -189,9 +187,11 @@ export class ApiClient {
         const payload = await readErrorPayload(response);
         throw new ApiError({
           code: codeForStatus(response.status),
-          message: payload.message || defaultMessageForStatus(response.status),
+          // The browser cannot establish that an upstream message is safe or
+          // audience-appropriate. Keep server codes/request IDs for support,
+          // but render only this controlled local message.
+          message: defaultMessageForStatus(response.status),
           status: response.status,
-          details: payload.details,
           requestId: payload.requestId || response.headers.get('x-request-id') || undefined,
           serverCode: payload.code,
         });

@@ -18,6 +18,110 @@ const SUPABASE_ASYMMETRIC_ALGORITHMS = new Set(['ES256', 'RS256']);
 const SEARCH_REGISTRY_NAME = /^[A-Z0-9_-]+$/;
 const MIN_SEARCH_TIMEOUT_MS = 100;
 const MAX_SEARCH_TIMEOUT_MS = 60_000;
+const NODE_ENVIRONMENTS = new Set(['development', 'test', 'production']);
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
+
+function nodeEnvironment(env) {
+  const value = env.NODE_ENV?.trim() || 'development';
+  if (!NODE_ENVIRONMENTS.has(value)) {
+    throw new Error('NODE_ENV must be development, test, or production.');
+  }
+  return value;
+}
+
+function isLoopbackHost(hostname) {
+  return LOOPBACK_HOSTS.has(hostname);
+}
+
+function rejectProductionPlaceholder(value, name, environment) {
+  if (environment !== 'production') return value;
+  const normalized = String(value).toLowerCase();
+  if (/your[-_]|placeholder|replace[-_]?me|change[-_]?me|example|\.invalid|<[^>]+>/.test(normalized)) {
+    throw new Error(`${name} must not use a placeholder value in production.`);
+  }
+  return value;
+}
+
+function normalizeOrigin(value, name, environment) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`${name} must contain valid absolute origins.`);
+  }
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password
+    || url.search || url.hash || (url.pathname !== '/' && url.pathname !== '')) {
+    throw new Error(`${name} must contain origin-only HTTP(S) URLs.`);
+  }
+  if (environment === 'production' && (url.protocol !== 'https:' || isLoopbackHost(url.hostname))) {
+    throw new Error(`${name} must contain HTTPS, non-loopback origins in production.`);
+  }
+  return url.origin;
+}
+
+function corsAllowedOrigins(env, environment) {
+  const raw = env.CORS_ALLOWED_ORIGINS?.trim();
+  if (!raw) {
+    if (environment === 'production') throw new Error('Missing required environment variable: CORS_ALLOWED_ORIGINS');
+    return ['http://localhost:5173'];
+  }
+  const origins = raw.split(',').map((value) => value.trim()).filter(Boolean);
+  if (origins.length === 0 || origins.length > 20) {
+    throw new Error('CORS_ALLOWED_ORIGINS must contain between 1 and 20 explicit origins.');
+  }
+  const normalized = origins.map((origin) => normalizeOrigin(origin, 'CORS_ALLOWED_ORIGINS', environment));
+  if (new Set(normalized).size !== normalized.length) {
+    throw new Error('CORS_ALLOWED_ORIGINS must not contain duplicate origins.');
+  }
+  return normalized;
+}
+
+function databaseConfig(env, environment) {
+  const databaseUrl = required(env, 'DATABASE_URL');
+  let parsed;
+  try {
+    parsed = new URL(databaseUrl);
+  } catch {
+    throw new Error('DATABASE_URL must be a valid PostgreSQL URL.');
+  }
+  if (!['postgres:', 'postgresql:'].includes(parsed.protocol) || !parsed.hostname) {
+    throw new Error('DATABASE_URL must use the postgres or postgresql protocol.');
+  }
+  const databaseSsl = strictBoolean(env, 'DATABASE_SSL', false);
+  if (environment === 'production') {
+    rejectProductionPlaceholder(databaseUrl, 'DATABASE_URL', environment);
+    if (!databaseSsl) throw new Error('DATABASE_SSL must be true in production.');
+    if (isLoopbackHost(parsed.hostname)) throw new Error('DATABASE_URL must not target a loopback host in production.');
+  }
+  return {
+    databaseUrl,
+    databaseSsl,
+    databasePoolMax: boundedPositiveInteger(env, 'DATABASE_POOL_MAX', 10, 1, 30),
+    databaseIdleTimeoutMs: boundedPositiveInteger(env, 'DATABASE_IDLE_TIMEOUT_MS', 30_000, 1_000, 300_000),
+    databaseConnectionTimeoutMs: boundedPositiveInteger(env, 'DATABASE_CONNECTION_TIMEOUT_MS', 5_000, 1_000, 60_000),
+    databaseStatementTimeoutMs: boundedPositiveInteger(env, 'DATABASE_STATEMENT_TIMEOUT_MS', 15_000, 1_000, 60_000),
+  };
+}
+
+function redisUrl(env, environment) {
+  const value = required(env, 'REDIS_URL');
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error('REDIS_URL must be a valid Redis URL.');
+  }
+  if (!['redis:', 'rediss:'].includes(parsed.protocol) || !parsed.hostname || parsed.search || parsed.hash) {
+    throw new Error('REDIS_URL must use redis or rediss without a query or fragment.');
+  }
+  if (environment === 'production') {
+    rejectProductionPlaceholder(value, 'REDIS_URL', environment);
+    if (parsed.protocol !== 'rediss:' || isLoopbackHost(parsed.hostname)) {
+      throw new Error('REDIS_URL must use rediss and a non-loopback host in production.');
+    }
+  }
+  return value;
+}
 
 function searchEnabled(env) {
   const value = env.SEARCH_ENABLED?.trim() || 'false';
@@ -48,9 +152,12 @@ function nonNegativeBoundedInteger(env, name, fallback, maximum) {
   return value;
 }
 
-function loadAuthRateLimitConfig(env, jwtAccessSecret, supabaseSecretKey) {
+function loadAuthRateLimitConfig(env, jwtAccessSecret, supabaseSecretKey, environment) {
   const authRateLimitEnabled = strictBoolean(env, 'AUTH_RATE_LIMIT_ENABLED', true);
   const trustProxyHops = nonNegativeBoundedInteger(env, 'TRUST_PROXY_HOPS', 0, 10);
+  if (environment === 'production' && trustProxyHops !== 1) {
+    throw new Error('TRUST_PROXY_HOPS must be 1 in production behind Render.');
+  }
   if (!authRateLimitEnabled) {
     const environment = env.NODE_ENV?.trim();
     if (!['development', 'test'].includes(environment)) {
@@ -214,7 +321,7 @@ function loadOfficeActionSearchConfig(env) {
   };
 }
 
-function loadPdfExportConfig(env) {
+function loadPdfExportConfig(env, environment) {
   const pdfExportEnabled = strictBoolean(env, 'PDF_EXPORT_ENABLED', false);
   const pdfExportMaxBytes = boundedPositiveInteger(env, 'PDF_EXPORT_MAX_BYTES', 10 * 1024 * 1024, 32 * 1024, 100 * 1024 * 1024);
   const pdfExportMaxPages = boundedPositiveInteger(env, 'PDF_EXPORT_MAX_PAGES', 100, 1, 500);
@@ -233,6 +340,9 @@ function loadPdfExportConfig(env) {
   if (pdfExportStorageProvider !== 'filesystem') throw new Error('PDF_EXPORT_STORAGE_PROVIDER must be filesystem when PDF export is enabled.');
   const pdfExportStorageRoot = env.PDF_EXPORT_STORAGE_ROOT?.trim();
   if (!pdfExportStorageRoot || !pdfExportStorageRoot.startsWith('/')) throw new Error('PDF_EXPORT_STORAGE_ROOT must be an absolute private storage path.');
+  if (environment === 'production') {
+    throw new Error('PDF_EXPORT_ENABLED cannot be enabled in production until a verified shared private-storage adapter is configured.');
+  }
   return {
     pdfExportEnabled: true, pdfExportQueueKey, pdfExportMaxBytes, pdfExportMaxPages, pdfExportMaxResults,
     pdfExportMaxAttempts, pdfExportWorkerIntervalMs, pdfExportWorkerMaxJobs, pdfExportStorageProvider, pdfExportStorageRoot,
@@ -302,6 +412,7 @@ export function loadSupabaseConfig(env = process.env) {
 }
 
 export function loadConfig(env = process.env) {
+  const environment = nodeEnvironment(env);
   const jwtAccessSecret = required(env, 'JWT_ACCESS_SECRET');
   if (Buffer.byteLength(jwtAccessSecret, 'utf8') < 32) {
     throw new Error('JWT_ACCESS_SECRET must contain at least 32 bytes.');
@@ -313,20 +424,29 @@ export function loadConfig(env = process.env) {
   }
   const searchConfig = loadSearchConfig(env);
   const officeActionSearchConfig = loadOfficeActionSearchConfig(env);
-  const pdfExportConfig = loadPdfExportConfig(env);
+  const pdfExportConfig = loadPdfExportConfig(env, environment);
   const watchConfig = loadWatchConfig(env);
   if (watchConfig.watchEnabled && !searchConfig.searchEnabled) {
     throw new Error('WATCH_ENABLED requires SEARCH_ENABLED=true.');
   }
   const authRateLimitConfig = loadAuthRateLimitConfig(
-    env, jwtAccessSecret, supabaseConfig.supabaseSecretKey,
+    env, jwtAccessSecret, supabaseConfig.supabaseSecretKey, environment,
   );
+  const database = databaseConfig(env, environment);
+  const configuredRedisUrl = redisUrl(env, environment);
+  if (environment === 'production') {
+    rejectProductionPlaceholder(jwtAccessSecret, 'JWT_ACCESS_SECRET', environment);
+    rejectProductionPlaceholder(supabaseConfig.supabaseSecretKey, 'SUPABASE_SECRET_KEY', environment);
+    rejectProductionPlaceholder(authRateLimitConfig.authRateLimitKeySecret, 'AUTH_RATE_LIMIT_KEY_SECRET', environment);
+    rejectProductionPlaceholder(supabaseConfig.supabaseUrl, 'SUPABASE_URL', environment);
+  }
 
   return {
+    environment,
     port: positiveInteger(env, 'PORT', 3000),
-    databaseUrl: required(env, 'DATABASE_URL'),
-    databaseSsl: env.DATABASE_SSL === 'true',
-    redisUrl: required(env, 'REDIS_URL'),
+    ...database,
+    redisUrl: configuredRedisUrl,
+    corsAllowedOrigins: corsAllowedOrigins(env, environment),
     jwtAccessSecret,
     inviteTokenTtlSeconds: positiveInteger(env, 'INVITE_TOKEN_TTL_SECONDS', 604_800),
     workerHeartbeatTtlSeconds: boundedPositiveInteger(env, 'WORKER_HEARTBEAT_TTL_SECONDS', 120, 30, 3_600),
@@ -345,6 +465,13 @@ export function loadUsptoIngestionConfig(env = process.env) {
     usptoBulkListingUrl: env.USPTO_BULK_LISTING_URL === undefined
       ? undefined : registryListingUrl(env.USPTO_BULK_LISTING_URL),
   };
+}
+
+/** Migration processes deliberately validate only their PostgreSQL contract so
+ * one-off schema work never requires Redis, workers, or Auth credentials. */
+export function loadMigrationConfig(env = process.env) {
+  const environment = nodeEnvironment(env);
+  return { environment, ...databaseConfig(env, environment) };
 }
 
 export function loadElasticsearchSyncConfig(env = process.env) {
