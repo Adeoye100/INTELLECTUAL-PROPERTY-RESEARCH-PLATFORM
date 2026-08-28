@@ -58,6 +58,161 @@
   }
 }
 
+.auth-shader-background {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+.auth-shader-background::before {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  content: '';
+  background:
+    radial-gradient(circle at 18% 24%, rgb(117 174 183 / 32%), transparent 36rem),
+    radial-gradient(circle at 84% 78%, rgb(20 101 117 / 42%), transparent 32rem),
+    linear-gradient(135deg, #000 8%, #0a1428 52%, #000);
+}
+
+.auth-shader-background__veil {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: linear-gradient(135deg, rgb(0 0 0 / 12%), rgb(0 0 0 / 42%));
+}
+
+.auth-shader-background canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  z-index: 1;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.hourglass-loader {
+  --hourglass-duration: 2s;
+  --hourglass-hue: 191;
+  display: inline-block;
+  width: 3.5rem;
+  height: auto;
+  flex: none;
+  vertical-align: middle;
+}
+
+.hourglass-loader__glare-top,
+.hourglass-loader__glare-bottom,
+.hourglass-loader__model,
+.hourglass-loader__motion-thick,
+.hourglass-loader__motion-medium,
+.hourglass-loader__motion-thin,
+.hourglass-loader__sand-drop,
+.hourglass-loader__sand-fill,
+.hourglass-loader__sand-grain-left,
+.hourglass-loader__sand-grain-right,
+.hourglass-loader__sand-line-left,
+.hourglass-loader__sand-line-right,
+.hourglass-loader__sand-mound-top,
+.hourglass-loader__sand-mound-bottom {
+  animation-duration: var(--hourglass-duration);
+  animation-timing-function: cubic-bezier(0.83, 0, 0.17, 1);
+  animation-iteration-count: infinite;
+}
+
+.hourglass-loader__glare-top { animation-name: hourglass-glare-top; }
+.hourglass-loader__glare-bottom { animation-name: hourglass-glare-bottom; }
+.hourglass-loader__model { animation-name: hourglass-flip; transform-origin: 12.25px 16.75px; }
+.hourglass-loader__motion-thick,
+.hourglass-loader__motion-medium,
+.hourglass-loader__motion-thin { transform-origin: 26px 26px; }
+.hourglass-loader__motion-thick { animation-name: hourglass-motion-thick; }
+.hourglass-loader__motion-medium { animation-name: hourglass-motion-medium; }
+.hourglass-loader__motion-thin { animation-name: hourglass-motion-thin; }
+.hourglass-loader__sand-drop { animation-name: hourglass-sand-drop; }
+.hourglass-loader__sand-fill { animation-name: hourglass-sand-fill; }
+.hourglass-loader__sand-grain-left { animation-name: hourglass-sand-grain-left; }
+.hourglass-loader__sand-grain-right { animation-name: hourglass-sand-grain-right; }
+.hourglass-loader__sand-line-left { animation-name: hourglass-sand-line-left; }
+.hourglass-loader__sand-line-right { animation-name: hourglass-sand-line-right; }
+.hourglass-loader__sand-mound-top { animation-name: hourglass-sand-mound-top; }
+.hourglass-loader__sand-mound-bottom { animation-name: hourglass-sand-mound-bottom; transform-origin: 12.25px 31.5px; }
+
+@keyframes hourglass-flip {
+  from { transform: translate(13.75px, 9.25px) rotate(-180deg); }
+  24%, to { transform: translate(13.75px, 9.25px) rotate(0); }
+}
+
+@keyframes hourglass-glare-top {
+  from { stroke: rgb(255 255 255 / 0%); }
+  24%, to { stroke: #fff; }
+}
+
+@keyframes hourglass-glare-bottom {
+  from { stroke: #fff; }
+  24%, to { stroke: rgb(255 255 255 / 0%); }
+}
+
+@keyframes hourglass-motion-thick {
+  from { animation-timing-function: cubic-bezier(0.33, 0, 0.67, 0); stroke: rgb(255 255 255 / 0%); stroke-dashoffset: 153.94; transform: rotate(0.67turn); }
+  20% { animation-timing-function: cubic-bezier(0.33, 1, 0.67, 1); stroke: #202020; stroke-dashoffset: 141.11; transform: rotate(1turn); }
+  40%, to { stroke: rgb(255 255 255 / 0%); stroke-dashoffset: 153.94; transform: rotate(1.33turn); }
+}
+
+@keyframes hourglass-motion-medium {
+  from, 8% { animation-timing-function: cubic-bezier(0.33, 0, 0.67, 0); stroke: rgb(255 255 255 / 0%); stroke-dashoffset: 153.94; transform: rotate(0.5turn); }
+  20% { animation-timing-function: cubic-bezier(0.33, 1, 0.67, 1); stroke: #fff; stroke-dashoffset: 147.53; transform: rotate(0.83turn); }
+  32%, to { stroke: rgb(255 255 255 / 0%); stroke-dashoffset: 153.94; transform: rotate(1.17turn); }
+}
+
+@keyframes hourglass-motion-thin {
+  from, 4% { animation-timing-function: cubic-bezier(0.33, 0, 0.67, 0); stroke: rgb(255 255 255 / 0%); stroke-dashoffset: 153.94; transform: rotate(0.33turn); }
+  24% { animation-timing-function: cubic-bezier(0.33, 1, 0.67, 1); stroke: #353535; stroke-dashoffset: 134.7; transform: rotate(0.67turn); }
+  44%, to { stroke: rgb(255 255 255 / 0%); stroke-dashoffset: 153.94; transform: rotate(1turn); }
+}
+
+@keyframes hourglass-sand-drop {
+  from, 10% { animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0); stroke-dashoffset: 1; }
+  70%, to { stroke-dashoffset: -107; }
+}
+
+@keyframes hourglass-sand-fill {
+  from, 10% { animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0); stroke-dashoffset: 55; }
+  70%, to { stroke-dashoffset: -54; }
+}
+
+@keyframes hourglass-sand-grain-left {
+  from, 10% { animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0); stroke-dashoffset: 29; }
+  70%, to { stroke-dashoffset: -22; }
+}
+
+@keyframes hourglass-sand-grain-right {
+  from, 10% { animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0); stroke-dashoffset: 27; }
+  70%, to { stroke-dashoffset: -24; }
+}
+
+@keyframes hourglass-sand-line-left {
+  from, 10% { animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0); stroke-dashoffset: 53; }
+  70%, to { stroke-dashoffset: -55; }
+}
+
+@keyframes hourglass-sand-line-right {
+  from, 10% { animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0); stroke-dashoffset: 14; }
+  70%, to { stroke-dashoffset: -24.5; }
+}
+
+@keyframes hourglass-sand-mound-top {
+  from, 10% { animation-timing-function: linear; transform: translate(0, 0); }
+  15% { animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0); transform: translate(0, 1.5px); }
+  51%, to { transform: translate(0, 13px); }
+}
+
+@keyframes hourglass-sand-mound-bottom {
+  from, 31% { animation-timing-function: cubic-bezier(0.61, 1, 0.88, 1); transform: scale(1, 0); }
+  56%, to { transform: scale(1, 1); }
+}
+
 @layer components {
   .brand-gradient {
     background: linear-gradient(180deg, theme('colors.forge-navy.950'), theme('colors.forge-teal.600'));

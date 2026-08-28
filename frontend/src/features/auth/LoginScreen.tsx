@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/Button';
+import { HourglassLoader } from '../../components/HourglassLoader';
 import { supabase } from '../../lib/supabase';
 import { AuthApiError, authErrorMessage, toAuthApiError } from './authApi';
 import { authRedirectUrl, roleHomePath, safeAppRedirect } from './roleRouting';
@@ -146,7 +147,7 @@ export const LoginScreen: React.FC = () => {
         )}
 
         <Button type="submit" className="w-full" disabled={isSubmitting}>
-          {isSubmitting ? 'Signing in…' : errorCode === 'NETWORK_ERROR' ? 'Retry sign in' : 'Sign in'}
+          {isSubmitting ? <><HourglassLoader decorative className="mr-2 h-5 w-5" />Signing in…</> : errorCode === 'NETWORK_ERROR' ? 'Retry sign in' : 'Sign in'}
         </Button>
       </form>
 
@@ -158,7 +159,7 @@ export const LoginScreen: React.FC = () => {
       <div>
         <Button type="button" variant="outline" className="w-full" disabled={isGoogleRedirecting} onClick={() => void signInWithGoogle()}>
           <span className="mr-2 font-bold" aria-hidden="true">G</span>
-          {isGoogleRedirecting ? 'Redirecting…' : 'Google'}
+          {isGoogleRedirecting ? <><HourglassLoader decorative className="mr-2 h-5 w-5" />Redirecting…</> : 'Google'}
         </Button>
       </div>
 

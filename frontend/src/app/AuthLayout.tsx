@@ -1,11 +1,13 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
+import { AuthShaderBackground } from '../components/AuthShaderBackground';
 import { Logo } from '../components/Logo';
 
 export const AuthLayout: React.FC = () => {
   return (
-    <main id="main-content" className="min-h-screen w-full flex items-center justify-center bg-forge-gradient p-6">
-      <div className="w-full max-w-md">
+    <main id="main-content" className="relative isolate flex min-h-screen w-full items-center justify-center overflow-hidden bg-black p-6">
+      <AuthShaderBackground />
+      <div className="relative z-10 w-full max-w-md">
         <div className="flex justify-center mb-8">
           <Logo className="scale-125" />
         </div>
