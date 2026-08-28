@@ -4,7 +4,7 @@ import { AlertTriangle } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { AuthApiError, authErrorMessage, toAuthApiError } from './authApi';
-import { clearSensitiveAuthUrl, roleHomePath, safeAppRedirect } from './roleRouting';
+import { authRedirectUrl, clearSensitiveAuthUrl, roleHomePath, safeAppRedirect } from './roleRouting';
 import { syncSupabaseSession } from './authStore';
 
 // A route remount (including Strict Mode's development effect replay) must not
@@ -28,9 +28,11 @@ async function exchangeCodeOnce(code: string): Promise<Session> {
 
     // A previous mounted callback may already have exchanged this single-use
     // code. In that case, a persisted Supabase session is authoritative.
-    if (result.error && consumedCodeError(result.error)) {
+    if (result.error) {
       const existing = await supabase.auth.getSession();
-      if (!existing.error && existing.data.session) return existing.data.session;
+      if (consumedCodeError(result.error) && !existing.error && existing.data.session) {
+        return existing.data.session;
+      }
     }
     if (result.error) throw result.error;
     throw new Error('Supabase did not return a session for this sign-in.');
@@ -47,7 +49,7 @@ export function OAuthCallbackScreen() {
   const statusRef = useRef<HTMLDivElement>(null);
   const exchangeStarted = useRef(false);
 
-  const completeSignIn = useCallback(async (retry = false) => {
+  const completeSignIn = useCallback(async () => {
     if (searchParams.get('error_description')) {
       throw new Error('Authentication provider rejected the sign-in request.');
     }
@@ -56,7 +58,7 @@ export function OAuthCallbackScreen() {
     const requestedDestination = searchParams.get('next');
     let session: Session | null;
 
-    if (code && !retry) {
+    if (code) {
       session = await exchangeCodeOnce(code);
     } else {
       const result = await supabase.auth.getSession();
@@ -84,10 +86,21 @@ export function OAuthCallbackScreen() {
     }
   }, []);
 
-  const retry = useCallback(() => {
+  const retry = useCallback(async () => {
     setError(null);
-    void completeSignIn(true).catch(handleFailure);
-  }, [completeSignIn, handleFailure]);
+    const next = safeAppRedirect(searchParams.get('next'), '/app');
+    const callback = new URL(authRedirectUrl('/auth/callback'));
+    callback.searchParams.set('next', next);
+    try {
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: callback.toString() },
+      });
+      if (oauthError) throw oauthError;
+    } catch (failure) {
+      await handleFailure(failure);
+    }
+  }, [handleFailure, searchParams]);
 
   useEffect(() => {
     if (exchangeStarted.current) return;
@@ -110,7 +123,7 @@ export function OAuthCallbackScreen() {
       <h1 className="text-2xl font-bold text-text-primary">Could not complete sign in</h1>
       <p className="text-text-secondary">{authErrorMessage(error)}</p>
       <div className="flex flex-wrap items-center justify-center gap-4">
-        {retryable && <button type="button" onClick={retry} className="font-bold text-accent underline">Try again</button>}
+        {retryable && <button type="button" onClick={() => void retry()} className="font-bold text-accent underline">Try again</button>}
         <Link to="/auth/login" className="inline-block font-bold text-accent underline">Return to sign in</Link>
       </div>
     </div>
