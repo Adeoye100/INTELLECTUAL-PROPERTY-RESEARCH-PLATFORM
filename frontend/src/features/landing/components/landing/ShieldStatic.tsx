@@ -6,6 +6,8 @@ import {
 './shieldGeometry';
 import { FACETS } from '../../data/facets';
 
+import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
+
 interface ShieldStaticProps {
   // 0-1 per facet, in facet order. Omit (or pass all 1s) for a fully assembled shield.
   facetProgress?: number[];
@@ -29,6 +31,8 @@ export function ShieldStatic({
   onFacetHover,
   onFacetSelect
 }: ShieldStaticProps) {
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const shouldAnimate = animated && !prefersReducedMotion;
   const uid = useId();
   const metalId = `shieldMetal-${uid}`;
   const flareId = `shieldFlare-${uid}`;
@@ -37,7 +41,7 @@ export function ShieldStatic({
   const [flareKeys, setFlareKeys] = useState<number[]>(WEDGES.map(() => 0));
 
   useEffect(() => {
-    if (!animated) return;
+    if (!shouldAnimate) return;
     const completed: number[] = [];
     progress.forEach((p, i) => {
       if (p >= 0.999 && prevProgress.current[i] < 0.999) {
@@ -48,7 +52,7 @@ export function ShieldStatic({
     if (completed.length) {
       setFlareKeys((current) => current.map((key, index) => completed.includes(index) ? key + 1 : key));
     }
-  }, [animated, progress]);
+  }, [shouldAnimate, progress]);
 
   return (
     <svg
@@ -92,7 +96,7 @@ export function ShieldStatic({
               style={{
                 transform: `translate(${dx}px, ${dy}px) rotate(${rotate}deg)`,
                 transformOrigin: `${wedge.centroid.x}px ${wedge.centroid.y}px`,
-                transition: animated ?
+                transition: shouldAnimate ?
                 'transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.6s ease-out' :
                 'none',
                 cursor: interactive ? 'pointer' : 'default',
@@ -113,7 +117,7 @@ export function ShieldStatic({
               aria-label={interactive ? `Show ${FACETS[wedge.index]?.title ?? `facet ${wedge.index + 1}`}` : undefined}
               onClick={() => onFacetSelect?.(wedge.index)} />
             
-            {animated &&
+            {shouldAnimate &&
             <path
               key={`flare-${wedge.index}-${flareKeys[i]}`}
               d={d}

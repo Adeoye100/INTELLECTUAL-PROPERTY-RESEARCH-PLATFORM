@@ -2,16 +2,30 @@ import { ApiError, getApiClient, type ApiRequestOptions } from '../../lib/api/cl
 import { supabase } from '../../lib/supabase';
 
 export type AuthErrorCode =
+  | 'APPLICATION_USER_MISSING'
   | 'DUPLICATE_ACCOUNT'
   | 'EMAIL_NOT_VERIFIED'
   | 'EXPIRED_LINK'
+  | 'FIRM_MEMBERSHIP_MISSING'
   | 'FIRM_ALREADY_EXISTS'
   | 'INVALID_CREDENTIALS'
   | 'NETWORK_ERROR'
   | 'PERMISSION_DENIED'
   | 'SEAT_LIMIT'
   | 'SESSION_EXPIRED'
+  | 'SERVICE_UNAVAILABLE'
+  | 'STALE_SESSION'
   | 'UNKNOWN_ERROR';
+
+export type AuthSyncStage = 'code-exchange' | 'provisioning' | 'resolve-current-user' | 'role-routing';
+
+/** Deliberately contains only status, controlled codes, and public API origin. */
+export interface AuthSynchronizationDiagnostic {
+  stage: AuthSyncStage;
+  status?: number;
+  responseCode: AuthErrorCode | ApiError['code'];
+  requestOrigin?: string;
+}
 
 export class AuthApiError extends Error {
   readonly code: AuthErrorCode;
@@ -26,6 +40,20 @@ export class AuthApiError extends Error {
     this.name = 'AuthApiError';
     this.code = code;
     this.status = status;
+  }
+}
+
+export class AuthSynchronizationError extends AuthApiError {
+  readonly diagnostic: AuthSynchronizationDiagnostic;
+
+  constructor(
+    code: AuthErrorCode,
+    message: string,
+    diagnostic: AuthSynchronizationDiagnostic,
+  ) {
+    super(code, message, diagnostic.status);
+    this.name = 'AuthSynchronizationError';
+    this.diagnostic = diagnostic;
   }
 }
 
@@ -72,14 +100,18 @@ export const authErrorMessage = (error: unknown): string => {
   if (!(error instanceof AuthApiError)) return 'Something went wrong. Please try again.';
   const messages: Record<AuthErrorCode, string> = {
     DUPLICATE_ACCOUNT: 'An account already exists for this email address. Sign in or reset your password instead.',
+    APPLICATION_USER_MISSING: 'Your account is authenticated, but it has not been added to an application firm yet. Ask a firm administrator for an invitation, then try again.',
     EMAIL_NOT_VERIFIED: 'Verify your email address before signing in. You can request another verification email below.',
     EXPIRED_LINK: 'This link has expired or has already been used. Request a new link to continue.',
+    FIRM_MEMBERSHIP_MISSING: 'Your account is signed in, but it does not have an application role and firm membership yet. Ask a firm administrator for an invitation, then try again.',
     FIRM_ALREADY_EXISTS: 'This firm may already exist. Request an invitation from your firm administrator.',
     INVALID_CREDENTIALS: 'The email address or password is incorrect.',
     NETWORK_ERROR: 'We could not reach the service. Check your connection and try again.',
     PERMISSION_DENIED: 'You do not have permission to complete this action.',
     SEAT_LIMIT: 'Your firm has reached its licensed seat limit. Ask an administrator to free a seat or update the plan.',
     SESSION_EXPIRED: 'Your session expired. Sign in again to continue.',
+    SERVICE_UNAVAILABLE: 'The application service is temporarily unavailable. Please try again shortly.',
+    STALE_SESSION: 'Your sign-in state changed before it could be completed. Please try again.',
     UNKNOWN_ERROR: 'The request could not be completed. Please try again.',
   };
   return messages[error.code];
@@ -124,4 +156,39 @@ export function toAuthApiError(error: unknown): AuthApiError {
     'The request could not be completed. Please try again.',
     candidate.status,
   );
+}
+
+export function toAuthSynchronizationError(
+  error: unknown,
+  stage: AuthSyncStage,
+): AuthSynchronizationError {
+  if (error instanceof AuthSynchronizationError) return error;
+
+  const apiError = error instanceof ApiError ? error : undefined;
+  const status = apiError?.status;
+  let code: AuthErrorCode;
+
+  if (stage === 'resolve-current-user' && status === 404) {
+    code = 'APPLICATION_USER_MISSING';
+  } else if (stage === 'provisioning' && status === 409) {
+    code = 'FIRM_ALREADY_EXISTS';
+  } else if (status === 401) {
+    code = 'SESSION_EXPIRED';
+  } else if (status !== undefined && status >= 500) {
+    code = 'SERVICE_UNAVAILABLE';
+  } else if (apiError?.code === 'NETWORK_ERROR' || apiError?.code === 'TIMEOUT') {
+    // Browsers intentionally expose CORS rejections and transport outages as
+    // the same fetch failure. The diagnostic makes that limit explicit.
+    code = 'NETWORK_ERROR';
+  } else {
+    code = toAuthApiError(error).code;
+  }
+
+  const diagnostic: AuthSynchronizationDiagnostic = {
+    stage,
+    responseCode: apiError?.code ?? code,
+  };
+  if (status !== undefined) diagnostic.status = status;
+  if (apiError?.requestOrigin) diagnostic.requestOrigin = apiError.requestOrigin;
+  return new AuthSynchronizationError(code, authErrorMessage(new AuthApiError(code, '')), diagnostic);
 }

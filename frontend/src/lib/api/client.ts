@@ -20,6 +20,7 @@ export class ApiError extends Error {
   readonly status?: number;
   readonly requestId?: string;
   readonly serverCode?: string;
+  readonly requestOrigin?: string;
 
   constructor(options: {
     code: ApiErrorCode;
@@ -27,6 +28,7 @@ export class ApiError extends Error {
     status?: number;
     requestId?: string;
     serverCode?: string;
+    requestOrigin?: string;
   }) {
     super(options.message);
     this.name = 'ApiError';
@@ -34,6 +36,7 @@ export class ApiError extends Error {
     this.status = options.status;
     this.requestId = options.requestId;
     this.serverCode = options.serverCode;
+    this.requestOrigin = options.requestOrigin;
   }
 }
 
@@ -48,6 +51,9 @@ export interface ApiRequestOptions {
   headers?: HeadersInit;
   method?: 'DELETE' | 'GET' | 'PATCH' | 'POST' | 'PUT';
   signal?: AbortSignal;
+  // Session establishment needs to classify a rejected bootstrap request
+  // before a global unauthorized handler clears the local projection.
+  suppressUnauthorizedHandler?: boolean;
   timeoutMs?: number;
 }
 
@@ -129,6 +135,7 @@ export class ApiClient {
         message: 'The service returned an unexpected response format.',
         status: response.status,
         requestId: response.headers.get('x-request-id') ?? undefined,
+        requestOrigin: this.requestOrigin(),
       });
     }
     try {
@@ -139,6 +146,7 @@ export class ApiClient {
         message: 'The service returned invalid JSON.',
         status: response.status,
         requestId: response.headers.get('x-request-id') ?? undefined,
+        requestOrigin: this.requestOrigin(),
       });
     }
   }
@@ -154,6 +162,7 @@ export class ApiClient {
     }
 
     const controller = new AbortController();
+    const requestOrigin = this.requestOrigin();
     let timedOut = false;
     const timeout = window.setTimeout(() => {
       timedOut = true;
@@ -183,7 +192,11 @@ export class ApiClient {
       });
 
       if (!response.ok) {
-        if (response.status === 401 && (token || headers.has('Authorization'))) this.onUnauthorized();
+        if (
+          response.status === 401
+          && !options.suppressUnauthorizedHandler
+          && (token || headers.has('Authorization'))
+        ) this.onUnauthorized();
         const payload = await readErrorPayload(response);
         throw new ApiError({
           code: codeForStatus(response.status),
@@ -194,25 +207,33 @@ export class ApiClient {
           status: response.status,
           requestId: payload.requestId || response.headers.get('x-request-id') || undefined,
           serverCode: payload.code,
+          requestOrigin,
         });
       }
       return response;
     } catch (error) {
       if (error instanceof ApiError) throw error;
       if (timedOut) {
-        throw new ApiError({ code: 'TIMEOUT', message: 'The request timed out. Please try again.' });
+        throw new ApiError({
+          code: 'TIMEOUT', message: 'The request timed out. Please try again.', requestOrigin,
+        });
       }
       if (options.signal?.aborted) {
-        throw new ApiError({ code: 'ABORTED', message: 'The request was cancelled.' });
+        throw new ApiError({ code: 'ABORTED', message: 'The request was cancelled.', requestOrigin });
       }
       throw new ApiError({
         code: 'NETWORK_ERROR',
         message: 'We could not reach the service. Check your connection and try again.',
+        requestOrigin,
       });
     } finally {
       window.clearTimeout(timeout);
       options.signal?.removeEventListener('abort', abortFromCaller);
     }
+  }
+
+  private requestOrigin() {
+    return new URL(this.baseUrl, window.location.origin).origin;
   }
 }
 

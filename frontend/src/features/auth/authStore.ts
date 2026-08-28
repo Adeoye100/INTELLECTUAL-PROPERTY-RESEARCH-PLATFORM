@@ -4,6 +4,11 @@ import type { UserRole } from '../../types';
 import { supabase } from '../../lib/supabase';
 import { getApiClient } from '../../lib/api/client';
 import { provisionFirmForSignupSession } from './signupProvisioning';
+import {
+  AuthSynchronizationError,
+  type AuthSynchronizationDiagnostic,
+  toAuthSynchronizationError,
+} from './authApi';
 
 export interface AuthenticatedUser {
   id: string;
@@ -26,6 +31,22 @@ interface AuthState {
 let sessionRevision = 0;
 let activeAccessToken: string | null = null;
 const sessionSynchronizations = new Map<string, Promise<AuthenticatedUser>>();
+let lastSynchronizationDiagnostic: AuthSynchronizationDiagnostic | null = null;
+
+export const AUTH_SYNCHRONIZATION_DIAGNOSTIC_EVENT = 'forge:auth-synchronization-diagnostic';
+
+export function getLastAuthSynchronizationDiagnostic() {
+  return lastSynchronizationDiagnostic;
+}
+
+function recordSynchronizationDiagnostic(diagnostic: AuthSynchronizationDiagnostic) {
+  lastSynchronizationDiagnostic = Object.freeze({ ...diagnostic });
+  // Support tooling can observe this event without access to a session token,
+  // server message, OAuth code, or user identifier.
+  window.dispatchEvent(new CustomEvent(AUTH_SYNCHRONIZATION_DIAGNOSTIC_EVENT, {
+    detail: lastSynchronizationDiagnostic,
+  }));
+}
 
 const beginSession = (accessToken: string) => {
   if (activeAccessToken !== accessToken) {
@@ -68,6 +89,7 @@ const isUserRole = (role: unknown): role is UserRole =>
 async function resolveCurrentUser(accessToken: string): Promise<CurrentUserResponse> {
   return getApiClient().requestJson<CurrentUserResponse>('/me', {
     headers: { Authorization: `Bearer ${accessToken}` },
+    suppressUnauthorizedHandler: true,
   });
 }
 
@@ -78,28 +100,54 @@ const displayName = (user: User) => {
 };
 
 async function synchronizeSupabaseSession(session: Session): Promise<AuthenticatedUser> {
-  const revision = beginSession(session.access_token);
-  await provisionFirmForSignupSession(session);
-  if (revision !== sessionRevision) throw new Error('A newer authentication state replaced this session.');
-  const currentUser = await resolveCurrentUser(session.access_token);
-  if (revision !== sessionRevision) throw new Error('A newer authentication state replaced this session.');
-  if (!isUserRole(currentUser.role) || typeof currentUser.firmId !== 'string' || !currentUser.firmId) {
-    useAuthStore.getState().clearSession();
-    await supabase.auth.signOut({ scope: 'local' });
-    throw new Error('No firm membership is associated with this account. Request access or ask a firm administrator for an invitation.');
-  }
+  try {
+    const revision = beginSession(session.access_token);
+    try {
+      await provisionFirmForSignupSession(session);
+    } catch (error) {
+      throw toAuthSynchronizationError(error, 'provisioning');
+    }
+    if (revision !== sessionRevision) {
+      throw new AuthSynchronizationError('STALE_SESSION', 'A newer authentication state replaced this session.', {
+        stage: 'resolve-current-user', responseCode: 'STALE_SESSION',
+      });
+    }
 
-  const user: AuthenticatedUser = {
-    id: currentUser.userId,
-    email: currentUser.email,
-    fullName: displayName(session.user),
-    role: currentUser.role,
-    firmId: currentUser.firmId,
-    emailVerified: Boolean(session.user.email_confirmed_at),
-    onboardingRequired: session.user.user_metadata.onboarding_required === true,
-  };
-  useAuthStore.setState({ token: session.access_token, user, status: 'authenticated' });
-  return user;
+    let currentUser: CurrentUserResponse;
+    try {
+      currentUser = await resolveCurrentUser(session.access_token);
+    } catch (error) {
+      throw toAuthSynchronizationError(error, 'resolve-current-user');
+    }
+    if (revision !== sessionRevision) {
+      throw new AuthSynchronizationError('STALE_SESSION', 'A newer authentication state replaced this session.', {
+        stage: 'resolve-current-user', responseCode: 'STALE_SESSION',
+      });
+    }
+    if (!isUserRole(currentUser.role) || typeof currentUser.firmId !== 'string' || !currentUser.firmId) {
+      throw new AuthSynchronizationError('FIRM_MEMBERSHIP_MISSING', 'Firm membership is missing.', {
+        stage: 'role-routing', responseCode: 'FIRM_MEMBERSHIP_MISSING',
+      });
+    }
+
+    const user: AuthenticatedUser = {
+      id: currentUser.userId,
+      email: currentUser.email,
+      fullName: displayName(session.user),
+      role: currentUser.role,
+      firmId: currentUser.firmId,
+      emailVerified: Boolean(session.user.email_confirmed_at),
+      onboardingRequired: session.user.user_metadata.onboarding_required === true,
+    };
+    useAuthStore.setState({ token: session.access_token, user, status: 'authenticated' });
+    return user;
+  } catch (error) {
+    const synchronizationError = error instanceof AuthSynchronizationError
+      ? error
+      : toAuthSynchronizationError(error, 'resolve-current-user');
+    recordSynchronizationDiagnostic(synchronizationError.diagnostic);
+    throw synchronizationError;
+  }
 }
 
 export function syncSupabaseSession(session: Session): Promise<AuthenticatedUser> {

@@ -2,32 +2,23 @@ import { FACETS } from '../../../data/facets';
 import { LandingHeader } from '../LandingHeader';
 import { StatSection } from '../StatSection';
 import { CTASection } from '../CTASection';
-import { ShieldStatic } from '../ShieldStatic';
+import { HeroSection } from '../HeroSection';
+
+interface StaticExperienceProps {
+  logoAvailable?: boolean;
+  showShield?: boolean;
+}
 // prefers-reduced-motion tier — a fully static page. The shield renders once,
 // fully assembled, with no motion, no scroll listeners, and no 3D at all.
 // Same six-facet content as the animated tiers, in plain document flow.
-export function StaticExperience() {
+export function StaticExperience({ logoAvailable = true, showShield = true }: StaticExperienceProps) {
   return (
     <div
-      className="relative min-h-screen text-forge-text-onDark"
-      style={{ backgroundImage: 'linear-gradient(rgba(10,20,40,0.38), rgba(10,20,40,0.38)), url(/landingpagebg.webp)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundAttachment: 'scroll' }}
+      className="relative min-h-screen overflow-x-clip bg-forge-gradient text-forge-text-onDark"
     >
-      <LandingHeader />
+      <LandingHeader logoAvailable={logoAvailable} />
       <main>
-        <section className="min-h-[80vh] flex flex-col items-center justify-center text-center px-6 py-28">
-          <ShieldStatic size={240} animated={false} />
-          <p className="mt-8 font-mono text-xs md:text-sm tracking-[0.32em] text-forge-silver-400 uppercase">
-            Brand Protection, Forged
-          </p>
-          <h1 className="mt-4 max-w-3xl font-heading text-4xl font-normal leading-tight text-forge-text-onDark md:text-6xl">
-            Forge Global — Brand Protection and Intellectual Property Security
-          </h1>
-          <p className="mt-6 max-w-xl text-base md:text-lg text-forge-subtext-onDark">
-            One shield, six capabilities. Search, analyze, and protect trademarks
-            across every registry that matters — assembled into a single system of
-            record.
-          </p>
-        </section>
+        <HeroSection animated={false} showShield={showShield} />
         {FACETS.map((facet) =>
         <section
           key={facet.id}
@@ -44,7 +35,7 @@ export function StaticExperience() {
             </p>
           </section>
         )}
-        <StatSection shieldVisual={<ShieldStatic size={200} animated={false} />} />
+        <StatSection />
         <CTASection />
       </main>
     </div>);

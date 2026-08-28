@@ -1,23 +1,30 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useDeviceCapability } from '../hooks/useDeviceCapability';
-
-const FullExperience = lazy(() => import('../components/landing/experiences/FullExperience').then((module) => ({ default: module.FullExperience })));
-const LiteExperience = lazy(() => import('../components/landing/experiences/LiteExperience').then((module) => ({ default: module.LiteExperience })));
-const StaticExperience = lazy(() => import('../components/landing/experiences/StaticExperience').then((module) => ({ default: module.StaticExperience })));
+import { type LandingBootDependencies, useLandingBootGate } from '../hooks/useLandingBootGate';
+import { LandingBootLoader } from '../components/landing/LandingBootLoader';
+import { FullExperience } from '../components/landing/experiences/FullExperience';
+import { LiteExperience } from '../components/landing/experiences/LiteExperience';
+import { StaticExperience } from '../components/landing/experiences/StaticExperience';
 
 // Public, unauthenticated marketing route at "/" — the front door to Forge
 // Global, before login. Picks one of three experiences based on motion
 // preference and device capability; see hooks/useDeviceCapability.
-export function LandingPage() {
+export function LandingPage(bootDependencies: LandingBootDependencies = {}) {
   const tier = useDeviceCapability();
+  const bootState = useLandingBootGate(bootDependencies);
 
   useEffect(() => {
     document.title = 'Forge Global — Brand Protection and Intellectual Property Security';
   }, []);
 
-  return (
-    <Suspense fallback={<main className="flex min-h-screen items-center justify-center bg-forge-navy-950 text-forge-subtext-onDark" role="status">Loading Forge Global…</main>}>
-      {tier === 'static' ? <StaticExperience /> : tier === 'lite' ? <LiteExperience /> : <FullExperience />}
-    </Suspense>
-  );
+  if (bootState === 'loading') return <LandingBootLoader />;
+
+  const logoAvailable = bootState === 'ready';
+  const showShield = bootState === 'ready';
+
+  return tier === 'static'
+    ? <StaticExperience logoAvailable={logoAvailable} showShield={showShield} />
+    : tier === 'lite'
+      ? <LiteExperience logoAvailable={logoAvailable} showShield={showShield} />
+      : <FullExperience logoAvailable={logoAvailable} showShield={showShield} />;
 }

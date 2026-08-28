@@ -1,52 +1,35 @@
-import React, { Suspense, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { FACETS } from '../../../data/facets';
 import { useScrollAssembly } from '../../../hooks/useScrollAssembly';
 import { LandingHeader } from '../LandingHeader';
 import { HeroSection } from '../HeroSection';
 import { FacetSection } from '../FacetSection';
-import { FacetInfoCard } from '../FacetInfoCard';
 import { StatSection } from '../StatSection';
 import { CTASection } from '../CTASection';
 
-const ShieldScene = React.lazy(() =>
-import('../ShieldScene').then((m) => ({ default: m.ShieldScene }))
-);
+interface FullExperienceProps {
+  logoAvailable?: boolean;
+  showShield?: boolean;
+}
 
-// The full, interactive 3D experience — a Three.js shield that assembles as
-// the user scrolls through the six capability facets. Loaded only for
-// capable, motion-enabled devices; the R3F/three.js chunk is code-split via
-// React.lazy so it never touches the reduced-motion or low-power bundles.
-export function FullExperience() {
+// Capable devices retain the scroll-led content treatment, but the visual mark
+// is intentionally a complete in-flow SVG. A fixed, partially assembled 3D
+// scene put pieces over hero copy during startup and on compact viewports.
+export function FullExperience({ logoAvailable = true, showShield = true }: FullExperienceProps) {
   const sectionRefs = useMemo(
     () => FACETS.map(() => React.createRef<HTMLElement>()),
     []
   );
-  const { progressRef, activeFacetIndex } = useScrollAssembly(sectionRefs);
-  const [hoveredFacet, setHoveredFacet] = useState<number | null>(null);
-  const [selectedFacet, setSelectedFacet] = useState<number | null>(null);
-
-  const cardFacetIndex = hoveredFacet ?? selectedFacet;
-  const cardFacet = cardFacetIndex !== null ? FACETS[cardFacetIndex] : null;
+  const { activeFacetIndex } = useScrollAssembly(sectionRefs);
 
   return (
     <div
-      className="relative min-h-screen text-forge-text-onDark overflow-hidden"
-      style={{ backgroundImage: 'linear-gradient(rgba(10,20,40,0.38), rgba(10,20,40,0.38)), url(/landingpagebg.webp)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundAttachment: 'fixed' }}
+      className="relative min-h-screen overflow-x-clip bg-forge-gradient text-forge-text-onDark"
     >
-      <div className="fixed inset-0 z-0" aria-hidden="true">
-        <Suspense fallback={null}>
-          <ShieldScene
-            progressRef={progressRef}
-            onHover={setHoveredFacet}
-            onSelect={setSelectedFacet} />
-          
-        </Suspense>
-      </div>
-
-      <LandingHeader />
+      <LandingHeader logoAvailable={logoAvailable} />
 
       <main className="relative z-10">
-        <HeroSection />
+        <HeroSection showShield={showShield} />
         {FACETS.map((facet, i) =>
         <FacetSection
           key={facet.id}
@@ -58,8 +41,6 @@ export function FullExperience() {
         <StatSection />
         <CTASection />
       </main>
-
-      <FacetInfoCard facet={cardFacet} />
     </div>);
 
 }
