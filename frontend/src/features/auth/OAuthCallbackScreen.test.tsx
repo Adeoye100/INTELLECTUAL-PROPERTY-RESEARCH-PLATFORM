@@ -1,11 +1,11 @@
 import { StrictMode } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OAuthCallbackScreen } from './OAuthCallbackScreen';
 import { getLastAuthSynchronizationDiagnostic, useAuthStore } from './authStore';
 
-const auth = vi.hoisted(() => ({ exchangeCodeForSession: vi.fn(), getSession: vi.fn(), signOut: vi.fn() }));
+const auth = vi.hoisted(() => ({ exchangeCodeForSession: vi.fn(), getSession: vi.fn(), signOut: vi.fn(), signInWithOAuth: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { auth } }));
 
 afterEach(() => {
@@ -185,5 +185,22 @@ describe('OAuthCallbackScreen', () => {
 
     expect(await screen.findByRole('heading', { name: 'Dashboard destination' })).toBeVisible();
     expect(auth.getSession).toHaveBeenCalledOnce();
+  });
+
+  it('starts a fresh OAuth flow from Try again instead of reusing the callback code', async () => {
+    auth.exchangeCodeForSession.mockResolvedValue({
+      data: { session: null }, error: { code: 'USER_NOT_FOUND', message: 'application user missing' },
+    });
+    auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
+    auth.signInWithOAuth.mockResolvedValue({ data: { provider: 'google', url: null }, error: null });
+    render(<MemoryRouter initialEntries={['/auth/callback?code=single-use-code&next=%2Fdashboard']}><OAuthCallbackScreen /></MemoryRouter>);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(auth.signInWithOAuth).toHaveBeenCalledOnce());
+    expect(auth.signInWithOAuth).toHaveBeenCalledWith(expect.objectContaining({
+      provider: 'google',
+      options: expect.objectContaining({ redirectTo: expect.stringContaining('/auth/callback?next=%2Fdashboard') }),
+    }));
+    expect(auth.exchangeCodeForSession).toHaveBeenCalledOnce();
   });
 });
