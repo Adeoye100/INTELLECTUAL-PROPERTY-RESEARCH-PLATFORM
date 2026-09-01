@@ -1,5 +1,5 @@
-import { type ReactNode } from 'react';
-import { STATS } from '../../data/facets';
+import { type ReactNode } from "react";
+import { STATS } from "../../data/facets";
 
 interface StatSectionProps {
   shieldVisual?: ReactNode;
@@ -7,26 +7,49 @@ interface StatSectionProps {
 
 export function StatSection({ shieldVisual }: StatSectionProps) {
   return (
-    <section className="min-h-screen flex flex-col items-center justify-center px-6 py-24 text-center">
-      {shieldVisual}
-      <h2
-        className={`${shieldVisual ? 'mt-10' : ''} text-2xl md:text-3xl font-semibold text-forge-text-onDark max-w-2xl`}>
-        
-        One assembled shield. Every registry, every jurisdiction, one system of record.
-      </h2>
-      <dl className="mt-14 grid grid-cols-1 sm:grid-cols-3 gap-10 max-w-3xl w-full">
-        {STATS.map((stat) =>
-        <div key={stat.label} className="flex flex-col items-center">
-            <dt className="text-xs uppercase tracking-widest text-forge-silver-400">
-              {stat.label}
-            </dt>
-            <dd className="mt-2 font-mono text-4xl md:text-5xl font-semibold text-forge-text-onDark">
-              {stat.value}
-            </dd>
-            <p className="mt-2 text-sm text-forge-subtext-onDark">{stat.caption}</p>
+    <section
+      id="proof"
+      className="scroll-mt-20 bg-[color:var(--landing-hero)] px-6 py-24 text-white md:px-10 lg:py-28"
+    >
+      <div className="mx-auto max-w-[1240px]">
+        <div className="grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-end">
+          <div>
+            {shieldVisual}
+            <p className="font-subheading text-sm tracking-[0.22em] text-forge-subtext-onDark">
+              A platform with structure
+            </p>
+            <h2 className="mt-4 max-w-2xl text-5xl font-semibold leading-[0.95] tracking-[-0.035em] sm:text-6xl">
+              One clear system around the work that protects a brand.
+            </h2>
           </div>
-        )}
-      </dl>
-    </section>);
+          <p className="max-w-2xl text-base leading-7 text-white/68 lg:justify-self-end">
+            Forge Global brings the research lifecycle together while retaining
+            evidence, organization boundaries, and role-aware access at every
+            step.
+          </p>
+        </div>
 
+        <dl className="mt-14 grid border-y border-white/15 sm:grid-cols-3">
+          {STATS.map((stat, index) => (
+            <div
+              key={stat.label}
+              className={`flex min-h-[190px] flex-col justify-between py-7 sm:px-7 ${index > 0 ? "border-t border-white/15 sm:border-l sm:border-t-0" : ""}`}
+            >
+              <dt className="text-[10px] uppercase tracking-[0.2em] text-white/55">
+                {stat.label}
+              </dt>
+              <div className="mt-8">
+                <dd className="font-subheading text-6xl tracking-wide text-white md:text-7xl">
+                  {stat.value}
+                </dd>
+                <p className="mt-2 text-sm text-forge-subtext-onDark">
+                  {stat.caption}
+                </p>
+              </div>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </section>
+  );
 }

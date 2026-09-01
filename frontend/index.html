@@ -1,10 +1,29 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <meta name="theme-color" content="#061f25" />
+    <meta
+      name="description"
+      content="Forge Global unifies trademark search, confusion-risk analysis, monitoring, and portfolio intelligence for modern IP teams."
+    />
+    <title>Forge Global — Intellectual Property Research</title>
+    <script>
+      try {
+        const savedTheme = localStorage.getItem("forge-theme");
+        const prefersDark = window.matchMedia(
+          "(prefers-color-scheme: dark)",
+        ).matches;
+        document.documentElement.classList.toggle(
+          "dark",
+          savedTheme ? savedTheme === "dark" : prefersDark,
+        );
+      } catch {
+        document.documentElement.classList.add("dark");
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

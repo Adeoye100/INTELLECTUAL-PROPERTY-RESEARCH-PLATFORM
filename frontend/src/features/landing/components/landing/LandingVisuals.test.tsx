@@ -1,64 +1,79 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
-import { LandingHeader } from './LandingHeader';
-import { HeroSection } from './HeroSection';
+import { describe, it, expect } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { type ComponentProps } from "react";
+import { BrowserRouter } from "react-router-dom";
+import { LandingHeader } from "./LandingHeader";
+import { HeroSection } from "./HeroSection";
 
-describe('Landing Page Visual Regressions', () => {
-  describe('LandingHeader', () => {
-    it('uses nowrap for Sign in text', () => {
+function renderHero(props: ComponentProps<typeof HeroSection> = {}) {
+  return render(
+    <BrowserRouter>
+      <HeroSection {...props} />
+    </BrowserRouter>,
+  );
+}
+
+describe("Landing Page Visual Regressions", () => {
+  describe("LandingHeader", () => {
+    it("uses nowrap for Sign in text", () => {
       render(
         <BrowserRouter>
           <LandingHeader />
-        </BrowserRouter>
+        </BrowserRouter>,
       );
       const signInLink = screen.getByText(/Sign in/i);
-      expect(signInLink).toHaveClass('whitespace-nowrap');
+      expect(signInLink).toHaveClass("whitespace-nowrap");
     });
 
-    it('uses white color for Sign in link', () => {
+    it("uses white color for Sign in link", () => {
       render(
         <BrowserRouter>
           <LandingHeader />
-        </BrowserRouter>
+        </BrowserRouter>,
       );
       const signInLink = screen.getByText(/Sign in/i);
-      expect(signInLink).toHaveClass('text-white');
+      expect(signInLink).toHaveClass("text-white");
     });
 
-    it('has Request Access button with minimum height', () => {
+    it("has the primary organization action with a minimum touch target", () => {
       render(
         <BrowserRouter>
           <LandingHeader />
-        </BrowserRouter>
+        </BrowserRouter>,
       );
-      const requestAccessLink = screen.getByText(/Request Access/i);
-      expect(requestAccessLink).toHaveClass('min-h-[44px]');
+      const organizationLink = screen.getByText(/Create organization/i);
+      expect(organizationLink.closest("a")).toHaveClass("min-h-[44px]");
     });
   });
 
-  describe('HeroSection', () => {
-    it('uses the approved near-white text token for the paragraph', () => {
-      render(<HeroSection animated={false} />);
-      const paragraph = screen.getByText(/One shield, six capabilities/i);
-      expect(paragraph).toHaveClass('text-[#F7FAFC]');
+  describe("HeroSection", () => {
+    it("uses the approved near-white text token for the hero paragraph", () => {
+      renderHero({ animated: false });
+      const paragraph = screen.getByText(
+        /Search registries, examine confusion risk/i,
+      );
+      expect(paragraph).toHaveClass("text-[#F7FAFC]");
     });
 
-    it('contains a dark backing panel behind the hero paragraph', () => {
-      render(<HeroSection animated={false} />);
-      const paragraph = screen.getByText(/One shield, six capabilities/i);
-      const backingPanel = paragraph.previousElementSibling;
-      expect(backingPanel).toHaveClass('bg-[rgba(10,20,40,0.78)]');
+    it("uses the semantic brand hero surface", () => {
+      renderHero({ animated: false });
+      expect(screen.getByTestId("landing-hero")).toHaveClass(
+        "bg-[color:var(--landing-hero)]",
+      );
     });
 
-    it('renders the shield when showShield is true', () => {
-      render(<HeroSection animated={false} showShield={true} />);
-      expect(screen.getByRole('img', { name: /Forge Global shield mark/i })).toBeInTheDocument();
+    it("renders the shield when showShield is true", () => {
+      renderHero({ animated: false, showShield: true });
+      expect(
+        screen.getByRole("img", { name: /Forge Global shield mark/i }),
+      ).toBeInTheDocument();
     });
 
-    it('hides the shield when showShield is false', () => {
-      render(<HeroSection animated={false} showShield={false} />);
-      expect(screen.queryByRole('img', { name: /Forge Global shield mark/i })).not.toBeInTheDocument();
+    it("hides the shield when showShield is false", () => {
+      renderHero({ animated: false, showShield: false });
+      expect(
+        screen.queryByRole("img", { name: /Forge Global shield mark/i }),
+      ).not.toBeInTheDocument();
     });
   });
 });
