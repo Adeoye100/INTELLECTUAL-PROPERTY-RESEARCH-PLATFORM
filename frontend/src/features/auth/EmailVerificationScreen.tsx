@@ -6,12 +6,16 @@ import { supabase } from '../../lib/supabase';
 import { AuthApiError, authErrorMessage, toAuthApiError } from './authApi';
 import { authRedirectUrl } from './roleRouting';
 import { syncSupabaseSession } from './authStore';
+import { redeemInvitationForSession } from './invitationRedemption';
+import { provisionOrganizationForSession } from './organizationProvisioning';
 
 export function EmailVerificationScreen() {
   const { token } = useParams<{ token?: string }>();
   const [searchParams] = useSearchParams();
   const confirmationCode = searchParams.get('code') ?? token;
   const email = searchParams.get('email');
+  const invitationToken = searchParams.get('invitation');
+  const organizationIntentToken = searchParams.get('organization_intent');
   const [status, setStatus] = useState<'pending' | 'loading' | 'verified' | 'resent' | 'error'>(confirmationCode ? 'loading' : 'pending');
   const [error, setError] = useState<AuthApiError | null>(null);
   const statusRef = useRef<HTMLDivElement>(null);
@@ -22,6 +26,8 @@ export function EmailVerificationScreen() {
     exchangePromise.current ??= supabase.auth.exchangeCodeForSession(confirmationCode).then(async ({ data, error: exchangeError }) => {
       if (exchangeError) throw exchangeError;
       if (!data.session) throw new Error('Supabase did not return a session for this confirmation.');
+      if (invitationToken) await redeemInvitationForSession(data.session, invitationToken);
+      if (organizationIntentToken) await provisionOrganizationForSession(data.session, organizationIntentToken);
       await syncSupabaseSession(data.session);
     });
     try {
@@ -30,7 +36,7 @@ export function EmailVerificationScreen() {
       exchangePromise.current = null;
       throw error;
     }
-  }, [confirmationCode]);
+  }, [confirmationCode, invitationToken, organizationIntentToken]);
 
   const verify = useCallback(async () => {
     setStatus('loading'); setError(null);
@@ -60,7 +66,7 @@ export function EmailVerificationScreen() {
       const { error: resendError } = await supabase.auth.resend({
         type: 'signup',
         email,
-        options: { emailRedirectTo: authRedirectUrl('/auth/verify-email') },
+        options: { emailRedirectTo: (() => { const callback = new URL(authRedirectUrl('/auth/verify-email')); if (invitationToken) callback.searchParams.set('invitation', invitationToken); if (organizationIntentToken) callback.searchParams.set('organization_intent', organizationIntentToken); return callback.toString(); })() },
       });
       if (resendError) throw resendError;
       setStatus('resent');

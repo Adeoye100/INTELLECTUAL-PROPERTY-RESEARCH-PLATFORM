@@ -28,11 +28,7 @@ function testApp() {
     return next(unauthorized());
   };
   const app = express();
-  app.use('/api/v1', createProtectedRouter(authenticate, {
-    async issueInvitation() {
-      throw forbidden();
-    },
-  }, { includeDiagnosticRoutes: true }));
+  app.use('/api/v1', createProtectedRouter(authenticate, { includeDiagnosticRoutes: true }));
   app.use(errorHandler);
   return app;
 }
@@ -41,7 +37,7 @@ describe('protected routes', () => {
   it('does not mount diagnostic ping routes by default', async () => {
     const authenticate = (_request, _response, next) => next();
     const app = express();
-    app.use('/api/v1', createProtectedRouter(authenticate, { async issueInvitation() {} }));
+    app.use('/api/v1', createProtectedRouter(authenticate));
     const response = await request(app).get('/api/v1/admin/ping');
     assert.equal(response.status, 404);
   });

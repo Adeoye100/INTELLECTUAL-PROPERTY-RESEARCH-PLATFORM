@@ -60,12 +60,12 @@ function createTestApp({ calls = [] } = {}) {
   return createApp({
     authenticate,
     authenticateIdentity: authenticate,
-    authService: {
+    invitationService: {
       async invitationDetails() { return { invitation: null }; },
-      async acceptInvitation() { return { accepted: true }; },
-      async issueInvitation() { return { id: recordId }; },
+      async redeem() { return { accepted: true }; },
+      async issue() { return { id: recordId }; },
     },
-    provisioningService: { async provisionFirm() { return { firmId, userId }; } },
+    provisioningService: { async startOrganizationIntent() { return { intentToken: 'a'.repeat(48) }; }, async provisionFirm() { return { firmId, userId }; } },
     searchService: { async search() { return searchResponse(); } },
     searchResultService: {
       async persistSearch({ searchResponse: searched }) {
@@ -139,8 +139,8 @@ describe('Phase 2 mounted route inventory', () => {
     const app = createTestApp();
     const routes = [
       ['GET', '/api/v1/auth/invitations/test-token'],
-      ['POST', '/api/v1/auth/invitations/test-token/accept', { fullName: 'Test User' }],
-      ['POST', '/api/v1/provisioning/firm', { firmName: 'Test Firm' }, 'admin-token'],
+      ['POST', '/api/v1/auth/invitations/test-token/redeem'],
+      ['POST', '/api/v1/provisioning/organization-intents', { email: 'test@iprp.test', firmName: 'Test Firm' }], ['POST', '/api/v1/provisioning/firm', { intentToken: 'a'.repeat(48) }, 'admin-token'],
       ['GET', '/api/v1/me'],
       ['POST', '/api/v1/admin/invitations', { fullName: 'Test User', email: 'test@example.test', role: 'viewer' }],
       ['GET', '/api/v1/admin/ping'], ['GET', '/api/v1/attorney/ping', undefined, 'attorney-token'],
@@ -166,7 +166,7 @@ describe('Phase 2 mounted route inventory', () => {
     ];
     for (const [method, path, body, token] of routes) {
       let request_ = request(app)[method.toLowerCase()](path);
-      if (!path.startsWith('/api/v1/auth/')) request_ = authenticated(request_, token);
+      if (!path.startsWith('/api/v1/auth/') || method !== 'GET') request_ = authenticated(request_, token);
       if (body !== undefined) request_ = request_.send(body);
       const response = await request_;
       assert.notEqual(response.status, 404, `${method} ${path} must be mounted before the terminal 404 handler`);

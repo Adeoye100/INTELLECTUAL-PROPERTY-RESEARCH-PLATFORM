@@ -2,9 +2,9 @@ import React from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Logo } from '../components/Logo';
 import { 
-  Briefcase, 
   LayoutDashboard, 
-  LogOut
+  LogOut,
+  Users
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from '../components/Button';
@@ -12,6 +12,7 @@ import { useAuthStore } from '../features/auth/authStore';
 import { authRequest } from '../features/auth/authApi';
 import { SessionExpiryMonitor } from '../features/auth/SessionExpiryMonitor';
 import { appQueryClient } from '../lib/queryClient';
+import { navigationForRole } from '../features/auth/capabilities';
 
 export const MainLayout: React.FC = () => {
   const navigate = useNavigate();
@@ -61,8 +62,9 @@ export const MainLayout: React.FC = () => {
         {/* Sidebar */}
         <aside className="w-20 xl:w-64 bg-forge-navy-800 text-white flex flex-col sticky top-16 h-[calc(100vh-64px)] overflow-y-auto transition-[width]">
           <nav className="flex-1 p-3 xl:p-4 space-y-1" aria-label="Application">
-            <NavItem to="/dashboard" icon={<LayoutDashboard size={20} />} label="Dashboard" />
-            <NavItem to="/portfolio" icon={<Briefcase size={20} />} label="Portfolio (unavailable)" />
+            {navigationForRole(user?.role).map((item) => (
+              <NavItem key={item.to} to={item.to} icon={item.to === '/dashboard' ? <LayoutDashboard size={20} /> : <Users size={20} />} label={item.label} />
+            ))}
           </nav>
           
           <div className="p-4 border-t border-white/10">

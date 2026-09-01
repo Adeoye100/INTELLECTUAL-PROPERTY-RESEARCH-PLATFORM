@@ -1,3 +1,4 @@
+import { loadInvitationConfig } from './auth/invitation-config.js';
 function required(env, name) {
   const value = env[name]?.trim();
   if (!value) throw new Error(`Missing required environment variable: ${name}`);
@@ -448,6 +449,7 @@ export function loadSupabaseConfig(env = process.env) {
 
 export function loadConfig(env = process.env) {
   const environment = nodeEnvironment(env);
+  const invitationConfig = loadInvitationConfig(env, environment);
   const jwtAccessSecret = required(env, 'JWT_ACCESS_SECRET');
   if (Buffer.byteLength(jwtAccessSecret, 'utf8') < 32) {
     throw new Error('JWT_ACCESS_SECRET must contain at least 32 bytes.');
@@ -479,6 +481,7 @@ export function loadConfig(env = process.env) {
 
   return {
     environment,
+    ...invitationConfig,
     port: positiveInteger(env, 'PORT', 3000),
     ...database,
     ...httpServer,

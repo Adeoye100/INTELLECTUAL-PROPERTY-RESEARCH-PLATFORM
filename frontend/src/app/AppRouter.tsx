@@ -1,10 +1,11 @@
 import { Suspense, type ComponentType } from 'react';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { AuthLayout } from './AuthLayout';
 import { MainLayout } from './MainLayout';
 import { RouteErrorScreen, RouteLoading } from './RouteFeedback';
-import { RequireAuthentication, RoleHomeRedirect } from '../features/auth/RouteGuards';
+import { RequireAdmin, RequireAuthentication, RoleHomeRedirect } from '../features/auth/RouteGuards';
 import { FeatureUnavailable } from './FeatureUnavailable';
+import { AdminUsersScreen } from '../features/admin/AdminUsersScreen';
 
 type RouteModule = Record<string, ComponentType>;
 
@@ -27,9 +28,10 @@ const router = createBrowserRouter([
     errorElement: <RouteErrorScreen />,
     children: [
       { path: 'login', lazy: lazyComponent(() => import('../features/auth/LoginScreen'), 'LoginScreen') },
-      { path: 'signup', lazy: lazyComponent(() => import('../features/auth/SignupScreen'), 'SignupScreen') },
+      { path: 'create-organization', lazy: lazyComponent(() => import('../features/auth/CreateOrganizationScreen'), 'CreateOrganizationScreen') },
+      { path: 'signup', element: <Navigate to="/auth/create-organization" replace /> },
       { path: 'callback', lazy: lazyComponent(() => import('../features/auth/OAuthCallbackScreen'), 'OAuthCallbackScreen') },
-      { path: 'invite/:token', lazy: lazyComponent(() => import('../features/auth/InviteAcceptanceScreen'), 'InviteAcceptanceScreen') },
+      { path: 'invite/:token', lazy: lazyComponent(() => import('../features/auth/InviteRedemptionScreen'), 'InviteRedemptionScreen') },
       { path: 'forgot-password', lazy: lazyComponent(() => import('../features/auth/PasswordResetScreens'), 'PasswordResetRequestScreen') },
       { path: 'reset-password', lazy: lazyComponent(() => import('../features/auth/PasswordResetScreens'), 'PasswordUpdateScreen') },
       { path: 'reset-password/:token', lazy: lazyComponent(() => import('../features/auth/PasswordResetScreens'), 'PasswordUpdateScreen') },
@@ -51,7 +53,8 @@ const router = createBrowserRouter([
       { path: 'portfolio/:markId', element: <FeatureUnavailable title="Portfolio management is not available" detail="The existing frontend and backend portfolio contracts require reconciliation before this workflow can be safely enabled." /> },
       { path: 'watches', element: <FeatureUnavailable title="Watch monitoring is not available" detail="It remains disabled until Redis and the separate watch worker are configured and verified." /> },
       { path: 'permission-denied', lazy: lazyComponent(() => import('../features/auth/PermissionDeniedScreen'), 'PermissionDeniedScreen') },
-      { path: 'admin', element: <FeatureUnavailable title="Billing and administration are not available" detail="The current administration screen contains demonstration billing data. Billing is not implemented for the initial deployment." /> },
+      { path: 'admin', element: <RequireAdmin><Navigate to="/admin/users" replace /></RequireAdmin> },
+      { path: 'admin/users', element: <RequireAdmin><AdminUsersScreen /></RequireAdmin> },
     ],
   },
 ]);

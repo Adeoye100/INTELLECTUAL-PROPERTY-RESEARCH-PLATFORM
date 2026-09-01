@@ -6,7 +6,7 @@ import { errorHandler, unauthorized } from '../../src/errors.js';
 import { createProvisioningRouter } from '../../src/routes/provisioning-routes.js';
 
 describe('firm provisioning route', () => {
-  it('requires a bearer-authenticated identity and delegates only firmName plus that identity', async () => {
+  it('requires a bearer-authenticated identity and delegates only intentToken plus that identity', async () => {
     const identity = {
       userId: '11111111-1111-4111-8111-111111111111',
       email: 'admin@example.test',
@@ -25,21 +25,21 @@ describe('firm provisioning route', () => {
         call = { auth, body };
         return {
           user: { id: 'local-user', firmId: 'firm-1', email: auth.email, role: 'admin' },
-          firm: { id: 'firm-1', name: body.firmName, subscriptionTier: 'free' },
+          firm: { id: 'firm-1', name: body.intentToken, subscriptionTier: 'free' },
         };
       },
     }));
     app.use(errorHandler);
 
-    const missing = await request(app).post('/api/v1/provisioning/firm').send({ firmName: 'Forge' });
+    const missing = await request(app).post('/api/v1/provisioning/firm').send({ intentToken: 'a'.repeat(48) });
     assert.equal(missing.status, 401);
 
     const response = await request(app)
       .post('/api/v1/provisioning/firm')
       .set('Authorization', 'Bearer verified-token')
-      .send({ firmName: 'Forge Legal' });
+      .send({ intentToken: 'a'.repeat(48) });
     assert.equal(response.status, 201);
-    assert.deepEqual(call, { auth: identity, body: { firmName: 'Forge Legal' } });
+    assert.deepEqual(call, { auth: identity, body: { intentToken: 'a'.repeat(48) } });
     assert.equal(response.body.user.role, 'admin');
   });
 });

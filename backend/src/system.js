@@ -5,6 +5,10 @@ import {
 } from './auth/middleware.js';
 import { AuthService } from './auth/auth-service.js';
 import { ProvisioningService } from './auth/provisioning-service.js';
+import { OrganizationProvisioningRepository } from './auth/organization-provisioning-repository.js';
+import { InvitationRepository } from './auth/invitation-repository.js';
+import { InvitationService } from './auth/invitation-service.js';
+import { createInvitationMailer } from './auth/invitation-mailer.js';
 import { RedisRoleFirmResolver } from './auth/role-firm-resolver.js';
 import { SupabaseAdminUserService } from './auth/supabase-admin-user-service.js';
 import { SupabaseVerifier } from './auth/supabase-verifier.js';
@@ -53,6 +57,8 @@ export async function createSystem(config, { officeActionSources = [], exportSto
   });
 
   const pool = createPool(config.databaseUrl, config);
+  const organizationProvisioningRepository = new OrganizationProvisioningRepository(pool);
+  const invitationRepository = new InvitationRepository(pool);
   const redisClient = createClient({ url: config.redisUrl });
   redisClient.on('error', (error) => {
     console.error('Redis client error', { name: error.name, code: error.code ?? 'UNKNOWN' });
@@ -85,6 +91,10 @@ export async function createSystem(config, { officeActionSources = [], exportSto
   });
   const auditLogRepository = new AuditLogRepository(pool);
   const auditService = new AuditService({ repository: auditLogRepository });
+  const invitationService = new InvitationService({
+    invitationRepository, tokenService, invitationMailer: createInvitationMailer(config), auditService,
+    roleFirmResolver, supabaseAdminUserService, inviteTokenTtlSeconds: config.inviteTokenTtlSeconds,
+  });
   const exportAuditService = new ExportAuditService({ auditService });
   const searchResultRepository = new SearchResultRepository(pool);
   const searchResultService = new SearchResultService({ repository: searchResultRepository, auditService });
@@ -93,7 +103,7 @@ export async function createSystem(config, { officeActionSources = [], exportSto
     createResolveRoleAndFirm(roleFirmResolver),
   ];
   const authenticateIdentity = createSupabaseAuthenticate(supabaseVerifier);
-  const provisioningService = new ProvisioningService({ userRepository, roleFirmResolver });
+  const provisioningService = new ProvisioningService({ organizationProvisioningRepository, roleFirmResolver, supabaseAdminUserService, firmSignupEnabled: config.publicFirmSignupEnabled, organizationIntentTtlSeconds: config.organizationIntentTtlSeconds });
   const portfolioMarkRepository = new PortfolioMarkRepository(pool);
   const portfolioMarkService = new PortfolioMarkService({
     repository: portfolioMarkRepository, auditService,
@@ -122,7 +132,7 @@ export async function createSystem(config, { officeActionSources = [], exportSto
 
   return {
     app: createApp({
-      authService,
+      invitationService,
       authenticate,
       authenticateIdentity,
       provisioningService,
@@ -150,6 +160,9 @@ export async function createSystem(config, { officeActionSources = [], exportSto
     redisClient,
     authRateLimiter,
     authService,
+    invitationService,
+    invitationRepository,
+    organizationProvisioningRepository,
     provisioningService,
     portfolioMarkRepository,
     portfolioMarkService,

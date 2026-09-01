@@ -167,7 +167,7 @@ describe('Redis-backed authentication rate limiter', () => {
     app.use('/api/v1/auth', createAuthRouter({
       async invitationDetails(token) { calls.push(token); return { token }; },
       async acceptInvitation() { return {}; },
-    }, { authRateLimiter: limiter }));
+    }, (_request, _response, next) => next(), { authRateLimiter: limiter }));
     app.use((_request, response) => response.status(404).json({ code: 'NOT_FOUND' }));
     app.use(errorHandler);
 

@@ -1,12 +1,10 @@
 import type { UserRole } from '../../types';
 
-export const roleHomePath = (role: UserRole) => {
-  // Billing, search, watches, and the legacy portfolio UI remain unavailable
-  // in the initial deployment profile. Every role therefore lands on the
-  // server-backed dashboard after authentication.
-  void role;
-  return '/dashboard';
-};
+export const roleHomePath = (role: UserRole) => ({
+  admin: '/dashboard',
+  attorney: '/dashboard',
+  viewer: '/dashboard',
+}[role]);
 
 const callbackPaths = new Set(['/auth/callback', '/auth/reset-password', '/auth/verify-email']);
 

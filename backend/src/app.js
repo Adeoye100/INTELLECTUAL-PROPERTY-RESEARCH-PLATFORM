@@ -4,6 +4,7 @@ import { errorHandler } from './errors.js';
 import { createAuthRouter } from './routes/auth-routes.js';
 import { createProtectedRouter } from './routes/protected-routes.js';
 import { createProvisioningRouter } from './routes/provisioning-routes.js';
+import { createAdminRouter } from './routes/admin-routes.js';
 import { createSearchRouter } from './routes/search-routes.js';
 import { createSearchResultRouter } from './routes/search-result-routes.js';
 import { createPortfolioMarkRouter } from './routes/portfolio-mark-routes.js';
@@ -24,7 +25,7 @@ import {
 } from './http-security.js';
 
 export function createApp({
-  authService, authenticate, authenticateIdentity, provisioningService, searchService = null,
+  invitationService = null, authenticate, authenticateIdentity, provisioningService, searchService = null,
   searchResultService = null,
   portfolioMarkService = null,
   watchService = null,
@@ -56,12 +57,15 @@ export function createApp({
   app.use(express.json({ limit: MAX_JSON_BODY_BYTES }));
   app.use(createHealthRouter({ readinessChecks }));
 
-  app.use('/api/v1/auth', createAuthRouter(authService, { authRateLimiter }));
+  app.use('/api/v1/auth', createAuthRouter(invitationService, authenticateIdentity, { authRateLimiter }));
   app.use(
     '/api/v1/provisioning',
     createProvisioningRouter(authenticateIdentity, provisioningService, { authRateLimiter }),
   );
-  app.use('/api/v1', createProtectedRouter(authenticate, authService, {
+  if (invitationService && userRoleService) {
+    app.use('/api/v1/admin', createAdminRouter(authenticate, invitationService, userRoleService, { authRateLimiter }));
+  }
+  app.use('/api/v1', createProtectedRouter(authenticate, {
     authRateLimiter,
     includeDiagnosticRoutes,
   }));

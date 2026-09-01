@@ -31,6 +31,11 @@ export function userRoleAuditSnapshot(record) {
   return pick(record, ['id', 'role', 'active']);
 }
 
+/** Invitation snapshots deliberately omit opaque token material. */
+export function invitationAuditSnapshot(record) {
+  return pick(record, ['id', 'email', 'intendedName', 'role', 'expiresAt', 'usedAt', 'acceptedAt', 'revokedAt', 'supersededBy', 'lastSentAt', 'status']);
+}
+
 export function officeActionRefAuditSnapshot(record) {
   return pick(record, [
     'id', 'portfolioMarkId', 'sourceRegistry', 'sourceReferenceId', 'applicationNumber',

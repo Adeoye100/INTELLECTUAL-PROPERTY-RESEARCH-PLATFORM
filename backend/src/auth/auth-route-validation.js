@@ -18,12 +18,21 @@ function validText(value, minimum, maximum = 200) {
 
 export function validateFirmProvisioning(request, _response, next) {
   try {
-    requireObjectWithOnly(request.body, new Set(['firmName']));
-    if (!validText(request.body.firmName, 2)) rejectInvalidBody();
+    requireObjectWithOnly(request.body, new Set(['intentToken']));
+    if (!validText(request.body.intentToken, 40, 128)) rejectInvalidBody();
     next();
   } catch (error) {
     next(error);
   }
+}
+
+export function validateOrganizationIntent(request, _response, next) {
+  try {
+    requireObjectWithOnly(request.body, new Set(['email', 'firmName']));
+    if (typeof request.body.email !== 'string' || !EMAIL_PATTERN.test(request.body.email.trim())
+      || !validText(request.body.firmName, 2)) rejectInvalidBody();
+    next();
+  } catch (error) { next(error); }
 }
 
 export function validateInvitationAcceptance(request, _response, next) {

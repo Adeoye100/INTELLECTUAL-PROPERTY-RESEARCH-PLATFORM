@@ -7,8 +7,8 @@ export function CTASection() {
           Forge your brand's defense.
         </h2>
         <p className="mt-5 max-w-lg text-base md:text-lg text-forge-subtext-onDark">
-          Create a new firm or join an existing firm by invitation to protect your trademark
-          portfolio today.
+          Start a new firm or join an existing firm by invitation to protect your trademark
+          portfolio.
         </p>
         <div className="mt-10 flex flex-col sm:flex-row items-center gap-4">
           <Link

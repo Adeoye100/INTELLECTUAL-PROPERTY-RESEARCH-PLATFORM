@@ -221,6 +221,7 @@ describe('production deployment configuration', () => {
     DATABASE_SSL: 'true',
     REDIS_URL: 'rediss://default:password@redis.provider.test:6380/0',
     CORS_ALLOWED_ORIGINS: 'https://app.iprp.test,https://preview.iprp.test',
+    PUBLIC_APP_URL: 'https://app.iprp.test',
     TRUST_PROXY_HOPS: '1',
     SUPABASE_URL: 'https://project-ref.supabase.co',
     SUPABASE_SECRET_KEY: 'server-only-key-sufficiently-long-for-production',

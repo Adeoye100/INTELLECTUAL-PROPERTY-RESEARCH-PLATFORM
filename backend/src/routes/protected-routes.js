@@ -1,9 +1,8 @@
 import { Router } from 'express';
 import { requireFirm, requireRole } from '../auth/middleware.js';
 import { createAuthIpRateLimit, resolveTrustedClientAddress } from '../auth/auth-rate-limiter.js';
-import { validateInvitationIssue } from '../auth/auth-route-validation.js';
 
-export function createProtectedRouter(authenticate, authService, {
+export function createProtectedRouter(authenticate, {
   authRateLimiter = null,
   includeDiagnosticRoutes = false,
 } = {}) {
@@ -22,17 +21,6 @@ export function createProtectedRouter(authenticate, authService, {
     });
   });
 
-  router.post(
-    '/admin/invitations',
-    resolveTrustedClientAddress,
-    invitationIpLimit,
-    validateInvitationIssue,
-    authenticate,
-    requireRole(['admin']),
-    async (request, response) => {
-      response.status(201).json(await authService.issueInvitation(request.auth, request.body));
-    },
-  );
 
   if (includeDiagnosticRoutes) {
     router.get('/admin/ping', authenticate, requireRole(['admin']), (_request, response) => {

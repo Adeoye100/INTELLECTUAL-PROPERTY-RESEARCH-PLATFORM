@@ -166,7 +166,7 @@ export const LoginScreen: React.FC = () => {
       <div className="border-t border-forge-silver-100 pt-4 text-center">
         <p className="text-sm text-text-secondary">
           Don&apos;t have an account?{' '}
-          <Link to="/auth/signup" className="font-bold text-accent hover:underline">Request access</Link>
+          <Link to="/auth/create-organization" className="font-bold text-accent hover:underline">Create organization</Link>
         </p>
       </div>
     </div>

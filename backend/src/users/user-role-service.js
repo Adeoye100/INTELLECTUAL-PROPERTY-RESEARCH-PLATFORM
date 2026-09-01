@@ -53,6 +53,9 @@ export class UserRoleService {
     const scopedActorUserId = uuid(actorUserId, 'actorUserId');
     const scopedTargetUserId = uuid(targetUserId, 'id');
     const role = parseUserRoleChange(input);
+    if (scopedActorUserId === scopedTargetUserId) {
+      throw conflict('SELF_ROLE_CHANGE_FORBIDDEN', 'Users cannot change their own role.');
+    }
     return this.userRepository.withTransaction(async (transaction) => {
       const before = await this.userRepository.findRoleTargetForUpdate({
         firmId: scopedFirmId, userId: scopedTargetUserId, transaction,

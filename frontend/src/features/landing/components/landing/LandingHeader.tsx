@@ -33,10 +33,10 @@ export function LandingHeader({ logoAvailable = true }: LandingHeaderProps) {
             Sign in
           </Link>
           <Link
-            to="/auth/signup"
+            to="/auth/create-organization"
             className="inline-flex min-h-[44px] items-center whitespace-nowrap rounded-full border border-forge-silver-400/50 bg-forge-silver-100/5 px-4 py-2 text-xs font-medium text-forge-text-onDark transition-colors hover:bg-forge-silver-100/15 sm:text-sm"
           >
-            Request Access
+            Create organization
           </Link>
         </nav>
       </div>

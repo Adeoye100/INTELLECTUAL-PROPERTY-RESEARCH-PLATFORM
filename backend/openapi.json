@@ -1,110 +1,2199 @@
 {
   "openapi": "3.1.0",
-  "info": { "title": "IPRP Backend API", "version": "2.0.0", "description": "Server-enforced firm tenancy. BE-14 billing is deferred and has no endpoint." },
-  "servers": [{ "url": "https://api.example.invalid", "description": "Replace only with an approved environment." }],
-  "security": [{ "bearerAuth": [] }],
+  "info": {
+    "title": "IPRP Backend API",
+    "version": "2.0.0",
+    "description": "Server-enforced firm tenancy. BE-14 billing is deferred and has no endpoint."
+  },
+  "servers": [
+    {
+      "url": "https://api.example.invalid",
+      "description": "Replace only with an approved environment."
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
   "paths": {
-    "/healthz": { "get": { "operationId": "healthz", "security": [], "responses": { "200": { "$ref": "#/components/responses/Health" } } } },
-    "/readyz": { "get": { "operationId": "readyz", "security": [], "responses": { "200": { "$ref": "#/components/responses/Readiness" }, "503": { "$ref": "#/components/responses/Error" } } } },
-    "/api/v1/auth/invitations/{token}": { "get": { "operationId": "invitationDetails", "security": [], "parameters": [{ "$ref": "#/components/parameters/token" }], "responses": { "200": { "$ref": "#/components/responses/Invitation" }, "400": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/Error" } } } },
-    "/api/v1/auth/invitations/{token}/accept": { "post": { "operationId": "acceptInvitation", "security": [], "parameters": [{ "$ref": "#/components/parameters/token" }], "requestBody": { "$ref": "#/components/requestBodies/InvitationAccept" }, "responses": { "201": { "$ref": "#/components/responses/Firm" }, "400": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/Error" } } } },
-    "/api/v1/provisioning/firm": { "post": { "operationId": "provisionFirm", "x-roles": ["verified identity"], "requestBody": { "$ref": "#/components/requestBodies/Firm" }, "responses": { "201": { "$ref": "#/components/responses/Firm" }, "400": { "$ref": "#/components/responses/Error" }, "401": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/Error" } } } },
-    "/api/v1/me": { "get": { "operationId": "currentMembership", "x-roles": ["admin", "attorney", "viewer"], "responses": { "200": { "$ref": "#/components/responses/Me" }, "401": { "$ref": "#/components/responses/Error" } } } },
-    "/api/v1/dashboard/analytics": { "get": { "operationId": "dashboardAnalytics", "x-roles": ["admin", "attorney", "viewer"], "parameters": [{ "name": "range", "in": "query", "schema": { "enum": ["7d", "30d", "90d"], "default": "30d" } }], "responses": { "200": { "$ref": "#/components/responses/DashboardAnalytics" }, "400": { "$ref": "#/components/responses/Error" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" } } } },
-    "/api/v1/admin/invitations": { "post": { "operationId": "issueInvitation", "x-roles": ["admin"], "requestBody": { "$ref": "#/components/requestBodies/InvitationIssue" }, "responses": { "201": { "$ref": "#/components/responses/Invitation" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/Error" } } } },
-    "/api/v1/search": { "get": { "operationId": "search", "x-roles": ["admin", "attorney", "viewer"], "x-featureGate": "SEARCH_ENABLED", "parameters": [{ "$ref": "#/components/parameters/mark" }, { "$ref": "#/components/parameters/jurisdiction" }, { "$ref": "#/components/parameters/niceClass" }], "responses": { "200": { "$ref": "#/components/responses/Search" }, "400": { "$ref": "#/components/responses/Error" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" }, "404": { "description": "Search feature disabled.", "$ref": "#/components/responses/Error" } } } },
-    "/api/v1/search-results": { "get": { "operationId": "listSearchResults", "x-roles": ["admin", "attorney", "viewer"], "parameters": [{ "$ref": "#/components/parameters/cursor" }, { "$ref": "#/components/parameters/pageSize" }], "responses": { "200": { "$ref": "#/components/responses/SearchResultList" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" } } } },
-    "/api/v1/search-results/{id}": { "get": { "operationId": "getSearchResult", "x-roles": ["admin", "attorney", "viewer"], "parameters": [{ "$ref": "#/components/parameters/id" }], "responses": { "200": { "$ref": "#/components/responses/SearchResult" }, "401": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" } } } },
-    "/api/v1/office-actions/search": { "get": { "operationId": "searchOfficeActions", "x-roles": ["admin", "attorney", "viewer"], "x-featureGate": "OFFICE_ACTION_SEARCH_ENABLED", "parameters": [{ "$ref": "#/components/parameters/officeActionMark" }], "responses": { "200": { "$ref": "#/components/responses/OfficeActionSearch" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" } } } },
-    "/api/v1/portfolio-marks": { "get": { "operationId": "listPortfolioMarks", "x-roles": ["admin", "attorney", "viewer"], "parameters": [{ "$ref": "#/components/parameters/pageSize" }], "responses": { "200": { "$ref": "#/components/responses/PortfolioList" }, "401": { "$ref": "#/components/responses/Error" } } }, "post": { "operationId": "createPortfolioMark", "x-roles": ["admin", "attorney"], "requestBody": { "$ref": "#/components/requestBodies/PortfolioMark" }, "responses": { "201": { "$ref": "#/components/responses/PortfolioMark" }, "400": { "$ref": "#/components/responses/Error" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" } } } },
-    "/api/v1/portfolio-marks/{id}": { "get": { "operationId": "getPortfolioMark", "x-roles": ["admin", "attorney", "viewer"], "parameters": [{ "$ref": "#/components/parameters/id" }], "responses": { "200": { "$ref": "#/components/responses/PortfolioMark" }, "404": { "$ref": "#/components/responses/Error" } } }, "patch": { "operationId": "updatePortfolioMark", "x-roles": ["admin", "attorney"], "parameters": [{ "$ref": "#/components/parameters/id" }], "requestBody": { "$ref": "#/components/requestBodies/PortfolioMarkPatch" }, "responses": { "200": { "$ref": "#/components/responses/PortfolioMark" }, "400": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" } } }, "delete": { "operationId": "deletePortfolioMark", "x-roles": ["admin", "attorney"], "parameters": [{ "$ref": "#/components/parameters/id" }], "responses": { "204": { "description": "Deleted." }, "403": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" } } } },
-    "/api/v1/watches": { "get": { "operationId": "listWatches", "x-roles": ["admin", "attorney", "viewer"], "responses": { "200": { "$ref": "#/components/responses/WatchList" } } }, "post": { "operationId": "createWatch", "x-roles": ["admin", "attorney"], "requestBody": { "$ref": "#/components/requestBodies/Watch" }, "responses": { "201": { "$ref": "#/components/responses/Watch" }, "400": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" } } } },
-    "/api/v1/watches/{id}": { "get": { "operationId": "getWatch", "x-roles": ["admin", "attorney", "viewer"], "parameters": [{ "$ref": "#/components/parameters/id" }], "responses": { "200": { "$ref": "#/components/responses/Watch" }, "404": { "$ref": "#/components/responses/Error" } } }, "patch": { "operationId": "updateWatch", "x-roles": ["admin", "attorney"], "parameters": [{ "$ref": "#/components/parameters/id" }], "requestBody": { "$ref": "#/components/requestBodies/WatchPatch" }, "responses": { "200": { "$ref": "#/components/responses/Watch" }, "400": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" } } }, "delete": { "operationId": "deleteWatch", "x-roles": ["admin", "attorney"], "parameters": [{ "$ref": "#/components/parameters/id" }], "responses": { "204": { "description": "Deleted." }, "404": { "$ref": "#/components/responses/Error" } } } },
-    "/api/v1/alerts": { "get": { "operationId": "listAlerts", "x-roles": ["admin", "attorney", "viewer"], "responses": { "200": { "$ref": "#/components/responses/AlertList" } } } },
-    "/api/v1/alerts/{id}": { "get": { "operationId": "getAlert", "x-roles": ["admin", "attorney", "viewer"], "parameters": [{ "$ref": "#/components/parameters/id" }], "responses": { "200": { "$ref": "#/components/responses/Alert" }, "404": { "$ref": "#/components/responses/Error" } } }, "patch": { "operationId": "transitionAlert", "x-roles": ["admin", "attorney"], "parameters": [{ "$ref": "#/components/parameters/id" }], "requestBody": { "$ref": "#/components/requestBodies/AlertAction" }, "responses": { "200": { "$ref": "#/components/responses/Alert" }, "400": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" } } } },
-    "/api/v1/audit-logs": { "get": { "operationId": "listAuditLogs", "x-roles": ["admin"], "parameters": [{ "$ref": "#/components/parameters/cursor" }, { "$ref": "#/components/parameters/pageSize" }], "responses": { "200": { "$ref": "#/components/responses/AuditList" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" } } } },
-    "/api/v1/users/{id}/role": { "patch": { "operationId": "changeUserRole", "x-roles": ["admin"], "parameters": [{ "$ref": "#/components/parameters/id" }], "requestBody": { "$ref": "#/components/requestBodies/Role" }, "responses": { "200": { "$ref": "#/components/responses/Me" }, "400": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" } } } },
-    "/api/v1/portfolio-marks/{portfolioMarkId}/office-action-refs": { "get": { "operationId": "listOfficeActionRefs", "x-roles": ["admin", "attorney", "viewer"], "parameters": [{ "$ref": "#/components/parameters/portfolioMarkId" }], "responses": { "200": { "$ref": "#/components/responses/OfficeActionList" }, "404": { "$ref": "#/components/responses/Error" } } }, "post": { "operationId": "createOfficeActionRef", "x-roles": ["admin", "attorney"], "parameters": [{ "$ref": "#/components/parameters/portfolioMarkId" }], "requestBody": { "$ref": "#/components/requestBodies/OfficeAction" }, "responses": { "201": { "$ref": "#/components/responses/OfficeAction" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" } } } },
-    "/api/v1/portfolio-marks/{portfolioMarkId}/office-action-refs/{id}": { "get": { "operationId": "getOfficeActionRef", "x-roles": ["admin", "attorney", "viewer"], "parameters": [{ "$ref": "#/components/parameters/portfolioMarkId" }, { "$ref": "#/components/parameters/id" }], "responses": { "200": { "$ref": "#/components/responses/OfficeAction" }, "404": { "$ref": "#/components/responses/Error" } } }, "patch": { "operationId": "updateOfficeActionRef", "x-roles": ["admin", "attorney"], "parameters": [{ "$ref": "#/components/parameters/portfolioMarkId" }, { "$ref": "#/components/parameters/id" }], "requestBody": { "$ref": "#/components/requestBodies/OfficeActionPatch" }, "responses": { "200": { "$ref": "#/components/responses/OfficeAction" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" } } }, "delete": { "operationId": "deleteOfficeActionRef", "x-roles": ["admin", "attorney"], "parameters": [{ "$ref": "#/components/parameters/portfolioMarkId" }, { "$ref": "#/components/parameters/id" }], "responses": { "204": { "description": "Deleted." }, "404": { "$ref": "#/components/responses/Error" } } } },
-    "/api/v1/exports": { "get": { "operationId": "listExports", "x-roles": ["admin", "attorney"], "x-featureGate": "PDF_EXPORT_ENABLED", "parameters": [{ "$ref": "#/components/parameters/cursor" }, { "$ref": "#/components/parameters/pageSize" }], "responses": { "200": { "$ref": "#/components/responses/ExportList" }, "404": { "$ref": "#/components/responses/Error" } } }, "post": { "operationId": "createExport", "x-roles": ["admin", "attorney"], "x-featureGate": "PDF_EXPORT_ENABLED", "requestBody": { "$ref": "#/components/requestBodies/Export" }, "responses": { "202": { "$ref": "#/components/responses/Export" }, "200": { "$ref": "#/components/responses/Export" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" } } } },
-    "/api/v1/exports/{id}": { "get": { "operationId": "getExport", "x-roles": ["admin", "attorney"], "x-featureGate": "PDF_EXPORT_ENABLED", "parameters": [{ "$ref": "#/components/parameters/id" }], "responses": { "200": { "$ref": "#/components/responses/Export" }, "404": { "$ref": "#/components/responses/Error" } } } },
-    "/api/v1/exports/{id}/download": { "get": { "operationId": "downloadExport", "x-roles": ["admin", "attorney"], "x-featureGate": "PDF_EXPORT_ENABLED", "parameters": [{ "$ref": "#/components/parameters/id" }], "responses": { "200": { "description": "Private PDF attachment after integrity check.", "content": { "application/pdf": { "schema": { "type": "string", "format": "binary" } } } }, "404": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } } }
+    "/healthz": {
+      "get": {
+        "operationId": "healthz",
+        "security": [],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Health"
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "operationId": "readyz",
+        "security": [],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Readiness"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/invitations/{token}": {
+      "get": {
+        "operationId": "invitationDetails",
+        "security": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Invitation"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/provisioning/firm": {
+      "post": {
+        "operationId": "provisionFirm",
+        "x-roles": [
+          "verified identity"
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/Firm"
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/Firm"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "operationId": "currentMembership",
+        "x-roles": [
+          "admin",
+          "attorney",
+          "viewer"
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Me"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/dashboard/analytics": {
+      "get": {
+        "operationId": "dashboardAnalytics",
+        "x-roles": [
+          "admin",
+          "attorney",
+          "viewer"
+        ],
+        "parameters": [
+          {
+            "name": "range",
+            "in": "query",
+            "schema": {
+              "enum": [
+                "7d",
+                "30d",
+                "90d"
+              ],
+              "default": "30d"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/DashboardAnalytics"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/invitations": {
+      "get": {
+        "operationId": "listAdminInvitations",
+        "x-roles": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Invitation"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "issueInvitation",
+        "x-roles": [
+          "admin"
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/InvitationIssue"
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/Invitation"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/search": {
+      "get": {
+        "operationId": "search",
+        "x-roles": [
+          "admin",
+          "attorney",
+          "viewer"
+        ],
+        "x-featureGate": "SEARCH_ENABLED",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/mark"
+          },
+          {
+            "$ref": "#/components/parameters/jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/niceClass"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Search"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "description": "Search feature disabled.",
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/search-results": {
+      "get": {
+        "operationId": "listSearchResults",
+        "x-roles": [
+          "admin",
+          "attorney",
+          "viewer"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/cursor"
+          },
+          {
+            "$ref": "#/components/parameters/pageSize"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SearchResultList"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/search-results/{id}": {
+      "get": {
+        "operationId": "getSearchResult",
+        "x-roles": [
+          "admin",
+          "attorney",
+          "viewer"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SearchResult"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/office-actions/search": {
+      "get": {
+        "operationId": "searchOfficeActions",
+        "x-roles": [
+          "admin",
+          "attorney",
+          "viewer"
+        ],
+        "x-featureGate": "OFFICE_ACTION_SEARCH_ENABLED",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/officeActionMark"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/OfficeActionSearch"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/portfolio-marks": {
+      "get": {
+        "operationId": "listPortfolioMarks",
+        "x-roles": [
+          "admin",
+          "attorney",
+          "viewer"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/pageSize"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/PortfolioList"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createPortfolioMark",
+        "x-roles": [
+          "admin",
+          "attorney"
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/PortfolioMark"
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/PortfolioMark"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/portfolio-marks/{id}": {
+      "get": {
+        "operationId": "getPortfolioMark",
+        "x-roles": [
+          "admin",
+          "attorney",
+          "viewer"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/PortfolioMark"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updatePortfolioMark",
+        "x-roles": [
+          "admin",
+          "attorney"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/PortfolioMarkPatch"
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/PortfolioMark"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deletePortfolioMark",
+        "x-roles": [
+          "admin",
+          "attorney"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/watches": {
+      "get": {
+        "operationId": "listWatches",
+        "x-roles": [
+          "admin",
+          "attorney",
+          "viewer"
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/WatchList"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createWatch",
+        "x-roles": [
+          "admin",
+          "attorney"
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/Watch"
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/Watch"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/watches/{id}": {
+      "get": {
+        "operationId": "getWatch",
+        "x-roles": [
+          "admin",
+          "attorney",
+          "viewer"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Watch"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateWatch",
+        "x-roles": [
+          "admin",
+          "attorney"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/WatchPatch"
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Watch"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteWatch",
+        "x-roles": [
+          "admin",
+          "attorney"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/alerts": {
+      "get": {
+        "operationId": "listAlerts",
+        "x-roles": [
+          "admin",
+          "attorney",
+          "viewer"
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/AlertList"
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}": {
+      "get": {
+        "operationId": "getAlert",
+        "x-roles": [
+          "admin",
+          "attorney",
+          "viewer"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Alert"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "transitionAlert",
+        "x-roles": [
+          "admin",
+          "attorney"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/AlertAction"
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Alert"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/audit-logs": {
+      "get": {
+        "operationId": "listAuditLogs",
+        "x-roles": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/cursor"
+          },
+          {
+            "$ref": "#/components/parameters/pageSize"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/AuditList"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/users/{id}/role": {
+      "patch": {
+        "operationId": "changeUserRole",
+        "x-roles": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/Role"
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Me"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/portfolio-marks/{portfolioMarkId}/office-action-refs": {
+      "get": {
+        "operationId": "listOfficeActionRefs",
+        "x-roles": [
+          "admin",
+          "attorney",
+          "viewer"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/portfolioMarkId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/OfficeActionList"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createOfficeActionRef",
+        "x-roles": [
+          "admin",
+          "attorney"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/portfolioMarkId"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/OfficeAction"
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/OfficeAction"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/portfolio-marks/{portfolioMarkId}/office-action-refs/{id}": {
+      "get": {
+        "operationId": "getOfficeActionRef",
+        "x-roles": [
+          "admin",
+          "attorney",
+          "viewer"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/portfolioMarkId"
+          },
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/OfficeAction"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateOfficeActionRef",
+        "x-roles": [
+          "admin",
+          "attorney"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/portfolioMarkId"
+          },
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/OfficeActionPatch"
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/OfficeAction"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteOfficeActionRef",
+        "x-roles": [
+          "admin",
+          "attorney"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/portfolioMarkId"
+          },
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/exports": {
+      "get": {
+        "operationId": "listExports",
+        "x-roles": [
+          "admin",
+          "attorney"
+        ],
+        "x-featureGate": "PDF_EXPORT_ENABLED",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/cursor"
+          },
+          {
+            "$ref": "#/components/parameters/pageSize"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ExportList"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createExport",
+        "x-roles": [
+          "admin",
+          "attorney"
+        ],
+        "x-featureGate": "PDF_EXPORT_ENABLED",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/Export"
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Export"
+          },
+          "202": {
+            "$ref": "#/components/responses/Export"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/exports/{id}": {
+      "get": {
+        "operationId": "getExport",
+        "x-roles": [
+          "admin",
+          "attorney"
+        ],
+        "x-featureGate": "PDF_EXPORT_ENABLED",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Export"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/exports/{id}/download": {
+      "get": {
+        "operationId": "downloadExport",
+        "x-roles": [
+          "admin",
+          "attorney"
+        ],
+        "x-featureGate": "PDF_EXPORT_ENABLED",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private PDF attachment after integrity check.",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/invitations/{token}/redeem": {
+      "post": {
+        "operationId": "redeemInvitation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/token"
+          }
+        ],
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/Firm"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/provisioning/organization-intents": {
+      "post": {
+        "operationId": "startOrganizationIntent",
+        "security": [],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/OrganizationIntent"
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/Firm"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users": {
+      "get": {
+        "operationId": "listAdminUsers",
+        "x-roles": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Invitation"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/invitations/{invitationId}/resend": {
+      "post": {
+        "operationId": "resendInvitation",
+        "x-roles": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "invitationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Invitation"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/invitations/{invitationId}": {
+      "delete": {
+        "operationId": "revokeInvitation",
+        "x-roles": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "invitationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Revoked."
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users/{userId}/role": {
+      "patch": {
+        "operationId": "changeAdminUserRole",
+        "x-roles": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/Role"
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Invitation"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    }
   },
   "components": {
-    "securitySchemes": { "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT", "description": "Verified Supabase access token; refresh/session ownership remains with Supabase." } },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Verified Supabase access token; refresh/session ownership remains with Supabase."
+      }
+    },
     "parameters": {
-      "id": { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
-      "firmId": { "name": "firmId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" }, "description": "Must equal verified membership; clients cannot select another firm." },
-      "portfolioMarkId": { "name": "portfolioMarkId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
-      "token": { "name": "token", "in": "path", "required": true, "schema": { "type": "string", "maxLength": 512 } },
-      "mark": { "name": "mark", "in": "query", "required": true, "schema": { "type": "string", "minLength": 2, "maxLength": 200 } },
-      "jurisdiction": { "name": "jurisdiction", "in": "query", "schema": { "type": "string", "maxLength": 100 } },
-      "niceClass": { "name": "class", "in": "query", "schema": { "type": "string", "pattern": "^[0-9, ]{1,134}$" } },
-      "officeActionMark": { "name": "markText", "in": "query", "schema": { "type": "string", "maxLength": 200 } },
-      "cursor": { "name": "cursor", "in": "query", "schema": { "type": "string", "maxLength": 512, "nullable": true } },
-      "pageSize": { "name": "pageSize", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100 } }
+      "id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "firmId": {
+        "name": "firmId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "description": "Must equal verified membership; clients cannot select another firm."
+      },
+      "portfolioMarkId": {
+        "name": "portfolioMarkId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "token": {
+        "name": "token",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "maxLength": 512
+        }
+      },
+      "mark": {
+        "name": "mark",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 200
+        }
+      },
+      "jurisdiction": {
+        "name": "jurisdiction",
+        "in": "query",
+        "schema": {
+          "type": "string",
+          "maxLength": 100
+        }
+      },
+      "niceClass": {
+        "name": "class",
+        "in": "query",
+        "schema": {
+          "type": "string",
+          "pattern": "^[0-9, ]{1,134}$"
+        }
+      },
+      "officeActionMark": {
+        "name": "markText",
+        "in": "query",
+        "schema": {
+          "type": "string",
+          "maxLength": 200
+        }
+      },
+      "cursor": {
+        "name": "cursor",
+        "in": "query",
+        "schema": {
+          "type": "string",
+          "maxLength": 512,
+          "nullable": true
+        }
+      },
+      "pageSize": {
+        "name": "pageSize",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
     },
     "requestBodies": {
-      "Firm": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["firmName"], "properties": { "firmName": { "type": "string", "maxLength": 200 } }, "additionalProperties": false } } } },
-      "InvitationAccept": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["fullName"], "properties": { "fullName": { "type": "string", "maxLength": 200 }, "email": { "type": "string", "format": "email", "nullable": true } }, "additionalProperties": false } } } },
-      "InvitationIssue": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["fullName", "email", "role"], "properties": { "fullName": { "type": "string", "maxLength": 200 }, "email": { "type": "string", "format": "email" }, "role": { "enum": ["admin", "attorney", "viewer"] } }, "additionalProperties": false } } } },
-      "PortfolioMark": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PortfolioMarkInput" } } } },
-      "PortfolioMarkPatch": { "required": true, "content": { "application/json": { "schema": { "allOf": [{ "$ref": "#/components/schemas/PortfolioMarkInput" }], "minProperties": 1 } } } },
-      "Watch": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["portfolioMarkId", "state", "pollIntervalMinutes"], "properties": { "portfolioMarkId": { "type": "string", "format": "uuid" }, "state": { "enum": ["enabled", "paused"] }, "pollIntervalMinutes": { "type": "integer", "minimum": 5, "maximum": 43200 } }, "additionalProperties": false } } } },
-      "WatchPatch": { "required": true, "content": { "application/json": { "schema": { "type": "object", "properties": { "state": { "enum": ["enabled", "paused"] }, "pollIntervalMinutes": { "type": "integer", "minimum": 5, "maximum": 43200 } }, "additionalProperties": false, "minProperties": 1 } } } },
-      "AlertAction": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["action"], "properties": { "action": { "enum": ["read", "dismiss"] } }, "additionalProperties": false } } } },
-      "Role": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["role"], "properties": { "role": { "enum": ["admin", "attorney", "viewer"] } }, "additionalProperties": false } } } },
-      "OfficeAction": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OfficeActionInput" } } } },
-      "OfficeActionPatch": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OfficeActionPatch" } } } },
-      "Export": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["type", "sourceEntityId", "parameters", "idempotencyKey"], "properties": { "type": { "enum": ["search_results", "risk_report", "portfolio_summary"] }, "sourceEntityId": { "type": "string", "format": "uuid" }, "parameters": { "type": "object", "maxProperties": 2 }, "idempotencyKey": { "type": "string", "maxLength": 128 } }, "additionalProperties": false } } } }
+      "Firm": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": [
+                "intentToken"
+              ],
+              "properties": {
+                "intentToken": {
+                  "type": "string",
+                  "minLength": 40,
+                  "maxLength": 128
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "InvitationAccept": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": [
+                "fullName"
+              ],
+              "properties": {
+                "fullName": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "email": {
+                  "type": "string",
+                  "format": "email",
+                  "nullable": true
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "InvitationIssue": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": [
+                "fullName",
+                "email",
+                "role"
+              ],
+              "properties": {
+                "fullName": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "email": {
+                  "type": "string",
+                  "format": "email"
+                },
+                "role": {
+                  "enum": [
+                    "admin",
+                    "attorney",
+                    "viewer"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "PortfolioMark": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/PortfolioMarkInput"
+            }
+          }
+        }
+      },
+      "PortfolioMarkPatch": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/PortfolioMarkInput"
+                }
+              ],
+              "minProperties": 1
+            }
+          }
+        }
+      },
+      "Watch": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": [
+                "portfolioMarkId",
+                "state",
+                "pollIntervalMinutes"
+              ],
+              "properties": {
+                "portfolioMarkId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "state": {
+                  "enum": [
+                    "enabled",
+                    "paused"
+                  ]
+                },
+                "pollIntervalMinutes": {
+                  "type": "integer",
+                  "minimum": 5,
+                  "maximum": 43200
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "WatchPatch": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "state": {
+                  "enum": [
+                    "enabled",
+                    "paused"
+                  ]
+                },
+                "pollIntervalMinutes": {
+                  "type": "integer",
+                  "minimum": 5,
+                  "maximum": 43200
+                }
+              },
+              "additionalProperties": false,
+              "minProperties": 1
+            }
+          }
+        }
+      },
+      "AlertAction": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": [
+                "action"
+              ],
+              "properties": {
+                "action": {
+                  "enum": [
+                    "read",
+                    "dismiss"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "Role": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": [
+                "role"
+              ],
+              "properties": {
+                "role": {
+                  "enum": [
+                    "admin",
+                    "attorney",
+                    "viewer"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "OfficeAction": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/OfficeActionInput"
+            }
+          }
+        }
+      },
+      "OfficeActionPatch": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/OfficeActionPatch"
+            }
+          }
+        }
+      },
+      "Export": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": [
+                "type",
+                "sourceEntityId",
+                "parameters",
+                "idempotencyKey"
+              ],
+              "properties": {
+                "type": {
+                  "enum": [
+                    "search_results",
+                    "risk_report",
+                    "portfolio_summary"
+                  ]
+                },
+                "sourceEntityId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "parameters": {
+                  "type": "object",
+                  "maxProperties": 2
+                },
+                "idempotencyKey": {
+                  "type": "string",
+                  "maxLength": 128
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "OrganizationIntent": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": [
+                "email",
+                "firmName"
+              ],
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "format": "email"
+                },
+                "firmName": {
+                  "type": "string",
+                  "maxLength": 200
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      }
     },
     "responses": {
-      "Error": { "description": "Stable safe error; never contains credentials, stacks, storage keys, or raw upstream bodies.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-      "Health": { "description": "Process health.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Health" } } } },
-      "Readiness": { "description": "Dependency readiness.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Health" } } } },
-      "Ok": { "description": "Safe diagnostic result.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Ok" } } } },
-      "Me": { "description": "Resolved membership.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Me" } } } },
-      "Firm": { "description": "Firm/user provisioning result.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Firm" } } } },
-      "Invitation": { "description": "Safe invitation result.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Invitation" } } } },
-      "Search": { "description": "Persisted federated result; partial source statuses remain explicit.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Search" } } } },
-      "SearchResult": { "description": "Immutable historical search snapshot.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SearchResult" } } } },
-      "SearchResultList": { "description": "Cursor-paginated immutable search history.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SearchResultList" } } } },
-      "PortfolioMark": { "description": "Firm-scoped portfolio record.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PortfolioMark" } } } },
-      "PortfolioList": { "description": "Bounded portfolio page.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/List" } } } },
-      "Watch": { "description": "Firm-scoped watch.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Watch" } } } },
-      "WatchList": { "description": "Bounded watch page.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/List" } } } },
-      "Alert": { "description": "Firm-scoped alert.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Alert" } } } },
-      "AlertList": { "description": "Bounded alert page.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/List" } } } },
-      "AuditList": { "description": "Admin-only append-only audit page.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuditList" } } } },
-      "OfficeAction": { "description": "Attributed Office Action reference.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OfficeAction" } } } },
-      "OfficeActionList": { "description": "Bounded Office Action page.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/List" } } } },
-      "OfficeActionSearch": { "description": "Federated Office Action source result.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Search" } } } },
-      "Export": { "description": "Safe export lifecycle record; no storage key or URL.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Export" } } } },
-      "ExportList": { "description": "Cursor-paginated export summaries.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ExportList" } } } },
-      "DashboardAnalytics": { "description": "Firm-scoped cached dashboard aggregate.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DashboardAnalytics" } } } }
+      "Error": {
+        "description": "Stable safe error; never contains credentials, stacks, storage keys, or raw upstream bodies.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Health": {
+        "description": "Process health.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Health"
+            }
+          }
+        }
+      },
+      "Readiness": {
+        "description": "Dependency readiness.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Health"
+            }
+          }
+        }
+      },
+      "Ok": {
+        "description": "Safe diagnostic result.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Ok"
+            }
+          }
+        }
+      },
+      "Me": {
+        "description": "Resolved membership.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Me"
+            }
+          }
+        }
+      },
+      "Firm": {
+        "description": "Firm/user provisioning result.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Firm"
+            }
+          }
+        }
+      },
+      "Invitation": {
+        "description": "Safe invitation result.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Invitation"
+            }
+          }
+        }
+      },
+      "Search": {
+        "description": "Persisted federated result; partial source statuses remain explicit.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Search"
+            }
+          }
+        }
+      },
+      "SearchResult": {
+        "description": "Immutable historical search snapshot.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/SearchResult"
+            }
+          }
+        }
+      },
+      "SearchResultList": {
+        "description": "Cursor-paginated immutable search history.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/SearchResultList"
+            }
+          }
+        }
+      },
+      "PortfolioMark": {
+        "description": "Firm-scoped portfolio record.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/PortfolioMark"
+            }
+          }
+        }
+      },
+      "PortfolioList": {
+        "description": "Bounded portfolio page.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/List"
+            }
+          }
+        }
+      },
+      "Watch": {
+        "description": "Firm-scoped watch.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Watch"
+            }
+          }
+        }
+      },
+      "WatchList": {
+        "description": "Bounded watch page.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/List"
+            }
+          }
+        }
+      },
+      "Alert": {
+        "description": "Firm-scoped alert.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Alert"
+            }
+          }
+        }
+      },
+      "AlertList": {
+        "description": "Bounded alert page.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/List"
+            }
+          }
+        }
+      },
+      "AuditList": {
+        "description": "Admin-only append-only audit page.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AuditList"
+            }
+          }
+        }
+      },
+      "OfficeAction": {
+        "description": "Attributed Office Action reference.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/OfficeAction"
+            }
+          }
+        }
+      },
+      "OfficeActionList": {
+        "description": "Bounded Office Action page.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/List"
+            }
+          }
+        }
+      },
+      "OfficeActionSearch": {
+        "description": "Federated Office Action source result.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Search"
+            }
+          }
+        }
+      },
+      "Export": {
+        "description": "Safe export lifecycle record; no storage key or URL.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Export"
+            }
+          }
+        }
+      },
+      "ExportList": {
+        "description": "Cursor-paginated export summaries.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ExportList"
+            }
+          }
+        }
+      },
+      "DashboardAnalytics": {
+        "description": "Firm-scoped cached dashboard aggregate.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/DashboardAnalytics"
+            }
+          }
+        }
+      }
     },
     "schemas": {
-      "Error": { "type": "object", "required": ["code", "message"], "properties": { "code": { "type": "string" }, "message": { "type": "string" } }, "additionalProperties": false },
-      "Health": { "type": "object", "required": ["status"], "properties": { "status": { "enum": ["ok", "ready"] } }, "additionalProperties": false },
-      "Ok": { "type": "object", "required": ["ok"], "properties": { "ok": { "const": true } } },
-      "Me": { "type": "object", "required": ["userId", "email", "role", "firmId"], "properties": { "userId": { "type": "string", "format": "uuid" }, "email": { "type": "string", "format": "email" }, "role": { "enum": ["admin", "attorney", "viewer"], "nullable": true }, "firmId": { "type": "string", "format": "uuid", "nullable": true } } },
-      "Firm": { "type": "object", "additionalProperties": true }, "Invitation": { "type": "object", "additionalProperties": true },
-      "SourceStatus": { "type": "object", "required": ["source", "status", "resultCount"], "properties": { "source": { "type": "string" }, "status": { "enum": ["complete", "unavailable"] }, "resultCount": { "type": "integer", "minimum": 0 } } },
-      "Search": { "type": "object", "required": ["results", "sourceStatuses", "partial", "requestId"], "properties": { "results": { "type": "array", "maxItems": 100, "items": { "type": "object" } }, "sourceStatuses": { "type": "array", "items": { "$ref": "#/components/schemas/SourceStatus" } }, "partial": { "type": "boolean" }, "requestId": { "type": "string", "maxLength": 128 } } },
-      "PortfolioMarkInput": { "type": "object", "required": ["markText", "jurisdiction", "sourceRegistry", "registryReference", "niceClasses", "status"], "properties": { "markText": { "type": "string", "maxLength": 200 }, "jurisdiction": { "type": "string", "maxLength": 100 }, "sourceRegistry": { "type": "string", "maxLength": 100 }, "registryReference": { "type": "string", "maxLength": 200 }, "niceClasses": { "type": "array", "maxItems": 45, "items": { "type": "integer", "minimum": 1, "maximum": 45 } }, "status": { "type": "string" }, "filingDate": { "type": "string", "format": "date", "nullable": true }, "registrationDate": { "type": "string", "format": "date", "nullable": true }, "renewalDate": { "type": "string", "format": "date", "nullable": true } }, "additionalProperties": false },
-      "PortfolioMark": { "allOf": [{ "$ref": "#/components/schemas/PortfolioMarkInput" }, { "type": "object", "required": ["id"], "properties": { "id": { "type": "string", "format": "uuid" } } }] },
-      "Watch": { "type": "object", "required": ["id", "portfolioMarkId", "state"], "properties": { "id": { "type": "string", "format": "uuid" }, "portfolioMarkId": { "type": "string", "format": "uuid" }, "state": { "enum": ["enabled", "paused"] }, "pollIntervalMinutes": { "type": "integer" } } },
-      "Alert": { "type": "object", "required": ["id", "status"], "properties": { "id": { "type": "string", "format": "uuid" }, "status": { "enum": ["unread", "read", "dismissed"] } } },
-      "DashboardAnalytics": { "type": "object", "required": ["generatedAt", "cacheStatus", "range", "portfolio", "watchActivity"], "properties": { "generatedAt": { "type": "string", "format": "date-time" }, "cacheStatus": { "enum": ["hit", "miss", "bypass"] }, "range": { "type": "string" }, "portfolio": { "type": "object" }, "watchActivity": { "type": "object" } }, "additionalProperties": false },
-      "OfficeActionInput": { "type": "object", "required": ["sourceRegistry", "sourceReferenceId", "documentType", "summaryMethod"], "properties": { "sourceRegistry": { "type": "string", "maxLength": 100 }, "sourceReferenceId": { "type": "string", "maxLength": 200 }, "documentType": { "type": "string" }, "summaryMethod": { "enum": ["registry", "manual", "extracted"] }, "officeActionDate": { "type": "string", "format": "date", "nullable": true }, "examinerReasoningSummary": { "type": "string", "maxLength": 4000, "nullable": true } }, "additionalProperties": false },
-      "OfficeActionPatch": { "type": "object", "minProperties": 1, "additionalProperties": false },
-      "OfficeAction": { "allOf": [{ "$ref": "#/components/schemas/OfficeActionInput" }, { "type": "object", "properties": { "id": { "type": "string", "format": "uuid" } } }] },
-      "SearchResult": { "type": "object", "additionalProperties": true },
-      "SearchResultList": { "type": "object", "required": ["searchResults", "nextCursor"], "properties": { "searchResults": { "type": "array", "maxItems": 100, "items": { "$ref": "#/components/schemas/SearchResult" } }, "nextCursor": { "type": "string", "nullable": true, "maxLength": 512 } } },
-      "Export": { "type": "object", "required": ["id", "type", "status"], "properties": { "id": { "type": "string", "format": "uuid" }, "type": { "enum": ["search_results", "risk_report", "portfolio_summary"] }, "status": { "enum": ["queued", "processing", "completed", "failed"] }, "failureCode": { "type": "string", "nullable": true } } },
-      "ExportList": { "type": "object", "required": ["exports", "nextCursor"], "properties": { "exports": { "type": "array", "maxItems": 100, "items": { "$ref": "#/components/schemas/Export" } }, "nextCursor": { "type": "string", "nullable": true, "maxLength": 512 } } },
-      "AuditList": { "type": "object", "required": ["auditLogs", "nextCursor"], "properties": { "auditLogs": { "type": "array", "maxItems": 100, "items": { "type": "object" } }, "nextCursor": { "type": "string", "nullable": true, "maxLength": 512 } } },
-      "List": { "type": "object", "required": ["items", "pagination"], "properties": { "items": { "type": "array", "maxItems": 100, "items": { "type": "object" } }, "pagination": { "type": "object" } } }
+      "Error": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Health": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "ok",
+              "ready"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "Ok": {
+        "type": "object",
+        "required": [
+          "ok"
+        ],
+        "properties": {
+          "ok": {
+            "const": true
+          }
+        }
+      },
+      "Me": {
+        "type": "object",
+        "required": [
+          "userId",
+          "email",
+          "role",
+          "firmId"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "role": {
+            "enum": [
+              "admin",
+              "attorney",
+              "viewer"
+            ],
+            "nullable": true
+          },
+          "firmId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "Firm": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "Invitation": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "SourceStatus": {
+        "type": "object",
+        "required": [
+          "source",
+          "status",
+          "resultCount"
+        ],
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "complete",
+              "unavailable"
+            ]
+          },
+          "resultCount": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "Search": {
+        "type": "object",
+        "required": [
+          "results",
+          "sourceStatuses",
+          "partial",
+          "requestId"
+        ],
+        "properties": {
+          "results": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "object"
+            }
+          },
+          "sourceStatuses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceStatus"
+            }
+          },
+          "partial": {
+            "type": "boolean"
+          },
+          "requestId": {
+            "type": "string",
+            "maxLength": 128
+          }
+        }
+      },
+      "PortfolioMarkInput": {
+        "type": "object",
+        "required": [
+          "markText",
+          "jurisdiction",
+          "sourceRegistry",
+          "registryReference",
+          "niceClasses",
+          "status"
+        ],
+        "properties": {
+          "markText": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "jurisdiction": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "sourceRegistry": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "registryReference": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "niceClasses": {
+            "type": "array",
+            "maxItems": 45,
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 45
+            }
+          },
+          "status": {
+            "type": "string"
+          },
+          "filingDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "registrationDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "renewalDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PortfolioMark": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PortfolioMarkInput"
+          },
+          {
+            "type": "object",
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        ]
+      },
+      "Watch": {
+        "type": "object",
+        "required": [
+          "id",
+          "portfolioMarkId",
+          "state"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "portfolioMarkId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "enum": [
+              "enabled",
+              "paused"
+            ]
+          },
+          "pollIntervalMinutes": {
+            "type": "integer"
+          }
+        }
+      },
+      "Alert": {
+        "type": "object",
+        "required": [
+          "id",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "enum": [
+              "unread",
+              "read",
+              "dismissed"
+            ]
+          }
+        }
+      },
+      "DashboardAnalytics": {
+        "type": "object",
+        "required": [
+          "generatedAt",
+          "cacheStatus",
+          "range",
+          "portfolio",
+          "watchActivity"
+        ],
+        "properties": {
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cacheStatus": {
+            "enum": [
+              "hit",
+              "miss",
+              "bypass"
+            ]
+          },
+          "range": {
+            "type": "string"
+          },
+          "portfolio": {
+            "type": "object"
+          },
+          "watchActivity": {
+            "type": "object"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OfficeActionInput": {
+        "type": "object",
+        "required": [
+          "sourceRegistry",
+          "sourceReferenceId",
+          "documentType",
+          "summaryMethod"
+        ],
+        "properties": {
+          "sourceRegistry": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "sourceReferenceId": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "documentType": {
+            "type": "string"
+          },
+          "summaryMethod": {
+            "enum": [
+              "registry",
+              "manual",
+              "extracted"
+            ]
+          },
+          "officeActionDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "examinerReasoningSummary": {
+            "type": "string",
+            "maxLength": 4000,
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "OfficeActionPatch": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false
+      },
+      "OfficeAction": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/OfficeActionInput"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        ]
+      },
+      "SearchResult": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "SearchResultList": {
+        "type": "object",
+        "required": [
+          "searchResults",
+          "nextCursor"
+        ],
+        "properties": {
+          "searchResults": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/SearchResult"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 512
+          }
+        }
+      },
+      "Export": {
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "enum": [
+              "search_results",
+              "risk_report",
+              "portfolio_summary"
+            ]
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "processing",
+              "completed",
+              "failed"
+            ]
+          },
+          "failureCode": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ExportList": {
+        "type": "object",
+        "required": [
+          "exports",
+          "nextCursor"
+        ],
+        "properties": {
+          "exports": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/Export"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 512
+          }
+        }
+      },
+      "AuditList": {
+        "type": "object",
+        "required": [
+          "auditLogs",
+          "nextCursor"
+        ],
+        "properties": {
+          "auditLogs": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "object"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 512
+          }
+        }
+      },
+      "List": {
+        "type": "object",
+        "required": [
+          "items",
+          "pagination"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "object"
+            }
+          },
+          "pagination": {
+            "type": "object"
+          }
+        }
+      }
     }
   }
 }

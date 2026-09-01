@@ -3,7 +3,6 @@ import type { Session, User } from '@supabase/supabase-js';
 import type { UserRole } from '../../types';
 import { supabase } from '../../lib/supabase';
 import { getApiClient } from '../../lib/api/client';
-import { provisionFirmForSignupSession } from './signupProvisioning';
 import {
   AuthSynchronizationError,
   type AuthSynchronizationDiagnostic,
@@ -102,11 +101,6 @@ const displayName = (user: User) => {
 async function synchronizeSupabaseSession(session: Session): Promise<AuthenticatedUser> {
   try {
     const revision = beginSession(session.access_token);
-    try {
-      await provisionFirmForSignupSession(session);
-    } catch (error) {
-      throw toAuthSynchronizationError(error, 'provisioning');
-    }
     if (revision !== sessionRevision) {
       throw new AuthSynchronizationError('STALE_SESSION', 'A newer authentication state replaced this session.', {
         stage: 'resolve-current-user', responseCode: 'STALE_SESSION',
@@ -150,6 +144,10 @@ async function synchronizeSupabaseSession(session: Session): Promise<Authenticat
   }
 }
 
+function isMissingMembershipError(error: unknown) {
+  return error instanceof AuthSynchronizationError && error.diagnostic.responseCode === 'FIRM_MEMBERSHIP_MISSING';
+}
+
 export function syncSupabaseSession(session: Session): Promise<AuthenticatedUser> {
   const existing = sessionSynchronizations.get(session.access_token);
   if (existing) return existing;
@@ -177,8 +175,8 @@ export function initializeAuth(): Promise<void> {
         return;
       }
       if (event === 'INITIAL_SESSION') return;
-      void syncSupabaseSession(session).catch(() => {
-        useAuthStore.getState().clearSession();
+      void syncSupabaseSession(session).catch((error) => {
+        if (!isMissingMembershipError(error)) useAuthStore.getState().clearSession();
       });
     });
   }
