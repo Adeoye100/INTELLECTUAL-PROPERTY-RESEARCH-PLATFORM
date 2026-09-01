@@ -20,7 +20,8 @@ export function LandingPage(bootDependencies: LandingBootDependencies = {}) {
   if (bootState === 'loading') return <LandingBootLoader />;
 
   const logoAvailable = bootState === 'ready';
-  const showShield = bootState === 'ready';
+  // The shield is an inline SVG and remains safe to render when raster preloading fails.
+  const showShield = true;
 
   return tier === 'static'
     ? <StaticExperience logoAvailable={logoAvailable} showShield={showShield} />

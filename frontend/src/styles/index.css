@@ -2,39 +2,151 @@
 @import "./visualization.css";
 @config "../../tailwind.config.js";
 
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: #f5f3ec;
+  --foreground: #0a1428;
+  --card: #ffffff;
+  --card-foreground: #0a1428;
+  --popover: #ffffff;
+  --popover-foreground: #0a1428;
+  --primary: #146575;
+  --primary-foreground: #ffffff;
+  --secondary: #e6eef0;
+  --secondary-foreground: #0e2540;
+  --muted: #ebe9e1;
+  --muted-foreground: #5b6470;
+  --accent: #9fc2d4;
+  --accent-foreground: #0a1428;
+  --destructive: #b3261e;
+  --destructive-foreground: #ffffff;
+  --border: #d8dde0;
+  --input: #d8dde0;
+  --ring: #146575;
+  --sidebar: #eef2f2;
+  --sidebar-foreground: #0a1428;
+  --landing-hero: #082e35;
+  --landing-hero-deep: #061f25;
+  --landing-hero-foreground: #f7fafc;
+  --landing-surface: #f5f3ec;
+  --landing-card: #ffffff;
+  --landing-grid: rgb(10 20 40 / 8%);
+  --font-body: "Poppins", system-ui, sans-serif;
+  --font-heading:
+    "EB Garamond Variable", "EB Garamond", Garamond, Georgia, serif;
+  --font-subheading: "Bebas Neue", Impact, sans-serif;
+  --radius: 0.2rem;
+  color-scheme: light;
+}
+
+.dark {
+  --background: #07111d;
+  --foreground: #f7fafc;
+  --card: #0e2540;
+  --card-foreground: #f7fafc;
+  --popover: #0e2540;
+  --popover-foreground: #f7fafc;
+  --primary: #75aeb7;
+  --primary-foreground: #07111d;
+  --secondary: #153447;
+  --secondary-foreground: #f7fafc;
+  --muted: #122b3b;
+  --muted-foreground: #b9c1ca;
+  --accent: #9fc2d4;
+  --accent-foreground: #07111d;
+  --destructive: #ff807a;
+  --destructive-foreground: #07111d;
+  --border: #294457;
+  --input: #365469;
+  --ring: #75aeb7;
+  --sidebar: #0a1928;
+  --sidebar-foreground: #f7fafc;
+  --landing-hero: #061c24;
+  --landing-hero-deep: #030d13;
+  --landing-hero-foreground: #f7fafc;
+  --landing-surface: #07111d;
+  --landing-card: #0e2540;
+  --landing-grid: rgb(159 194 212 / 9%);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --font-sans: var(--font-body);
+  --font-serif: var(--font-heading);
+  --font-heading: var(--font-heading);
+  --font-subheading: var(--font-subheading);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 8px);
+}
+
 @font-face {
-  font-family: 'Poppins';
-  src: url('/Poppins-Medium.ttf') format('truetype');
+  font-family: "Poppins";
+  src: url("/Poppins-Medium.ttf") format("truetype");
   font-style: normal;
   font-weight: 500;
   font-display: swap;
 }
 
 @font-face {
-  font-family: 'Bebas Neue';
-  src: url('/BebasNeue-Regular.ttf') format('truetype');
+  font-family: "Bebas Neue";
+  src: url("/BebasNeue-Regular.ttf") format("truetype");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
 }
 
 @font-face {
-  font-family: 'ITC Garamond';
-  src: url('/ITCGaramondStd-LtIta.ttf') format('truetype');
+  font-family: "ITC Garamond";
+  src: url("/ITCGaramondStd-LtIta.ttf") format("truetype");
   font-style: italic;
   font-weight: 300;
   font-display: swap;
 }
 
 @layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
   :focus-visible {
-    outline: 3px solid #146575;
+    outline: 3px solid var(--ring);
     outline-offset: 3px;
   }
 
   body {
-    @apply font-sans text-text-primary antialiased;
-    background-color: #0A1428;
+    @apply bg-background font-sans text-foreground antialiased;
+    min-width: 320px;
+    transition:
+      background-color 240ms ease,
+      color 240ms ease;
   }
 
   h1,
@@ -43,7 +155,8 @@
   h4,
   h5,
   h6 {
-    @apply font-heading;
+    font-family: var(--font-heading);
+    text-wrap: balance;
   }
 }
 
@@ -75,10 +188,18 @@
   position: absolute;
   inset: 0;
   z-index: 0;
-  content: '';
+  content: "";
   background:
-    radial-gradient(circle at 18% 24%, rgb(117 174 183 / 32%), transparent 36rem),
-    radial-gradient(circle at 84% 78%, rgb(20 101 117 / 42%), transparent 32rem),
+    radial-gradient(
+      circle at 18% 24%,
+      rgb(117 174 183 / 32%),
+      transparent 36rem
+    ),
+    radial-gradient(
+      circle at 84% 78%,
+      rgb(20 101 117 / 42%),
+      transparent 32rem
+    ),
     linear-gradient(135deg, #000 8%, #0a1428 52%, #000);
 }
 
@@ -127,108 +248,266 @@
   animation-iteration-count: infinite;
 }
 
-.hourglass-loader__glare-top { animation-name: hourglass-glare-top; }
-.hourglass-loader__glare-bottom { animation-name: hourglass-glare-bottom; }
-.hourglass-loader__model { animation-name: hourglass-flip; transform-origin: 12.25px 16.75px; }
+.hourglass-loader__glare-top {
+  animation-name: hourglass-glare-top;
+}
+.hourglass-loader__glare-bottom {
+  animation-name: hourglass-glare-bottom;
+}
+.hourglass-loader__model {
+  animation-name: hourglass-flip;
+  transform-origin: 12.25px 16.75px;
+}
 .hourglass-loader__motion-thick,
 .hourglass-loader__motion-medium,
-.hourglass-loader__motion-thin { transform-origin: 26px 26px; }
-.hourglass-loader__motion-thick { animation-name: hourglass-motion-thick; }
-.hourglass-loader__motion-medium { animation-name: hourglass-motion-medium; }
-.hourglass-loader__motion-thin { animation-name: hourglass-motion-thin; }
-.hourglass-loader__sand-drop { animation-name: hourglass-sand-drop; }
-.hourglass-loader__sand-fill { animation-name: hourglass-sand-fill; }
-.hourglass-loader__sand-grain-left { animation-name: hourglass-sand-grain-left; }
-.hourglass-loader__sand-grain-right { animation-name: hourglass-sand-grain-right; }
-.hourglass-loader__sand-line-left { animation-name: hourglass-sand-line-left; }
-.hourglass-loader__sand-line-right { animation-name: hourglass-sand-line-right; }
-.hourglass-loader__sand-mound-top { animation-name: hourglass-sand-mound-top; }
-.hourglass-loader__sand-mound-bottom { animation-name: hourglass-sand-mound-bottom; transform-origin: 12.25px 31.5px; }
+.hourglass-loader__motion-thin {
+  transform-origin: 26px 26px;
+}
+.hourglass-loader__motion-thick {
+  animation-name: hourglass-motion-thick;
+}
+.hourglass-loader__motion-medium {
+  animation-name: hourglass-motion-medium;
+}
+.hourglass-loader__motion-thin {
+  animation-name: hourglass-motion-thin;
+}
+.hourglass-loader__sand-drop {
+  animation-name: hourglass-sand-drop;
+}
+.hourglass-loader__sand-fill {
+  animation-name: hourglass-sand-fill;
+}
+.hourglass-loader__sand-grain-left {
+  animation-name: hourglass-sand-grain-left;
+}
+.hourglass-loader__sand-grain-right {
+  animation-name: hourglass-sand-grain-right;
+}
+.hourglass-loader__sand-line-left {
+  animation-name: hourglass-sand-line-left;
+}
+.hourglass-loader__sand-line-right {
+  animation-name: hourglass-sand-line-right;
+}
+.hourglass-loader__sand-mound-top {
+  animation-name: hourglass-sand-mound-top;
+}
+.hourglass-loader__sand-mound-bottom {
+  animation-name: hourglass-sand-mound-bottom;
+  transform-origin: 12.25px 31.5px;
+}
 
 @keyframes hourglass-flip {
-  from { transform: translate(13.75px, 9.25px) rotate(-180deg); }
-  24%, to { transform: translate(13.75px, 9.25px) rotate(0); }
+  from {
+    transform: translate(13.75px, 9.25px) rotate(-180deg);
+  }
+  24%,
+  to {
+    transform: translate(13.75px, 9.25px) rotate(0);
+  }
 }
 
 @keyframes hourglass-glare-top {
-  from { stroke: rgb(255 255 255 / 0%); }
-  24%, to { stroke: #fff; }
+  from {
+    stroke: rgb(255 255 255 / 0%);
+  }
+  24%,
+  to {
+    stroke: #fff;
+  }
 }
 
 @keyframes hourglass-glare-bottom {
-  from { stroke: #fff; }
-  24%, to { stroke: rgb(255 255 255 / 0%); }
+  from {
+    stroke: #fff;
+  }
+  24%,
+  to {
+    stroke: rgb(255 255 255 / 0%);
+  }
 }
 
 @keyframes hourglass-motion-thick {
-  from { animation-timing-function: cubic-bezier(0.33, 0, 0.67, 0); stroke: rgb(255 255 255 / 0%); stroke-dashoffset: 153.94; transform: rotate(0.67turn); }
-  20% { animation-timing-function: cubic-bezier(0.33, 1, 0.67, 1); stroke: #202020; stroke-dashoffset: 141.11; transform: rotate(1turn); }
-  40%, to { stroke: rgb(255 255 255 / 0%); stroke-dashoffset: 153.94; transform: rotate(1.33turn); }
+  from {
+    animation-timing-function: cubic-bezier(0.33, 0, 0.67, 0);
+    stroke: rgb(255 255 255 / 0%);
+    stroke-dashoffset: 153.94;
+    transform: rotate(0.67turn);
+  }
+  20% {
+    animation-timing-function: cubic-bezier(0.33, 1, 0.67, 1);
+    stroke: #202020;
+    stroke-dashoffset: 141.11;
+    transform: rotate(1turn);
+  }
+  40%,
+  to {
+    stroke: rgb(255 255 255 / 0%);
+    stroke-dashoffset: 153.94;
+    transform: rotate(1.33turn);
+  }
 }
 
 @keyframes hourglass-motion-medium {
-  from, 8% { animation-timing-function: cubic-bezier(0.33, 0, 0.67, 0); stroke: rgb(255 255 255 / 0%); stroke-dashoffset: 153.94; transform: rotate(0.5turn); }
-  20% { animation-timing-function: cubic-bezier(0.33, 1, 0.67, 1); stroke: #fff; stroke-dashoffset: 147.53; transform: rotate(0.83turn); }
-  32%, to { stroke: rgb(255 255 255 / 0%); stroke-dashoffset: 153.94; transform: rotate(1.17turn); }
+  from,
+  8% {
+    animation-timing-function: cubic-bezier(0.33, 0, 0.67, 0);
+    stroke: rgb(255 255 255 / 0%);
+    stroke-dashoffset: 153.94;
+    transform: rotate(0.5turn);
+  }
+  20% {
+    animation-timing-function: cubic-bezier(0.33, 1, 0.67, 1);
+    stroke: #fff;
+    stroke-dashoffset: 147.53;
+    transform: rotate(0.83turn);
+  }
+  32%,
+  to {
+    stroke: rgb(255 255 255 / 0%);
+    stroke-dashoffset: 153.94;
+    transform: rotate(1.17turn);
+  }
 }
 
 @keyframes hourglass-motion-thin {
-  from, 4% { animation-timing-function: cubic-bezier(0.33, 0, 0.67, 0); stroke: rgb(255 255 255 / 0%); stroke-dashoffset: 153.94; transform: rotate(0.33turn); }
-  24% { animation-timing-function: cubic-bezier(0.33, 1, 0.67, 1); stroke: #353535; stroke-dashoffset: 134.7; transform: rotate(0.67turn); }
-  44%, to { stroke: rgb(255 255 255 / 0%); stroke-dashoffset: 153.94; transform: rotate(1turn); }
+  from,
+  4% {
+    animation-timing-function: cubic-bezier(0.33, 0, 0.67, 0);
+    stroke: rgb(255 255 255 / 0%);
+    stroke-dashoffset: 153.94;
+    transform: rotate(0.33turn);
+  }
+  24% {
+    animation-timing-function: cubic-bezier(0.33, 1, 0.67, 1);
+    stroke: #353535;
+    stroke-dashoffset: 134.7;
+    transform: rotate(0.67turn);
+  }
+  44%,
+  to {
+    stroke: rgb(255 255 255 / 0%);
+    stroke-dashoffset: 153.94;
+    transform: rotate(1turn);
+  }
 }
 
 @keyframes hourglass-sand-drop {
-  from, 10% { animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0); stroke-dashoffset: 1; }
-  70%, to { stroke-dashoffset: -107; }
+  from,
+  10% {
+    animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0);
+    stroke-dashoffset: 1;
+  }
+  70%,
+  to {
+    stroke-dashoffset: -107;
+  }
 }
 
 @keyframes hourglass-sand-fill {
-  from, 10% { animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0); stroke-dashoffset: 55; }
-  70%, to { stroke-dashoffset: -54; }
+  from,
+  10% {
+    animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0);
+    stroke-dashoffset: 55;
+  }
+  70%,
+  to {
+    stroke-dashoffset: -54;
+  }
 }
 
 @keyframes hourglass-sand-grain-left {
-  from, 10% { animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0); stroke-dashoffset: 29; }
-  70%, to { stroke-dashoffset: -22; }
+  from,
+  10% {
+    animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0);
+    stroke-dashoffset: 29;
+  }
+  70%,
+  to {
+    stroke-dashoffset: -22;
+  }
 }
 
 @keyframes hourglass-sand-grain-right {
-  from, 10% { animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0); stroke-dashoffset: 27; }
-  70%, to { stroke-dashoffset: -24; }
+  from,
+  10% {
+    animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0);
+    stroke-dashoffset: 27;
+  }
+  70%,
+  to {
+    stroke-dashoffset: -24;
+  }
 }
 
 @keyframes hourglass-sand-line-left {
-  from, 10% { animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0); stroke-dashoffset: 53; }
-  70%, to { stroke-dashoffset: -55; }
+  from,
+  10% {
+    animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0);
+    stroke-dashoffset: 53;
+  }
+  70%,
+  to {
+    stroke-dashoffset: -55;
+  }
 }
 
 @keyframes hourglass-sand-line-right {
-  from, 10% { animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0); stroke-dashoffset: 14; }
-  70%, to { stroke-dashoffset: -24.5; }
+  from,
+  10% {
+    animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0);
+    stroke-dashoffset: 14;
+  }
+  70%,
+  to {
+    stroke-dashoffset: -24.5;
+  }
 }
 
 @keyframes hourglass-sand-mound-top {
-  from, 10% { animation-timing-function: linear; transform: translate(0, 0); }
-  15% { animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0); transform: translate(0, 1.5px); }
-  51%, to { transform: translate(0, 13px); }
+  from,
+  10% {
+    animation-timing-function: linear;
+    transform: translate(0, 0);
+  }
+  15% {
+    animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0);
+    transform: translate(0, 1.5px);
+  }
+  51%,
+  to {
+    transform: translate(0, 13px);
+  }
 }
 
 @keyframes hourglass-sand-mound-bottom {
-  from, 31% { animation-timing-function: cubic-bezier(0.61, 1, 0.88, 1); transform: scale(1, 0); }
-  56%, to { transform: scale(1, 1); }
+  from,
+  31% {
+    animation-timing-function: cubic-bezier(0.61, 1, 0.88, 1);
+    transform: scale(1, 0);
+  }
+  56%,
+  to {
+    transform: scale(1, 1);
+  }
 }
 
 @layer components {
   .brand-gradient {
-    background: linear-gradient(180deg, theme('colors.forge-navy.950'), theme('colors.forge-teal.600'));
+    background: linear-gradient(
+      180deg,
+      theme("colors.forge-navy.950"),
+      theme("colors.forge-teal.600")
+    );
   }
 
   .btn-primary {
     @apply bg-forge-teal-700 text-white font-medium py-2 px-4 rounded transition-colors duration-200;
   }
 
-  .btn-primary:hover, .btn-primary:active {
+  .btn-primary:hover,
+  .btn-primary:active {
     @apply bg-forge-navy-950;
   }
 }
