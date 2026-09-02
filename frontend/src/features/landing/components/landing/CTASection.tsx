@@ -35,7 +35,7 @@ export function CTASection() {
       <footer className="mx-auto flex max-w-[1240px] flex-col gap-5 border-t border-border py-8 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <p>
           © {new Date().getFullYear()} Forge Global. Intellectual property
-          research, made coherent.
+          research.
         </p>
         <div className="flex flex-wrap gap-5">
           <a href="#capabilities" className="transition hover:text-foreground">
