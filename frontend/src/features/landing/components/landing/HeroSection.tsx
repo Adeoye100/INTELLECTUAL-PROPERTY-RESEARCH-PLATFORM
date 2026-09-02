@@ -152,9 +152,9 @@ export function HeroSection({
           animated ? "animate-bounce-slow" : ""
         }`}
       >
-        <span className="text-[10px] uppercase tracking-widest sm:text-xs">
-          Scroll to assemble
-        </span>
+        {/*<span className="text-[10px] uppercase tracking-widest sm:text-xs">*/}
+        {/*  Scroll to assemble*/}
+        {/*</span>*/}
         <ChevronDownIcon className="h-4 w-4" aria-hidden="true" />
       </div>
     </section>
