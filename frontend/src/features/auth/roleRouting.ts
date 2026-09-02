@@ -1,8 +1,8 @@
 import type { UserRole } from '../../types';
 
 export const roleHomePath = (role: UserRole) => ({
-  admin: '/dashboard',
-  attorney: '/dashboard',
+  admin: '/admin/users',
+  attorney: '/portfolio',
   viewer: '/dashboard',
 }[role]);
 

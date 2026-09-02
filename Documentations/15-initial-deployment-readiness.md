@@ -44,7 +44,7 @@ evidence exists.
 | Office Action search | Disabled for initial deployment | Provider route is unmounted; no licensed source is configured. Existing manual reference APIs remain server-only API functionality, not frontend navigation. |
 | Watches and alerts | Disabled for initial deployment | Watch/alert routes are unmounted, workers are not deployed, and the frontend reports unavailable. |
 | PDF exports | Disabled for initial deployment | Export routes are unmounted. No queue, storage, or worker is constructed. |
-| Billing / BE-14 | Disabled for initial deployment | Billing is not implemented; administration/billing navigation is unavailable and demonstration billing data is not shipped as an enabled workflow. |
+| Billing / BE-14 | Implemented, disabled until provider verification | Admin-only hosted Paystack checkout is available after migration 015, live plan/secret configuration, signed-webhook setup, and a controlled live transaction. |
 | Diagnostics and detailed errors | Disabled for initial deployment | Legacy ping routes are absent by default; safe error codes/messages exclude `details`, stack traces, SQL, and configuration. |
 
 Disabled routes deliberately produce the application’s normal `404` response,

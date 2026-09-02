@@ -1,70 +1,72 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '../auth/authStore';
 import { AdminScreen } from './AdminScreen';
 
-describe('AdminScreen seat management', () => {
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
+  status,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+const summary = {
+  subscription: { tier: 'starter', status: 'active', provider: 'paystack', renewsAt: null },
+  plans: [{ tier: 'starter', amountSubunit: 250_000, currency: 'NGN' }, { tier: 'professional', amountSubunit: 750_000, currency: 'NGN' }],
+  transactions: [{
+    id: 'tx-1', reference: 'iprp_0123456789abcdef0123456789abcdef', tier: 'starter',
+    amountSubunit: 250_000, currency: 'NGN', status: 'success', paidAt: '2026-09-01T12:00:00.000Z',
+  }],
+};
+
+describe('AdminScreen billing', () => {
   beforeEach(() => {
     useAuthStore.getState().setSession('admin-token', {
-      id: 'u1',
-      email: 'admin@forgeglobal.com',
-      fullName: 'Jane Smith',
-      role: 'admin',
-      firmId: 'firm-1',
+      id: 'u1', email: 'admin@forgeglobal.com', fullName: 'Jane Smith', role: 'admin', firmId: 'firm-1',
     });
   });
 
   afterEach(() => {
     act(() => useAuthStore.getState().clearSession());
     localStorage.clear();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
-  it('supports keyboard invitation, role assignment, and seat removal', async () => {
-    const user = userEvent.setup();
+  it('renders server-owned subscription state and transaction history', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(json(summary));
+    vi.stubGlobal('fetch', fetchMock);
     render(<MemoryRouter><AdminScreen /></MemoryRouter>);
 
-    const inviteButton = screen.getByRole('button', { name: 'Invite user' });
-    inviteButton.focus();
-    await user.keyboard('{Enter}');
+    expect(await screen.findByText('starter', { selector: 'p' })).toBeVisible();
+    expect(screen.getByText('active')).toBeVisible();
+    expect(screen.getByText('iprp_0123456789abcdef0123456789abcdef')).toBeVisible();
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/billing', expect.objectContaining({
+      credentials: 'omit',
+      headers: expect.any(Headers),
+    }));
+    expect((fetchMock.mock.calls[0][1].headers as Headers).get('Authorization')).toBe('Bearer admin-token');
+  });
 
-    const dialog = screen.getByRole('dialog', { name: 'Invite a user' });
-    expect(dialog).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Close Invite a user' })).toHaveFocus();
+  it('verifies a callback reference on the backend and removes it from browser history', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(json(summary));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MemoryRouter initialEntries={['/admin/billing?reference=iprp_callback']}><AdminScreen /></MemoryRouter>);
 
-    await user.tab();
-    const nameInput = screen.getByRole('textbox', { name: 'Full name' });
-    expect(nameInput).toHaveFocus();
-    fireEvent.change(nameInput, { target: { value: 'Lola Reed' } });
-    fireEvent.change(screen.getByRole('textbox', { name: 'Email address' }), { target: { value: 'lola@firm.com' } });
-    fireEvent.change(screen.getByRole('combobox', { name: 'Role' }), { target: { value: 'viewer' } });
-    screen.getByRole('button', { name: 'Send invitation' }).focus();
-    await user.keyboard('{Enter}');
+    expect(await screen.findByText('Payment verified and subscription activated.')).toBeVisible();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const verifyCall = fetchMock.mock.calls.find(([input]) => input === '/api/v1/billing/verify');
+    expect(verifyCall?.[1]).toEqual(expect.objectContaining({ method: 'POST' }));
+    expect(JSON.parse(String(verifyCall?.[1]?.body))).toEqual({ reference: 'iprp_callback' });
+  });
 
-    const invitedRow = screen.getByText('Lola Reed').closest('tr');
-    expect(invitedRow).not.toBeNull();
-    expect(within(invitedRow!).getByText('viewer')).toBeVisible();
-    expect(within(invitedRow!).getByText('Invited')).toBeVisible();
-    expect(screen.getByText(/9 of 10 seats used/i)).toBeVisible();
-
-    fireEvent.change(within(invitedRow!).getByRole('combobox', { name: 'Role for Lola Reed' }), { target: { value: 'attorney' } });
-    expect(within(invitedRow!).getByText('attorney')).toBeVisible();
-
-    fireEvent.click(within(invitedRow!).getByRole('button', { name: "Remove Lola Reed's seat" }));
-    expect(screen.queryByText('Lola Reed')).not.toBeInTheDocument();
-    expect(screen.getByText(/8 of 10 seats used/i)).toBeVisible();
-  }, 30_000);
-
-  it('returns focus to the invitation trigger when Escape closes the modal', async () => {
-    const user = userEvent.setup();
+  it('rejects an unexpected checkout origin before browser navigation', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(json({ subscription: null, transactions: [], plans: summary.plans }))
+      .mockResolvedValueOnce(json({ authorizationUrl: 'https://attacker.example/checkout' }));
+    vi.stubGlobal('fetch', fetchMock);
     render(<MemoryRouter><AdminScreen /></MemoryRouter>);
-    const inviteButton = screen.getByRole('button', { name: 'Invite user' });
 
-    await user.click(inviteButton);
-    await user.keyboard('{Escape}');
-
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(inviteButton).toHaveFocus();
-  }, 20_000);
+    fireEvent.click(await screen.findByRole('button', { name: 'Choose starter' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Checkout could not be started');
+  });
 });

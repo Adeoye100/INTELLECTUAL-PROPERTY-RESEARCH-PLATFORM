@@ -177,6 +177,33 @@ describe('Office Action search configuration', () => {
   });
 });
 
+describe('Paystack billing configuration', () => {
+  const enabled = {
+    PAYSTACK_ENABLED: 'true', PAYSTACK_MODE: 'test', PAYSTACK_SECRET_KEY: 'sk_test_server_only_value',
+    PAYSTACK_STARTER_PLAN_CODE: 'PLN_starter1', PAYSTACK_STARTER_AMOUNT_SUBUNIT: '250000', PAYSTACK_STARTER_CURRENCY: 'ngn',
+    PAYSTACK_PROFESSIONAL_PLAN_CODE: 'PLN_professional1', PAYSTACK_PROFESSIONAL_AMOUNT_SUBUNIT: '750000', PAYSTACK_PROFESSIONAL_CURRENCY: 'NGN',
+  };
+
+  it('is disabled by default and exposes no secret', () => {
+    const config = loadConfig(applicationEnvironment());
+    assert.equal(config.paystackEnabled, false);
+    assert.deepEqual(config.paystackPlans, {});
+    assert.equal(config.paystackSecretKey, undefined);
+  });
+
+  it('loads strict server-priced plan configuration outside production', () => {
+    const config = loadConfig(applicationEnvironment(enabled));
+    assert.equal(config.paystackCallbackUrl, 'http://localhost:5173/admin/billing');
+    assert.deepEqual(config.paystackPlans.starter, { tier: 'starter', planCode: 'PLN_starter1', amountSubunit: 250000, currency: 'NGN' });
+  });
+
+  it('rejects mode/key mismatches, malformed plans, and test mode in production', () => {
+    assert.throws(() => loadConfig(applicationEnvironment({ ...enabled, PAYSTACK_SECRET_KEY: 'sk_live_wrong' })), /match PAYSTACK_MODE/);
+    assert.throws(() => loadConfig(applicationEnvironment({ ...enabled, PAYSTACK_STARTER_AMOUNT_SUBUNIT: '0' })), /PAYSTACK_STARTER_AMOUNT_SUBUNIT/);
+    assert.throws(() => loadConfig(applicationEnvironment({ ...enabled, PAYSTACK_STARTER_PLAN_CODE: 'bad' })), /PLAN_CODE/);
+  });
+});
+
 describe('authentication rate-limit configuration', () => {
   it('loads the versioned default policies and direct-connection proxy default', () => {
     const config = loadConfig(applicationEnvironment());

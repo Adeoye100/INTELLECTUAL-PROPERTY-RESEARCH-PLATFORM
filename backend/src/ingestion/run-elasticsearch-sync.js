@@ -7,7 +7,7 @@ import {
 import { RegistryTrademarkRepository } from './registry-trademark-repository.js';
 
 const config = loadElasticsearchSyncConfig();
-const pool = createPool(config.databaseUrl);
+const pool = createPool(config.databaseUrl, config);
 try {
   const repository = new RegistryTrademarkRepository(pool);
   const projector = new ElasticsearchProjector({

@@ -1,4 +1,4 @@
-import { Suspense, type ComponentType } from 'react';
+import { lazy, Suspense, type ComponentType } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { AuthLayout } from './AuthLayout';
 import { MainLayout } from './MainLayout';
@@ -6,6 +6,8 @@ import { RouteErrorScreen, RouteLoading } from './RouteFeedback';
 import { RequireAdmin, RequireAuthentication, RoleHomeRedirect } from '../features/auth/RouteGuards';
 import { FeatureUnavailable } from './FeatureUnavailable';
 import { AdminUsersScreen } from '../features/admin/AdminUsersScreen';
+
+const BillingScreen = lazy(() => import('../features/billing/AdminScreen').then(({ AdminScreen }) => ({ default: AdminScreen })));
 
 type RouteModule = Record<string, ComponentType>;
 
@@ -55,9 +57,11 @@ const router = createBrowserRouter([
       { path: 'permission-denied', lazy: lazyComponent(() => import('../features/auth/PermissionDeniedScreen'), 'PermissionDeniedScreen') },
       { path: 'admin', element: <RequireAdmin><Navigate to="/admin/users" replace /></RequireAdmin> },
       { path: 'admin/users', element: <RequireAdmin><AdminUsersScreen /></RequireAdmin> },
+      { path: 'admin/billing', element: <RequireAdmin><Suspense fallback={<RouteLoading />}><BillingScreen /></Suspense></RequireAdmin> },
     ],
   },
 ]);
+
 
 export function AppRouter() {
   return <Suspense fallback={<RouteLoading />}><RouterProvider router={router} /></Suspense>;

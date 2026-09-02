@@ -71,16 +71,18 @@ describe('role access', () => {
   });
 
   it.each([
-    ['admin', 'Dashboard home'],
-    ['attorney', 'Dashboard home'],
-    ['viewer', 'Dashboard home'],
+    ['admin', 'Admin home'],
+    ['attorney', 'Attorney home'],
+    ['viewer', 'Viewer home'],
   ] as const)('routes %s to its role-aware home', (role, destination) => {
     setRole(role);
     render(
       <MemoryRouter initialEntries={['/app']}>
         <Routes>
           <Route path="/app" element={<RoleHomeRedirect />} />
-          <Route path="/dashboard" element={<div>Dashboard home</div>} />
+          <Route path="/admin/users" element={<div>Admin home</div>} />
+          <Route path="/portfolio" element={<div>Attorney home</div>} />
+          <Route path="/dashboard" element={<div>Viewer home</div>} />
         </Routes>
       </MemoryRouter>,
     );

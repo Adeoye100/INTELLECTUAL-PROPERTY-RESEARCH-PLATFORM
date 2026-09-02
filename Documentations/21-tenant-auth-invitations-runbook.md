@@ -17,6 +17,10 @@ Ordinary sign-in never provisions a firm. `/auth/signup` is a backwards-compatib
 | Attorney | Dashboard and enabled firm research/case-work features; never users, invitations, or firm administration. |
 | Viewer | Dashboard and read-only enabled firm information; no mutation or administration. |
 
+After session establishment, the authoritative API role determines the default route: Admins go to Users & Invitations, Attorneys to Portfolio, and Viewers to Dashboard. A `next` query parameter is accepted only when it is a same-origin application path; protocol-relative and cross-origin destinations are rejected. Route guards improve the browser experience, but the API role and firm membership remain the security boundary.
+
+There is intentionally no open "regular member" signup that guesses a tenant. An existing firm Admin invites a user and chooses Viewer (the UI default), Attorney, or Admin. Public Create organization is a separate bootstrap operation and makes the creator the first Admin by design. This prevents an unaffiliated identity from selecting another firm's ID or granting itself a role.
+
 The frontend capability map and route guard provide usable navigation and permission-denied feedback. The API remains the authority: all member and invitation management routes require a verified membership and Admin role, and every query is scoped to `request.auth.firmId`.
 
 ## Invitation lifecycle

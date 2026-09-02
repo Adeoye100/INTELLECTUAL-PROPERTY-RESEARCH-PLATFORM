@@ -39,7 +39,7 @@ describe('LoginScreen', () => {
         status: 200, headers: { 'Content-Type': 'application/json' },
       })));
     const user = userEvent.setup();
-    render(<MemoryRouter initialEntries={['/auth/login']}><Routes><Route path="/auth/login" element={<LoginScreen />} /><Route path="/dashboard" element={<h1>Dashboard destination</h1>} /></Routes></MemoryRouter>);
+    render(<MemoryRouter initialEntries={['/auth/login']}><Routes><Route path="/auth/login" element={<LoginScreen />} /><Route path="/portfolio" element={<h1>Attorney portfolio</h1>} /></Routes></MemoryRouter>);
 
     const email = screen.getByRole('textbox', { name: 'Email address' });
     email.focus();
@@ -51,7 +51,7 @@ describe('LoginScreen', () => {
     submit.focus();
     await user.keyboard('{Enter}');
 
-    expect(await screen.findByRole('heading', { name: 'Dashboard destination' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Attorney portfolio' })).toBeVisible();
     expect(auth.signInWithPassword).toHaveBeenCalledWith({ email: 'attorney@example.test', password: 'safe-password' });
   }, 20_000);
 

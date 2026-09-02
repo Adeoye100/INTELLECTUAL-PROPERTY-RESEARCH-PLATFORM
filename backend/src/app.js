@@ -17,6 +17,7 @@ import { createAuditRequestContextMiddleware } from './audit/request-context.js'
 import { createExportRouter } from './routes/export-routes.js';
 import { createHealthRouter } from './routes/health-routes.js';
 import { createDashboardRouter } from './routes/dashboard-routes.js';
+import { createBillingRouter } from './routes/billing-routes.js';
 import {
   createRequestBoundsMiddleware,
   rejectUnsupportedRequestContent,
@@ -42,6 +43,7 @@ export function createApp({
   includeDiagnosticRoutes = false,
   readinessChecks = [],
   dashboardAnalyticsService = null,
+  billingService = null,
 }) {
   if (!Number.isSafeInteger(trustProxyHops) || trustProxyHops < 0 || trustProxyHops > 10) {
     throw new Error('trustProxyHops must be an integer between 0 and 10.');
@@ -54,8 +56,17 @@ export function createApp({
   app.use(createAuditRequestContextMiddleware());
   app.use(createCorsMiddleware({ allowedOrigins: corsAllowedOrigins }));
   app.use(rejectUnsupportedRequestContent());
-  app.use(express.json({ limit: MAX_JSON_BODY_BYTES }));
+  app.use(express.json({
+    limit: MAX_JSON_BODY_BYTES,
+    verify: (request, _response, buffer) => {
+      if (request.originalUrl?.split('?', 1)[0] === '/api/v1/billing/webhook') {
+        request.rawBody = Buffer.from(buffer);
+      }
+    },
+  }));
   app.use(createHealthRouter({ readinessChecks }));
+
+  if (billingService) app.use('/api/v1', createBillingRouter(authenticate, billingService));
 
   app.use('/api/v1/auth', createAuthRouter(invitationService, authenticateIdentity, { authRateLimiter }));
   app.use(

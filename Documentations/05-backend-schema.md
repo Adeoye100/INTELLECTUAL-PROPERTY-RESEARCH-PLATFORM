@@ -189,15 +189,17 @@ composite key, source provenance uniqueness, object-only metadata constraint,
 lookup indexes, and the three Office Action audit actions/entity type. It is
 additive/repeat-safe and was **not applied** by BE-18.
 
-### `subscriptions`
-| Column | Type | Notes |
-|---|---|---|
-| id | uuid PK | |
-| firm_id | uuid FK | |
-| seats_licensed | int | |
-| billing_provider | text | confirmed in Phase 1 |
-| status | text | active/past_due/canceled |
-| renewal_date | date | ties to the yearly renewal line in the agreement |
+### Billing (migration 015)
+
+Subscription projection is stored on `firms`: `subscription_tier`,
+`subscription_status`, `subscription_provider`, provider subscription/customer
+codes, and `subscription_renews_at`. `billing_transactions` retains only
+firm-scoped provider references, the server-selected tier/plan/amount/currency,
+status, initiating user, and payment timestamps. `billing_webhook_events`
+retains a SHA-256 payload digest, bounded event name/reference, and processing
+timestamps for idempotency. It does not retain webhook payloads or payment
+credentials. Both new tables are deny-by-default behind RLS and grant no browser
+role direct access.
 
 ### `audit_logs`
 | Column | Type | Notes |

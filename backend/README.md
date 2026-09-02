@@ -721,8 +721,9 @@ For a deployed reverse-proxy chain, set it to the exact number of trusted hops
 true)`. Construction performs no Redis operation; the existing system Redis
 client lifecycle is reused. BE-15 has no database migration.
 
-BE-14 billing remains deferred. The error handler intentionally logs no request
-body or password.
+BE-14 billing is implemented as an Admin-only Paystack boundary under
+`/api/v1/billing`; see the production billing handoff for activation gates. The
+error handler intentionally logs no request body or password.
 
 ## BE-16 immutable audit log
 
@@ -836,7 +837,9 @@ BE-17 is **code-complete, staging verification pending**. The traceable route,
 authorization, migration, and security matrix is in
 [`../Documentations/08-phase2-backend-exit-check.md`](../Documentations/08-phase2-backend-exit-check.md).
 It uses the canonical backend contracts rather than frontend/mock candidate
-routes and explicitly records BE-14 billing as deferred.
+routes and records the historical BE-14 deferral in effect when BE-17 was
+signed off. Current billing behavior is documented in
+`../Documentations/22-production-billing-registry-auth-security.md`.
 
 The application-level `phase2-route-inventory.test.js` sends requests through
 `createApp` with injected fakes. It verifies every mounted non-deferred Phase 2
@@ -1143,7 +1146,8 @@ test. `pnpm migration:check` inspects 001–012 without applying them, and
 compatible load suite is under `load/`; it has no measured staging result and
 will refuse unsafe targets without explicit opt-in. See the documentation index
 and operations runbook for provider, staging, independent-audit, and failover
-gates. BE-14 remains deferred.
+gates. BE-14 is implemented but remains disabled until live provider
+configuration and acceptance gates are completed.
 # Dashboard analytics (VZ-03)
 
 `GET /api/v1/dashboard/analytics?range=7d|30d|90d` returns firm-scoped
