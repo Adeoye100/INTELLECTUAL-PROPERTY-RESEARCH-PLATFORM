@@ -70,9 +70,9 @@ export function HeroSection({
           </div>
 
           <div className="mt-10 flex flex-wrap gap-x-8 gap-y-3 border-t border-white/12 pt-5 text-xs text-white/65">
-            <span>Multi-jurisdiction search</span>
-            <span>Explainable risk signals</span>
-            <span>Firm-scoped security</span>
+            {/*<span>Multi-jurisdiction search</span>*/}
+            {/*<span>Explainable risk signals</span>*/}
+            {/*<span>Firm-scoped security</span>*/}
           </div>
         </div>
 

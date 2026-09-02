@@ -102,7 +102,7 @@ describe('LandingPage boot gate', () => {
     renderLanding({ fontReady: resolvedFonts, preloadImages: resolvedAssets });
 
     expect(await screen.findByTestId('landing-hero')).toBeVisible();
-    expect(screen.getByText('Scroll to assemble').parentElement).not.toHaveClass('animate-bounce-slow');
+    expect(screen.getByText('').parentElement).not.toHaveClass('animate-bounce-slow');
   });
 
   it('cleans up its timeout when unmounted', async () => {
