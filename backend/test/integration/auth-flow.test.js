@@ -103,7 +103,11 @@ describe('auth API with real PostgreSQL and Redis', () => {
     `);
     assert.deepEqual(
       columns.rows.filter(({ table_name }) => table_name === 'firms').map(({ column_name }) => column_name),
-      ['id', 'name', 'subscription_tier', 'created_at'],
+      [
+        'id', 'name', 'subscription_tier', 'created_at', 'subscription_status',
+        'subscription_provider', 'subscription_code', 'subscription_customer_code',
+        'subscription_renews_at',
+      ],
     );
     assert.deepEqual(
       columns.rows.filter(({ table_name }) => table_name === 'users').map(({ column_name }) => column_name),
