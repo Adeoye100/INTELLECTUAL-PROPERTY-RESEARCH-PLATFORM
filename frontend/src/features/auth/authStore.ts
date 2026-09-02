@@ -101,6 +101,7 @@ const displayName = (user: User) => {
 async function synchronizeSupabaseSession(session: Session): Promise<AuthenticatedUser> {
   try {
     const revision = beginSession(session.access_token);
+    await Promise.resolve();
     if (revision !== sessionRevision) {
       throw new AuthSynchronizationError('STALE_SESSION', 'A newer authentication state replaced this session.', {
         stage: 'resolve-current-user', responseCode: 'STALE_SESSION',

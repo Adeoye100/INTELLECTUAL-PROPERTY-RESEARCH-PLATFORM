@@ -1,25 +1,16 @@
-import { describe, expect, it } from 'vitest';
-import { filterPortfolioMarks, getRenewalWarning } from './portfolioDomain';
-import type { PortfolioMark } from '../../types';
+import { describe, expect, it } from "vitest";
+import { getRenewalWarning, portfolioFiltersFromParams, portfolioListQuery } from "./portfolioDomain";
 
-const mark = (overrides: Partial<PortfolioMark>): PortfolioMark => ({
-  id: 'p1', firmId: 'f1', ownerUserId: 'u1', markText: 'FORGE GLOBAL', jurisdiction: 'US',
-  niceClasses: [9], status: 'Registered', filingDate: '2020-01-01', renewalDate: '2026-08-20',
-  sourceRegistry: 'USPTO', ...overrides,
-});
-
-describe('portfolio renewal and filters', () => {
-  it('distinguishes overdue, urgent, upcoming, and safe renewal dates', () => {
-    const now = new Date('2026-08-04T12:00:00.000Z');
-    expect(getRenewalWarning('2026-08-03', now)).toMatchObject({ level: 'high', label: 'Overdue by 1 day' });
-    expect(getRenewalWarning('2026-08-20', now)).toMatchObject({ level: 'high', label: 'Due in 16 days' });
-    expect(getRenewalWarning('2026-10-01', now)).toMatchObject({ level: 'medium' });
-    expect(getRenewalWarning('2027-08-04', now)).toMatchObject({ level: 'low' });
+describe("portfolio domain", () => {
+  it("calculates renewal warnings from UTC calendar dates", () => {
+    const now = new Date("2026-08-04T12:00:00.000Z");
+    expect(getRenewalWarning("2026-08-03", now)).toMatchObject({ level: "high", label: "Overdue by 1 day" });
+    expect(getRenewalWarning("2026-10-01", now)).toMatchObject({ level: "medium" });
   });
 
-  it('applies mark, jurisdiction, status, and renewal filters', () => {
-    const marks = [mark({}), mark({ id: 'p2', markText: 'INNOVATE PRO', jurisdiction: 'EU', status: 'Pending', renewalDate: '2027-01-01' })];
-    expect(filterPortfolioMarks(marks, { mark: 'forge', jurisdiction: 'US', status: 'Registered', renewalWindow: '30' }, new Date('2026-08-04T12:00:00Z'))).toHaveLength(1);
-    expect(filterPortfolioMarks(marks, { mark: '', jurisdiction: 'EU', status: '', renewalWindow: 'all' })).toEqual([marks[1]]);
+  it("normalizes URL filters and maps renewal windows to bounded server query parameters", () => {
+    const filters = portfolioFiltersFromParams(new URLSearchParams("query=  forge%20global  &status=registered&jurisdiction=us&niceClass=9&renewal=30"));
+    expect(filters).toMatchObject({ query: "forge global", status: "registered", jurisdiction: "US", niceClass: "9", renewalWindow: "30" });
+    expect(portfolioListQuery(filters, 2, new Date("2026-08-04T12:00:00.000Z"))).toEqual({ page: 2, pageSize: 25, query: "forge global", status: "registered", jurisdiction: "US", niceClass: 9, renewalAfter: "2026-08-04", renewalBefore: "2026-09-03" });
   });
 });

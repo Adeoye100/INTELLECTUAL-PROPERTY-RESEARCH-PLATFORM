@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { Session } from '@supabase/supabase-js';
 import { CheckCircle, Mail } from 'lucide-react';
 import { Link, useSearchParams, useParams } from 'react-router-dom';
 import { Button } from '../../components/Button';
@@ -19,35 +20,65 @@ export function EmailVerificationScreen() {
   const [status, setStatus] = useState<'pending' | 'loading' | 'verified' | 'resent' | 'error'>(confirmationCode ? 'loading' : 'pending');
   const [error, setError] = useState<AuthApiError | null>(null);
   const statusRef = useRef<HTMLDivElement>(null);
-  const exchangePromise = useRef<Promise<void> | null>(null);
+  const exchangePromise = useRef<Promise<Session> | null>(null);
+  const exchangedCode = useRef<string | null>(null);
+  const exchangedSession = useRef<Session | null>(null);
+  const invitationRedeemed = useRef(false);
+  const organizationProvisioned = useRef(false);
+  const synchronized = useRef(false);
 
   const exchangeConfirmation = useCallback(async () => {
-    if (!confirmationCode) return;
-    exchangePromise.current ??= supabase.auth.exchangeCodeForSession(confirmationCode).then(async ({ data, error: exchangeError }) => {
+    if (!confirmationCode) return null;
+    if (exchangedCode.current !== confirmationCode) {
+      exchangedCode.current = confirmationCode;
+      exchangePromise.current = null;
+      exchangedSession.current = null;
+      invitationRedeemed.current = false;
+      organizationProvisioned.current = false;
+      synchronized.current = false;
+    }
+    if (exchangedSession.current) return exchangedSession.current;
+    exchangePromise.current ??= supabase.auth.exchangeCodeForSession(confirmationCode).then(({ data, error: exchangeError }) => {
       if (exchangeError) throw exchangeError;
       if (!data.session) throw new Error('Supabase did not return a session for this confirmation.');
-      if (invitationToken) await redeemInvitationForSession(data.session, invitationToken);
-      if (organizationIntentToken) await provisionOrganizationForSession(data.session, organizationIntentToken);
-      await syncSupabaseSession(data.session);
+      exchangedSession.current = data.session;
+      return data.session;
     });
     try {
-      await exchangePromise.current;
+      return await exchangePromise.current;
     } catch (error) {
       exchangePromise.current = null;
       throw error;
     }
-  }, [confirmationCode, invitationToken, organizationIntentToken]);
+  }, [confirmationCode]);
+
+  const completeVerifiedSession = useCallback(async () => {
+    const session = await exchangeConfirmation();
+    if (!session) return;
+    if (invitationToken && !invitationRedeemed.current) {
+      await redeemInvitationForSession(session, invitationToken);
+      invitationRedeemed.current = true;
+    }
+    if (organizationIntentToken && !organizationProvisioned.current) {
+      await provisionOrganizationForSession(session, organizationIntentToken);
+      organizationProvisioned.current = true;
+    }
+    if (!synchronized.current) {
+      await syncSupabaseSession(session);
+      synchronized.current = true;
+    }
+  }, [exchangeConfirmation, invitationToken, organizationIntentToken]);
 
   const verify = useCallback(async () => {
     setStatus('loading'); setError(null);
-    try { await exchangeConfirmation(); setStatus('verified'); }
+    try { await completeVerifiedSession(); setStatus('verified'); }
     catch (caught) { setError(toAuthApiError(caught)); setStatus('error'); }
-  }, [exchangeConfirmation]);
+  }, [completeVerifiedSession]);
 
   useEffect(() => {
     if (!confirmationCode) return;
     let active = true;
-    void exchangeConfirmation()
+    void completeVerifiedSession()
       .then(() => { if (active) setStatus('verified'); })
       .catch((caught) => {
         if (active) {
@@ -56,7 +87,7 @@ export function EmailVerificationScreen() {
         }
       });
     return () => { active = false; };
-  }, [confirmationCode, exchangeConfirmation]);
+  }, [confirmationCode, completeVerifiedSession]);
   useEffect(() => { if (status !== 'loading' && status !== 'pending') statusRef.current?.focus(); }, [status]);
 
   const resend = async () => {

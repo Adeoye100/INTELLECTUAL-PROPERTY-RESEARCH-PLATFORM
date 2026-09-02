@@ -1,8 +1,8 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SignupScreen } from './SignupScreen';
 
 const auth = vi.hoisted(() => ({ signUp: vi.fn() }));
@@ -21,27 +21,32 @@ const renderSignup = () => render(
 
 async function completeSignupForm(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByRole('textbox', { name: 'Full name' }), 'Ada Counsel');
-  await user.type(screen.getByRole('textbox', { name: 'Company or firm' }), 'Forge Legal');
+  await user.type(screen.getByRole('textbox', { name: 'Firm name' }), 'Forge Legal');
   await user.type(screen.getByRole('textbox', { name: 'Email address' }), 'ada@example.test');
   await user.type(screen.getByLabelText('Password'), 'safe-password');
 }
 
+beforeEach(() => {
+  vi.stubEnv('VITE_PUBLIC_FIRM_SIGNUP_ENABLED', 'true');
+});
+
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   auth.signUp.mockReset();
 });
 
 describe('SignupScreen', () => {
   it('creates the Supabase identity and advances to verification when confirmation defers the session', async () => {
     auth.signUp.mockResolvedValue({ data: { user: { id: 'u1', identities: [{}] }, session: null }, error: null });
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ intentToken: 'intent-token', expiresAt: '2026-12-31T23:59:59.000Z' })).mockResolvedValueOnce(jsonResponse({ intentToken: 'intent-token', expiresAt: '2026-12-31T23:59:59.000Z' }));
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     renderSignup();
 
     await completeSignupForm(user);
-    const submit = screen.getByRole('button', { name: 'Request access' });
+    const submit = screen.getByRole('button', { name: 'Create organization' });
     submit.focus();
     await user.keyboard('{Enter}');
 
@@ -55,7 +60,7 @@ describe('SignupScreen', () => {
         full_name: 'Ada Counsel', forge_signup_firm_name: 'Forge Legal',
       }) }),
     }));
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledOnce();
   }, 20_000);
 
   it('provisions the firm with the returned access token before entering the app', async () => {
@@ -80,6 +85,7 @@ describe('SignupScreen', () => {
       error: null,
     });
     const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ intentToken: 'intent-token', expiresAt: '2026-12-31T23:59:59.000Z' }))
       .mockResolvedValueOnce(jsonResponse({
         user: { id: 'local-user', firmId: 'firm-1', email: 'ada@example.test', role: 'admin' },
         firm: { id: 'firm-1', name: 'Forge Legal', subscriptionTier: 'free' },
@@ -99,13 +105,14 @@ describe('SignupScreen', () => {
     );
 
     await completeSignupForm(user);
-    await user.click(screen.getByRole('button', { name: 'Request access' }));
+    await user.click(screen.getByRole('button', { name: 'Create organization' }));
 
     expect(await screen.findByRole('heading', { name: 'Dashboard workspace' })).toBeVisible();
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/provisioning/firm');
-    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('Authorization')).toBe('Bearer verified-signup-token');
-    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ firmName: 'Forge Legal' });
-    expect(String(fetchMock.mock.calls[1][0])).toContain('/me');
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/provisioning/organization-intents');
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/provisioning/firm');
+    expect(new Headers(fetchMock.mock.calls[1][1]?.headers).get('Authorization')).toBe('Bearer verified-signup-token');
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual({ intentToken: 'intent-token' });
+    expect(String(fetchMock.mock.calls[2][0])).toContain('/me');
   }, 20_000);
 
   it('reports a conflicting firm without sending the password to the backend', async () => {
@@ -123,7 +130,7 @@ describe('SignupScreen', () => {
       },
       error: null,
     });
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ intentToken: 'intent-token', expiresAt: '2026-12-31T23:59:59.000Z' })).mockResolvedValueOnce(jsonResponse({
       code: 'FIRM_ALREADY_EXISTS',
       message: 'This firm may already exist. Request an invitation from your firm administrator.',
     }, 409));
@@ -132,29 +139,28 @@ describe('SignupScreen', () => {
     renderSignup();
 
     await completeSignupForm(user);
-    await user.click(screen.getByRole('button', { name: 'Request access' }));
+    await user.click(screen.getByRole('button', { name: 'Create organization' }));
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(/request an invitation from your firm administrator/i);
     expect(alert).not.toHaveTextContent(/reset password/i);
-    expect(String(fetchMock.mock.calls[0][1]?.body)).not.toContain('safe-password');
+    expect(String(fetchMock.mock.calls[1][1]?.body)).not.toContain('safe-password');
   }, 20_000);
 
   it('shows the duplicate-account recovery state from Supabase', async () => {
     auth.signUp.mockResolvedValue({ data: { user: null, session: null }, error: { code: 'user_already_exists', message: 'Already registered' } });
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ intentToken: 'intent-token', expiresAt: '2026-12-31T23:59:59.000Z' })).mockResolvedValueOnce(jsonResponse({ intentToken: 'intent-token', expiresAt: '2026-12-31T23:59:59.000Z' }));
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     renderSignup();
 
     await completeSignupForm(user);
-    await user.click(screen.getByRole('button', { name: 'Request access' }));
+    await user.click(screen.getByRole('button', { name: 'Create organization' }));
 
     const alert = await screen.findByRole('alert');
     await waitFor(() => expect(alert).toHaveFocus());
     expect(alert).toHaveTextContent(/account already exists for this email address/i);
-    expect(within(alert).getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/auth/login');
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledOnce();
   }, 20_000);
 
   it('exposes accessible validation errors in keyboard order', async () => {
@@ -163,11 +169,11 @@ describe('SignupScreen', () => {
 
     await user.tab();
     expect(screen.getByRole('textbox', { name: 'Full name' })).toHaveFocus();
-    screen.getByRole('button', { name: 'Request access' }).focus();
+    screen.getByRole('button', { name: 'Create organization' }).focus();
     await user.keyboard('{Enter}');
-
-    expect(await screen.findByText('Enter your full name.')).toHaveAttribute('id', 'signup-fullName-error');
-    expect(screen.getByRole('textbox', { name: 'Full name' })).toHaveAttribute('aria-describedby', 'signup-fullName-error');
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Enter your name, organization name, valid email address, and a password of at least eight characters.');
+    await waitFor(() => expect(alert).toHaveFocus());
     expect(auth.signUp).not.toHaveBeenCalled();
     expect((await axe.run(container)).violations).toEqual([]);
   }, 20_000);

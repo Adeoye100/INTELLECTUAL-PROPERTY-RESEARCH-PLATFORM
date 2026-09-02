@@ -80,7 +80,7 @@ describe('syncSupabaseSession', () => {
     expect(useAuthStore.getState().status).toBe('unauthenticated');
   });
 
-  it('classifies a provisioning conflict and emits no session token in its diagnostic', async () => {
+  it('does not provision from editable signup metadata and emits no session token in its diagnostic', async () => {
     const diagnosticListener = vi.fn();
     window.addEventListener(AUTH_SYNCHRONIZATION_DIAGNOSTIC_EVENT, diagnosticListener);
     const consoleSpy = vi.spyOn(console, 'log');
@@ -95,7 +95,7 @@ describe('syncSupabaseSession', () => {
     await expect(syncSupabaseSession(signupSession as never)).rejects.toMatchObject({ code: 'FIRM_ALREADY_EXISTS' });
 
     expect(getLastAuthSynchronizationDiagnostic()).toEqual(expect.objectContaining({
-      stage: 'provisioning', status: 409, responseCode: 'VALIDATION_ERROR', requestOrigin: expect.any(String),
+      stage: 'resolve-current-user', status: 409, responseCode: 'VALIDATION_ERROR', requestOrigin: expect.any(String),
     }));
     expect(diagnosticListener.mock.calls[0][0].detail).not.toHaveProperty('accessToken');
     expect(JSON.stringify(diagnosticListener.mock.calls[0][0].detail)).not.toContain(session.access_token);

@@ -1,11 +1,18 @@
-import type { UserRole } from '../../types';
+import type { UserRole } from "../../types";
 
-export type Capability = 'dashboard:view' | 'members:manage' | 'invitations:manage' | 'firm:write' | 'firm:read';
+export type Capability =
+  | "dashboard:view"
+  | "portfolio:view"
+  | "portfolio:write"
+  | "members:manage"
+  | "invitations:manage"
+  | "firm:write"
+  | "firm:read";
 
 const capabilities: Record<UserRole, ReadonlySet<Capability>> = {
-  admin: new Set(['dashboard:view', 'members:manage', 'invitations:manage', 'firm:write', 'firm:read']),
-  attorney: new Set(['dashboard:view', 'firm:write', 'firm:read']),
-  viewer: new Set(['dashboard:view', 'firm:read']),
+  admin: new Set(["dashboard:view", "portfolio:view", "portfolio:write", "members:manage", "invitations:manage", "firm:write", "firm:read"]),
+  attorney: new Set(["dashboard:view", "portfolio:view", "portfolio:write", "firm:write", "firm:read"]),
+  viewer: new Set(["dashboard:view", "portfolio:view", "firm:read"]),
 };
 
 export function hasCapability(role: UserRole | null | undefined, capability: Capability) {
@@ -19,8 +26,9 @@ export interface NavigationItem {
 }
 
 const functionalNavigation: readonly NavigationItem[] = [
-  { to: '/dashboard', label: 'Dashboard', capability: 'dashboard:view' },
-  { to: '/admin/users', label: 'Users & Invitations', capability: 'members:manage' },
+  { to: "/dashboard", label: "Dashboard", capability: "dashboard:view" },
+  { to: "/portfolio", label: "Portfolio", capability: "portfolio:view" },
+  { to: "/admin/users", label: "Users & Invitations", capability: "members:manage" },
 ];
 
 export function navigationForRole(role: UserRole | null | undefined) {
@@ -28,7 +36,7 @@ export function navigationForRole(role: UserRole | null | undefined) {
 }
 
 export const roleDescriptions: Record<UserRole, string> = {
-  admin: 'Admin manages firm members and settings.',
-  attorney: 'Attorney performs firm legal and research work.',
-  viewer: 'Viewer has read-only access to firm information.',
+  admin: "Admin manages firm members and settings.",
+  attorney: "Attorney performs firm legal and research work.",
+  viewer: "Viewer has read-only access to firm information.",
 };

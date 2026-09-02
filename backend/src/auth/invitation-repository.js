@@ -6,8 +6,8 @@ function timestamp(value) {
 
 function statusFor(row, now = Date.now()) {
   if (row.used_at || row.accepted_at) return 'accepted';
-  if (row.revoked_at) return 'revoked';
   if (row.superseded_by) return 'superseded';
+  if (row.revoked_at) return 'revoked';
   if (timestamp(row.expires_at).getTime() <= now) return 'expired';
   return 'pending';
 }
@@ -127,14 +127,47 @@ export class InvitationRepository {
     if (!current.rowCount) throw invitationError('NOT_FOUND');
     const invitation = invitationFromRow(current.rows[0]);
     if (invitation.status !== 'pending') throw invitationError('NOT_PENDING');
-    await transaction.query('UPDATE firm_invitations SET superseded_by = $2 WHERE id = $1', [invitationId, id]);
+    // Revoke first to leave the partial active-invitation uniqueness set before
+    // inserting the replacement. The self-referential superseded_by FK cannot
+    // point at an invitation row that has not been inserted yet.
+    await transaction.query('UPDATE firm_invitations SET revoked_at = now() WHERE id = $1', [invitationId]);
     const inserted = await transaction.query(
       `INSERT INTO firm_invitations (id, firm_id, issued_by_user_id, email, intended_name, role, expires_at, token_hash, last_sent_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now()) RETURNING id`,
       [id, firmId, issuerUserId, invitation.email, invitation.intendedName, invitation.role, expiresAt, tokenHash],
     );
+    await transaction.query('UPDATE firm_invitations SET superseded_by = $2 WHERE id = $1', [invitationId, inserted.rows[0].id]);
     const full = await transaction.query(`${invitationSelect} WHERE invitation.id = $1`, [inserted.rows[0].id]);
     return { previous: invitation, invitation: invitationFromRow(full.rows[0]) };
+  }
+
+  async restoreUndeliveredResend({ transaction, firmId, actorSupabaseUserId, previousInvitationId, invitationId }) {
+    await this.assertAdmin(transaction, { firmId, actorSupabaseUserId });
+    const previousResult = await transaction.query(
+      `${invitationSelect} WHERE invitation.firm_id = $1 AND invitation.id = $2 FOR UPDATE OF invitation`,
+      [firmId, previousInvitationId],
+    );
+    const replacementResult = await transaction.query(
+      `${invitationSelect} WHERE invitation.firm_id = $1 AND invitation.id = $2 FOR UPDATE OF invitation`,
+      [firmId, invitationId],
+    );
+    if (!previousResult.rowCount || !replacementResult.rowCount) throw invitationError('NOT_FOUND');
+    const previous = invitationFromRow(previousResult.rows[0]);
+    const replacement = invitationFromRow(replacementResult.rows[0]);
+    if (previous.status !== 'superseded' || replacement.status !== 'pending') throw invitationError('NOT_PENDING');
+    await transaction.query('UPDATE firm_invitations SET revoked_at = now() WHERE id = $1', [invitationId]);
+    await transaction.query(
+      `UPDATE firm_invitations SET revoked_at = NULL, superseded_by = NULL
+       WHERE id = $1 AND used_at IS NULL AND accepted_at IS NULL`,
+      [previousInvitationId],
+    );
+    const afterPrevious = await transaction.query(`${invitationSelect} WHERE invitation.id = $1`, [previousInvitationId]);
+    const afterReplacement = await transaction.query(`${invitationSelect} WHERE invitation.id = $1`, [invitationId]);
+    return {
+      previous: invitationFromRow(afterPrevious.rows[0]),
+      replacementBefore: replacement,
+      replacement: invitationFromRow(afterReplacement.rows[0]),
+    };
   }
 
   async revoke({ transaction, firmId, actorSupabaseUserId, invitationId }) {

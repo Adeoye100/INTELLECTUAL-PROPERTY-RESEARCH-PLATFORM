@@ -17,7 +17,7 @@ export class DashboardAnalyticsRepository {
       this.database.query('SELECT COUNT(*)::int AS total FROM portfolio_marks WHERE firm_id = $1', [firmId]),
       this.database.query('SELECT status, COUNT(*)::int AS count FROM portfolio_marks WHERE firm_id = $1 GROUP BY status', [firmId]),
       this.database.query(`SELECT COALESCE(rs.composite_rating, 'unknown') AS rating, COUNT(*)::int AS count FROM portfolio_marks pm LEFT JOIN LATERAL (SELECT composite_rating FROM risk_scores WHERE firm_id = pm.firm_id AND portfolio_mark_id = pm.id ORDER BY created_at DESC LIMIT 1) rs ON true WHERE pm.firm_id = $1 GROUP BY rs.composite_rating`, [firmId]),
-      this.database.query("SELECT COUNT(*)::int AS count FROM portfolio_marks WHERE firm_id = $1 AND renewal_date IS NOT NULL AND renewal_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'", [firmId]),
+      this.database.query("SELECT COUNT(*)::int AS count FROM portfolio_marks WHERE firm_id = $1 AND renewal_date IS NOT NULL AND renewal_date BETWEEN (now() AT TIME ZONE 'UTC')::date AND (now() AT TIME ZONE 'UTC')::date + INTERVAL '30 days'", [firmId]),
       this.database.query("SELECT state, COUNT(*)::int AS count FROM watches WHERE firm_id = $1 GROUP BY state", [firmId]),
       this.database.query('SELECT DATE(last_polled_at) AS day, COUNT(*)::int AS polls, COUNT(*) FILTER (WHERE last_poll_status = \'partial\')::int AS partial, COUNT(*) FILTER (WHERE last_poll_status = \'failed\')::int AS unavailable FROM watches WHERE firm_id = $1 AND last_polled_at >= $2 GROUP BY DATE(last_polled_at)', [firmId, since]),
       this.database.query('SELECT DATE(created_at) AS day, COUNT(*)::int AS alerts FROM alerts WHERE firm_id = $1 AND created_at >= $2 GROUP BY DATE(created_at)', [firmId, since]),

@@ -125,7 +125,7 @@ export class InvitationService {
     try {
       await this.invitationMailer.sendInvitation({ invitation: result.invitation, token });
     } catch (error) {
-      await this.revokeUndelivered(result.invitation, auth, requestContext);
+      await this.restoreUndeliveredResend(result, auth, requestContext);
       if (error instanceof AppError) throw error;
       throw new AppError(503, 'INVITATION_EMAIL_UNAVAILABLE', 'Invitation email could not be delivered. Please retry.');
     }
@@ -203,6 +203,21 @@ export class InvitationService {
         await this.record(transaction, auth, AUDIT_ACTIONS.INVITATION_REVOKED, changed.after, changed.before, changed.after, requestContext);
       });
     } catch { /* The original request still fails; no token is ever returned to the browser. */ }
+  }
+
+  async restoreUndeliveredResend(result, auth, requestContext) {
+    try {
+      await this.invitationRepository.withTransaction(async (transaction) => {
+        const restored = await this.invitationRepository.restoreUndeliveredResend({
+          transaction, firmId: auth.firmId, actorSupabaseUserId: auth.userId,
+          previousInvitationId: result.previous.id, invitationId: result.invitation.id,
+        });
+        await this.record(
+          transaction, auth, AUDIT_ACTIONS.INVITATION_REVOKED, restored.replacement,
+          restored.replacementBefore, restored.replacement, requestContext,
+        );
+      });
+    } catch { /* Preserve the delivery failure; audit data never includes token material. */ }
   }
 
   async record(transaction, auth, action, invitation, before, after, requestContext) {

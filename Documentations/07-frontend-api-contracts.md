@@ -47,12 +47,12 @@ and environment configuration.
 | `GET /api/v1/search` | Query: `mark`, repeated `jurisdiction`, comma-separated `class`, `status`, `owner`, `filedFrom`, `filedTo` | Implemented BE-19 `SearchResponse`: `{ searchId, results, sourceStatuses, partial, requestId }`. Every result uses that immutable `searchId` and includes risk evidence with `conceptualScore: null`; `owner` and `filingDate` may be `null`. Elasticsearch `relevanceScore`, raw responses, and legal conclusions are not exposed. | Admin, Attorney, Viewer | The server persists the normalized result/evidence snapshot transactionally before responding |
 | `GET /api/v1/search-results` | Optional `requestedByUserId`, `createdFrom`, `createdTo`, `partial`, `pageSize`, `cursor` | `{ searchResults, nextCursor }` summaries only | Admin firm-wide; Attorney/Viewer own history only | Bounded cursor pagination, `createdAt DESC, id DESC`; no result arrays in list rows |
 | `GET /api/v1/search-results/:id` | UUID path parameter | Exact historical normalized query, results, source statuses, methodology versions, request ID, and creation time | Admin, Attorney, Viewer in firm | Firm-scoped; never reruns Elasticsearch or recalculates risk |
-| `POST /api/v1/portfolio/import` | `{ searchResultId: string }` | `201 PortfolioMark` | Admin, Attorney | Idempotency, source snapshot, ownership/firm selection, renewal derivation |
-| `GET /api/v1/portfolio-marks` | Implemented canonical list; see BE-11 contract below | `200 { items, pagination }` | Admin, Attorney, Viewer within firm | Frontend must migrate old `/portfolio` mock calls before live use |
+| `POST /api/v1/portfolio/import` | Not implemented; deferred | — | — | Search import is outside P2-01 and absent from the active UI |
+| `GET /api/v1/portfolio-marks` | Implemented canonical list; see BE-11 contract below | `200 { items, pagination }` | Admin, Attorney, Viewer within firm | P2-01 frontend uses this paginated contract |
 | `POST /api/v1/portfolio-marks` | Implemented canonical create; see BE-11 contract below | `201 PortfolioMark` | Admin, Attorney | Transactional BE-16 audit event included |
 | `GET /api/v1/portfolio-marks/:id` | UUID path parameter | `200 PortfolioMark` | Admin, Attorney, Viewer in same firm | No status-history endpoint in BE-11 |
 | `PATCH /api/v1/portfolio-marks/:id` | Non-empty mutable-field subset | `200 PortfolioMark` | Admin, Attorney | Transactional BE-16 audit event included |
-| `DELETE /api/v1/portfolio-marks/:id` | UUID path parameter | `204` | Admin, Attorney | Transactional hard delete and audit event |
+| `DELETE /api/v1/portfolio-marks/:id` | UUID path parameter | `204` | Admin, Attorney | Backend route exists, but P2-01 UI withholds deletion because restrictive dependent foreign keys require a separate lifecycle decision |
 | `GET /api/v1/portfolio/:markId/attachments` | Mark ID in path | `PortfolioAttachment[]` | Admin, Attorney, Viewer in same firm | Storage metadata, malware state, pagination, retention |
 | `GET /api/v1/portfolio/:markId/attachments/:attachmentId/download` | IDs in path | Current mock shape `{ downloadUrl, fileName, mocked? }` | Admin, Attorney, Viewer in same firm | Direct authenticated blob vs short-lived URL, content-type/disposition, URL TTL, download audit; current frontend fixture is not a live contract |
 | `POST /api/v1/portfolio/:markId/watch` | Not implemented; no convenience alias | — | — | Canonical BE-12 route is `/api/v1/watches` |
@@ -141,7 +141,7 @@ successful create/get/update response is:
 The list response is `{ items: PortfolioMark[], pagination: { page, pageSize,
 total, totalPages } }`. It defaults to `page=1` and `pageSize=25`, caps page at
 100,000 and page size at 100, and orders records by newest creation timestamp
-then descending ID. Supported filters are `status`, `jurisdiction`,
+then descending ID. Supported filters are bounded case-insensitive literal `query`, `status`, `jurisdiction`,
 `sourceRegistry`, exact `registryReference`, `niceClass`, `renewalAfter`, and
 `renewalBefore` (the date filters use `YYYY-MM-DD`).
 
@@ -150,8 +150,7 @@ Stable errors are `VALIDATION_ERROR` (400), `UNAUTHORIZED` (401), `FORBIDDEN`
 `INTERNAL_ERROR` (500). The conflict is the same firm's duplicate
 `sourceRegistry`/`registryReference`; SQL and tenant details are not exposed.
 
-Deletion is a transactional hard delete because the schema specifies no
-soft-delete or retention policy. BE-16 adds redacted audit entries for
+The backend has a transactional hard-delete operation, but P2-01 does not expose it in the UI. Watches, risk scores, alerts, and Office Action references use restrictive foreign keys, so dependency-safe deletion or archival requires a separate reviewed lifecycle decision. BE-16 adds redacted audit entries for
 successful Portfolio Mark mutations before production activation. This ticket
 does not connect marks to risk analyses, watches, alerts, or exports.
 

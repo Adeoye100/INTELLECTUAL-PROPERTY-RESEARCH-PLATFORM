@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OfficeActionResearchScreen } from './OfficeActionResearchScreen';
 
-const mark = { id: 'p1', firmId: 'f1', ownerUserId: 'u1', markText: 'FORGE GLOBAL', jurisdiction: 'US', niceClasses: [9], status: 'Registered', filingDate: '2020-01-01', renewalDate: '2030-01-01', sourceRegistry: 'USPTO' };
+const mark = { id: 'p1', firmId: 'f1', ownerUserId: 'u1', markText: 'FORGE GLOBAL', jurisdiction: 'US', niceClasses: [9], status: 'registered', filingDate: '2020-01-01', renewalDate: '2030-01-01', sourceRegistry: 'USPTO', registryReference: 'TEST-1', registrationDate: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
 const officeAction = { id: 'oa1', portfolioMarkId: null, referenceText: 'USPTO OA-2025-10', examinerReasoningSummary: 'Shared dominant term and related software services.', linkedPrecedentRef: null };
 
 function renderScreen(action = officeAction) {
@@ -13,7 +13,7 @@ function renderScreen(action = officeAction) {
     const url = String(input);
     const body = url.includes('/office-actions/search') ? [action]
       : url.includes('/office-actions/link') ? { success: true, message: 'Linked', linkedOfficeActionId: 'oa1', linkedPortfolioMarkId: 'p1' }
-        : [mark];
+        : { items: [mark], pagination: { page: 1, pageSize: 25, total: 1, totalPages: 1 } };
     return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
   });
   vi.stubGlobal('fetch', fetchMock);

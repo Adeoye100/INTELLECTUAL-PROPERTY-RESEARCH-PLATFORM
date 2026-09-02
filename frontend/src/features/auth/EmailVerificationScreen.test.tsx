@@ -48,14 +48,14 @@ describe('EmailVerificationScreen', () => {
       },
       error: null,
     });
-    renderVerification('/auth/verify-email?code=valid-code');
+    renderVerification('/auth/verify-email?code=valid-code&organization_intent=intent-token');
 
     await screen.findByRole('heading', { name: 'Email verified' });
     const status = screen.getByRole('status');
     await waitFor(() => expect(status).toHaveFocus());
     expect(auth.exchangeCodeForSession).toHaveBeenCalledWith('valid-code');
     expect(fetch).toHaveBeenCalledWith('/api/v1/provisioning/firm', expect.objectContaining({
-      method: 'POST', body: JSON.stringify({ firmName: 'Forge Legal' }),
+      method: 'POST', body: JSON.stringify({ intentToken: 'intent-token' }),
     }));
     expect(screen.getByRole('link', { name: 'Continue to the app' })).toHaveAttribute('href', '/app');
   });

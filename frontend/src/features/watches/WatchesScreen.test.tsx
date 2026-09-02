@@ -8,7 +8,7 @@ import type { Alert, PortfolioMark, WatchSummary } from '../../types';
 import { useAuthStore } from '../auth/authStore';
 import { WatchesScreen } from './WatchesScreen';
 
-const mark: PortfolioMark = { id: 'p1', firmId: 'f1', ownerUserId: 'u1', markText: 'FORGE GLOBAL', jurisdiction: 'US', niceClasses: [9], status: 'Registered', filingDate: '2020-01-01', renewalDate: '2030-01-01', sourceRegistry: 'USPTO' };
+const mark: PortfolioMark = { id: 'p1', firmId: 'f1', ownerUserId: 'u1', markText: 'FORGE GLOBAL', jurisdiction: 'US', niceClasses: [9], status: 'registered', filingDate: '2020-01-01', renewalDate: '2030-01-01', sourceRegistry: 'USPTO', registryReference: 'TEST-1', registrationDate: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
 const watches: WatchSummary[] = [];
 const alerts: Alert[] = [
   { id: 'older', watchId: 'w1', matchedFilingRef: 'EU1', riskScoreId: 'r2', riskResultId: '2', read: true, createdAt: '2026-08-01T22:00:00Z', matchedMarkText: 'FORTRESS', protectedMarkText: 'FORGE GLOBAL', severity: 'medium', source: 'EUIPO', supportingEvidence: ['Visual match'] },
@@ -24,7 +24,7 @@ const renderWatches = () => {
     const url = String(input);
     if (url.includes('/api/v1/alerts') && init?.method === 'GET') return jsonResponse(alerts);
     if (url.endsWith('/api/v1/watches') && init?.method === 'GET') return jsonResponse(watches);
-    if (url.endsWith('/api/v1/portfolio')) return jsonResponse([mark]);
+    if (url.includes('/api/v1/portfolio-marks')) return jsonResponse({ items: [mark], pagination: { page: 1, pageSize: 25, total: 1, totalPages: 1 } });
     if (url.endsWith('/api/v1/watches') && init?.method === 'POST') return jsonResponse({ id: 'w-new', userId: 'u1', markText: mark.markText, jurisdiction: mark.jurisdiction, mocked: true, ...JSON.parse(String(init.body)) }, 201);
     return jsonResponse({}, 500);
   });

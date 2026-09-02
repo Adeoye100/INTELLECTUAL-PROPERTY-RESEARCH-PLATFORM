@@ -31,8 +31,8 @@ export function createPortfolioMarkRouter(authenticate, portfolioMarkService) {
     async (request, response) => {
       response.json(await portfolioMarkService.listPortfolioMarks({
         firmId: request.auth.firmId,
-        filters: request.portfolioMarkFilters,
-        pagination: request.portfolioMarkPagination,
+        filters: request.query,
+        pagination: request.query,
       }));
     });
   router.get('/portfolio-marks/:id', authenticate, requireRole(READ_ROLES), validatePortfolioMarkId,

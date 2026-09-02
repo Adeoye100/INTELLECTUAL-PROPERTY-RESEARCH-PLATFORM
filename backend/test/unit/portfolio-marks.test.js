@@ -118,12 +118,15 @@ describe('portfolio mark service', () => {
     const invalidOperations = [
       () => service.getPortfolioMark({ firmId, portfolioMarkId: 'not-a-uuid' }),
       () => service.createPortfolioMark({ firmId, actorUserId: userId, input: { ...input, status: 'live' } }),
+      () => service.createPortfolioMark({ firmId, actorUserId: userId, input: { ...input, status: 'draft' } }),
       () => service.createPortfolioMark({ firmId, actorUserId: userId, input: { ...input, filingDate: '2026-02-30' } }),
       () => service.createPortfolioMark({ firmId, actorUserId: userId, input: { ...input, niceClasses: [46] } }),
       () => service.createPortfolioMark({ firmId, actorUserId: userId, input: { ...input, firm_id: otherFirmId } }),
+      () => service.createPortfolioMark({ firmId, actorUserId: userId, input: { ...input, ownerUserId: userId } }),
       () => service.updatePortfolioMark({ firmId, portfolioMarkId: markId, input: {} }),
       () => service.updatePortfolioMark({ firmId, portfolioMarkId: markId, input: { id: markId } }),
       () => service.listPortfolioMarks({ firmId, filters: { role: 'admin' }, pagination: {} }),
+      () => service.listPortfolioMarks({ firmId, filters: { query: 'x'.repeat(201) }, pagination: {} }),
       () => service.listPortfolioMarks({ firmId, filters: { niceClass: '46' }, pagination: {} }),
       () => service.listPortfolioMarks({ firmId, filters: { renewalAfter: '2026-03-01', renewalBefore: '2026-02-01' }, pagination: {} }),
       () => service.listPortfolioMarks({ firmId, filters: {}, pagination: { page: '0' } }),
@@ -169,7 +172,7 @@ describe('portfolio mark repository', () => {
       niceClasses: [9, 42], status: 'registered', filingDate: null, registrationDate: null, renewalDate: null,
     } });
     const listed = await repo.list({ firmId, filters: {
-      status: 'registered', jurisdiction: null, sourceRegistry: null, registryReference: null,
+      query: '100%_FORGE', status: 'registered', jurisdiction: null, sourceRegistry: null, registryReference: null,
       niceClass: null, renewalBefore: null, renewalAfter: null,
     }, pagination: { page: 2, pageSize: 10 } });
     await repo.get({ firmId, portfolioMarkId: markId });
@@ -179,7 +182,9 @@ describe('portfolio mark repository', () => {
     const sql = calls.map(([statement]) => statement).join('\n');
     assert.match(sql, /WHERE firm_id = \$1 AND id = \$2/);
     assert.match(sql, /ORDER BY created_at DESC, id DESC/);
-    assert.match(sql, /LIMIT \$3 OFFSET \$4/);
+    assert.match(sql, /mark_text ILIKE/);
+    assert.equal(sql.includes('LIMIT $4 OFFSET $5'), true);
+    assert.equal(calls.some(([, values]) => values.includes('100\\%\\_FORGE')), true);
     assert.match(sql, /DELETE FROM portfolio_marks WHERE firm_id = \$1 AND id = \$2/);
     assert.equal(sql.includes('Forge Global'), false);
     assert.equal(calls.every(([, values]) => Array.isArray(values)), true);
@@ -206,6 +211,8 @@ describe('portfolio mark routes', () => {
     assert.equal((await request(app).get(`/api/v1/portfolio-marks/${markId}`).set('Authorization', 'Bearer viewer-token')).status, 200);
     const denied = await request(app).patch(`/api/v1/portfolio-marks/${markId}`).set('Authorization', 'Bearer viewer-token').send({ status: 'filed' });
     assert.equal(denied.status, 403);
+    assert.equal((await request(app).post('/api/v1/portfolio-marks').set('Authorization', 'Bearer viewer-token').send(input)).status, 403);
+    assert.equal((await request(app).delete('/api/v1/portfolio-marks/' + markId).set('Authorization', 'Bearer viewer-token')).status, 403);
     const createsBeforeInvalid = calls.filter(([name]) => name === 'create').length;
     const invalid = await request(app).post('/api/v1/portfolio-marks').set('Authorization', 'Bearer admin-token').send({ ...input, firm_id: otherFirmId });
     assert.equal(invalid.status, 400);

@@ -1,5 +1,5 @@
 import type { FormEvent } from "react";
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/Button';
 import { supabase } from '../../lib/supabase';
@@ -8,7 +8,7 @@ import { startOrganizationCreation, provisionOrganizationForSession } from './or
 import { authRedirectUrl, roleHomePath } from './roleRouting';
 import { syncSupabaseSession } from './authStore';
 
-const enabled = import.meta.env.VITE_PUBLIC_FIRM_SIGNUP_ENABLED === 'true';
+const publicFirmSignupEnabled = () => import.meta.env.VITE_PUBLIC_FIRM_SIGNUP_ENABLED === 'true';
 
 export function CreateOrganizationScreen() {
   const navigate = useNavigate();
@@ -20,6 +20,8 @@ export function CreateOrganizationScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [verificationLink, setVerificationLink] = useState<string | null>(null);
+
+  useEffect(() => { if (error || verificationLink) statusRef.current?.focus(); }, [error, verificationLink]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -50,11 +52,10 @@ export function CreateOrganizationScreen() {
       setVerificationLink(`/auth/verify-email?email=${encodeURIComponent(email.trim())}&organization_intent=${encodeURIComponent(intent.intentToken)}`);
     } catch (caught) {
       setError(authErrorMessage(toAuthApiError(caught)));
-      queueMicrotask(() => statusRef.current?.focus());
     } finally { setBusy(false); }
   };
 
-  if (!enabled) {
+  if (!publicFirmSignupEnabled()) {
     return <div className="space-y-5 text-center"><h1 className="text-2xl font-bold text-text-primary">Create organization</h1><p className="text-text-secondary">Public organization creation is currently unavailable. To join an existing firm, ask a firm Administrator to send an invitation.</p><Link className="font-bold text-accent underline" to="/auth/login">Sign in to accept an invitation</Link></div>;
   }
   if (verificationLink) {

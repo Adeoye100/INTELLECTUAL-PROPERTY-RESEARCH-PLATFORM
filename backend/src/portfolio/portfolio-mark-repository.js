@@ -33,6 +33,10 @@ export function portfolioMarkFromRow(row) {
   };
 }
 
+function escapeLikePattern(value) {
+  return value.replace(/[\\%_]/g, (character) => String.fromCharCode(92) + character);
+}
+
 function whereForFilters({ firmId, filters }) {
   const values = [firmId];
   const clauses = ['firm_id = $1'];
@@ -40,6 +44,7 @@ function whereForFilters({ firmId, filters }) {
     values.push(value);
     clauses.push(sql.replace('?', `$${values.length}`));
   };
+  if (filters.query) add("mark_text ILIKE '%' || ? || '%' ESCAPE '\\'", escapeLikePattern(filters.query));
   if (filters.status) add('status = ?', filters.status);
   if (filters.jurisdiction) add('jurisdiction = ?', filters.jurisdiction);
   if (filters.sourceRegistry) add('source_registry = ?', filters.sourceRegistry);

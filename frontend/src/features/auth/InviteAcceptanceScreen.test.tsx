@@ -27,9 +27,9 @@ describe('InviteAcceptanceScreen', () => {
     }), { status: 410, headers: { 'Content-Type': 'application/json' } })));
     renderInvitation('expired');
 
-    expect(await screen.findByRole('heading', { name: 'Invitation expired' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Invitation unavailable' })).toBeVisible();
     expect(screen.getByText(/expired or has already been used/i)).toBeVisible();
-    expect(screen.getByRole('link', { name: /ask your administrator/i })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeVisible();
   });
 
   it('recovers from a network error and exposes a logical keyboard order', async () => {
@@ -37,20 +37,22 @@ describe('InviteAcceptanceScreen', () => {
     const fetchMock = vi.fn()
       .mockRejectedValueOnce(new TypeError('offline'))
       .mockResolvedValueOnce(new Response(JSON.stringify({
-        email: 'new@firm.com', firmName: 'Forge Legal Partners', role: 'attorney',
+        email: 'new@firm.com', firmName: 'Forge Legal Partners', role: 'attorney', expiresAt: '2026-12-31T23:59:59.000Z',
       }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     vi.stubGlobal('fetch', fetchMock);
     renderInvitation('network-retry');
 
     const errorState = await screen.findByRole('alert');
     await waitFor(() => expect(errorState).toHaveFocus());
-    const retry = screen.getByRole('button', { name: 'Retry invitation' });
+    const retry = screen.getByRole('button', { name: 'Retry' });
     await user.tab();
     expect(retry).toHaveFocus();
     await user.keyboard('{Enter}');
 
     const name = await screen.findByRole('textbox', { name: 'Full name' });
     expect(name).toHaveFocus();
+    await user.tab();
+    expect(screen.getByLabelText('Invited email')).toHaveFocus();
     await user.tab();
     expect(screen.getByLabelText('Create password')).toHaveFocus();
     await user.tab();
@@ -61,13 +63,13 @@ describe('InviteAcceptanceScreen', () => {
   it('keeps backend acceptance and establishes the resulting Supabase session', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({
-        email: 'viewer-invite@invite.example', firmName: 'Forge Legal Partners', role: 'viewer',
+        email: 'viewer-invite@invite.example', firmName: 'Forge Legal Partners', role: 'viewer', expiresAt: '2026-12-31T23:59:59.000Z',
       }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ accepted: true }), {
         status: 201, headers: { 'Content-Type': 'application/json' },
       }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
-        userId: 'supabase-user', email: 'viewer-invite@invite.example', role: 'viewer', firmId: 'firm-1',
+        userId: 'supabase-user', email: 'viewer-invite@invite.example', role: 'viewer', expiresAt: '2026-12-31T23:59:59.000Z', firmId: 'firm-1',
       }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     vi.stubGlobal('fetch', fetchMock);
     auth.signUp.mockResolvedValue({
@@ -96,13 +98,14 @@ describe('InviteAcceptanceScreen', () => {
     await user.type(await screen.findByRole('textbox', { name: 'Full name' }), 'Invited User');
     await user.type(screen.getByLabelText('Create password'), 'safe-password');
     await user.type(screen.getByLabelText('Confirm password'), 'safe-password');
-    await user.click(screen.getByRole('button', { name: 'Accept invitation' }));
+    await user.click(screen.getByRole('button', { name: 'Create account and accept invitation' }));
 
     expect(await screen.findByRole('heading', { name: 'Onboarding dashboard' })).toBeVisible();
     expect(auth.signUp).toHaveBeenCalledWith(expect.objectContaining({
       email: 'viewer-invite@invite.example', password: 'safe-password',
     }));
     expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual({ fullName: 'Invited User' });
+    expect(String(fetchMock.mock.calls[1][0])).toContain('/auth/invitations/viewer-invite/redeem');
+    expect(new Headers(fetchMock.mock.calls[1][1]?.headers).get('Authorization')).toBe('Bearer supabase-access-token');
   }, 20_000);
 });

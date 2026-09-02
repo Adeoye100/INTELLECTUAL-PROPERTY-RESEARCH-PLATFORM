@@ -1,5 +1,10 @@
 export type UserRole = 'admin' | 'attorney' | 'viewer';
-export type RiskLevel = 'low' | 'medium' | 'high';
+export type RiskLevel = "low" | "medium" | "high";
+/** A calendar date serialized by the API as YYYY-MM-DD. */
+export type CalendarDate = string;
+/** ISO-8601 timestamp supplied by the API. */
+export type IsoTimestamp = string;
+export type PortfolioMarkStatus = "pending" | "filed" | "registered" | "abandoned" | "expired" | "cancelled";
 export type SourceStatus = 'complete' | 'pending' | 'delayed' | 'unavailable';
 export type SourceStatusEntry = { source: string; status: SourceStatus; resultCount?: number };
 export type WatchAlertChannel = 'email' | 'in-app';
@@ -29,36 +34,30 @@ export interface PortfolioMark {
   ownerUserId: string | null;
   markText: string;
   jurisdiction: string;
-  niceClasses: number[];
-  status: string;
-  filingDate: string | null;
-  renewalDate: string | null;
   sourceRegistry: string;
-  mocked?: boolean;
+  registryReference: string;
+  niceClasses: number[];
+  status: PortfolioMarkStatus;
+  filingDate: CalendarDate | null;
+  registrationDate: CalendarDate | null;
+  renewalDate: CalendarDate | null;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
 }
 
-export interface PortfolioStatusHistoryEntry {
-  id: string;
-  status: string;
-  effectiveAt: string;
-  source: string;
-  note?: string;
-}
+/** Deferred document-storage shape; it is not part of the active portfolio-mark API. */
+export interface PortfolioStatusHistoryEntry { id: string; status: string; effectiveAt: string; source: string; note?: string; }
+export interface PortfolioAttachment { id: string; portfolioMarkId: string; fileName: string; contentType: string; uploadedAt: string; availability: "available" | "unavailable"; mocked?: boolean; }
+export interface PortfolioMarkDetail extends PortfolioMark { statusHistory: PortfolioStatusHistoryEntry[]; }
 
-export type AttachmentAvailability = 'available' | 'unavailable';
-
-export interface PortfolioAttachment {
-  id: string;
-  portfolioMarkId: string;
-  fileName: string;
-  contentType: string;
-  uploadedAt: string;
-  availability: AttachmentAvailability;
-  mocked?: boolean;
-}
-
-export interface PortfolioMarkDetail extends PortfolioMark {
-  statusHistory: PortfolioStatusHistoryEntry[];
+export interface PortfolioMarkListResponse {
+  items: PortfolioMark[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export interface PortfolioDetailRouteState {

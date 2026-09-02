@@ -8,7 +8,7 @@ const CREATE_FIELDS = new Set([
 ]);
 const PATCH_FIELDS = CREATE_FIELDS;
 const FILTER_FIELDS = new Set([
-  'page', 'pageSize', 'status', 'jurisdiction', 'sourceRegistry', 'registryReference',
+  'page', 'pageSize', 'query', 'status', 'jurisdiction', 'sourceRegistry', 'registryReference',
   'niceClass', 'renewalBefore', 'renewalAfter',
 ]);
 
@@ -162,6 +162,7 @@ export function parsePortfolioMarkFilters(query) {
   }
 
   return {
+    query: input.query === undefined ? null : text(queryScalar(input.query, 'query'), 'query', 200),
     status: input.status === undefined ? null : status(queryScalar(input.status, 'status')),
     jurisdiction: input.jurisdiction === undefined
       ? null : jurisdiction(queryScalar(input.jurisdiction, 'jurisdiction')),

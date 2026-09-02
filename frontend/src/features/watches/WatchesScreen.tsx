@@ -40,7 +40,7 @@ export const WatchesScreen: React.FC = () => {
   const [editingWatch, setEditingWatch] = useState<WatchSummary | null>(null);
   const [requestMessage, setRequestMessage] = useState<{ type: 'success' | 'permission' | 'error'; text: string } | null>(null);
   const watches = useQuery({ queryKey: ['watches'], queryFn: listWatches, retry: false });
-  const portfolio = useQuery({ queryKey: ['portfolio'], queryFn: listPortfolioMarks, retry: false });
+  const portfolio = useQuery({ queryKey: ['portfolio'], queryFn: () => listPortfolioMarks().then((response) => response.items), retry: false });
   const alerts = useQuery({ queryKey: ['alerts', filters], queryFn: () => listAlerts(filters), retry: false, placeholderData: (previous) => previous });
   const visibleAlerts = filterAlerts(alerts.data ?? [], filters);
   const {

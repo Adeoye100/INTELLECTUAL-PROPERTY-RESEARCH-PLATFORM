@@ -41,7 +41,7 @@ export const OfficeActionResearchScreen: React.FC = () => {
   // Get portfolio marks for linking
   const portfolioMarks = useQuery<PortfolioMark[]>({
     queryKey: ['portfolio'],
-    queryFn: listPortfolioMarks,
+    queryFn: () => listPortfolioMarks().then((response) => response.items),
   });
 
   const onSubmit = (data: SearchFilters) => setSubmittedFilters({

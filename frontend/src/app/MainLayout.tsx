@@ -4,7 +4,8 @@ import { Logo } from '../components/Logo';
 import { 
   LayoutDashboard, 
   LogOut,
-  Users
+  Users,
+  BriefcaseBusiness
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from '../components/Button';
@@ -63,7 +64,7 @@ export const MainLayout: React.FC = () => {
         <aside className="w-20 xl:w-64 bg-forge-navy-800 text-white flex flex-col sticky top-16 h-[calc(100vh-64px)] overflow-y-auto transition-[width]">
           <nav className="flex-1 p-3 xl:p-4 space-y-1" aria-label="Application">
             {navigationForRole(user?.role).map((item) => (
-              <NavItem key={item.to} to={item.to} icon={item.to === '/dashboard' ? <LayoutDashboard size={20} /> : <Users size={20} />} label={item.label} />
+              <NavItem key={item.to} to={item.to} icon={item.to === '/dashboard' ? <LayoutDashboard size={20} /> : item.to === '/portfolio' ? <BriefcaseBusiness size={20} /> : <Users size={20} />} label={item.label} />
             ))}
           </nav>
           

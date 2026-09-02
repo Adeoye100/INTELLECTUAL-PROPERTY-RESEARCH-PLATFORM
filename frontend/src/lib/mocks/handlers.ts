@@ -12,7 +12,7 @@ const mockSearchResults: SearchResult[] = [
     niceClasses: [9, 42],
     jurisdiction: 'US',
     filingDate: '2025-02-14',
-    status: 'Pending',
+    status: 'pending',
     riskScore: {
       id: 'r1',
       phoneticScore: 85,
@@ -59,7 +59,7 @@ const mockSearchResults: SearchResult[] = [
     niceClasses: [35],
     jurisdiction: 'EU',
     filingDate: '2024-09-03',
-    status: 'Registered',
+    status: 'registered',
     riskScore: {
       id: 'r2',
       phoneticScore: 30,
@@ -210,7 +210,7 @@ const mockOfficeActionRefs: OfficeActionRef[] = [
   },
 ];
 
-const mockPortfolioMarks: PortfolioMark[] = [
+const mockPortfolioMarks = [
   {
     id: 'p1',
     firmId: 'f1',
@@ -218,7 +218,7 @@ const mockPortfolioMarks: PortfolioMark[] = [
     markText: 'FORGE GLOBAL',
     jurisdiction: 'US',
     niceClasses: [9, 35, 42],
-    status: 'Registered',
+    status: 'registered',
     filingDate: '2022-01-15',
     renewalDate: '2032-01-15',
     sourceRegistry: 'USPTO',
@@ -231,7 +231,7 @@ const mockPortfolioMarks: PortfolioMark[] = [
     markText: 'INNOVATE PRO',
     jurisdiction: 'US',
     niceClasses: [42],
-    status: 'Pending',
+    status: 'pending',
     filingDate: '2024-03-10',
     renewalDate: '2026-08-25',
     sourceRegistry: 'USPTO',
@@ -244,19 +244,19 @@ const mockPortfolioMarks: PortfolioMark[] = [
     markText: 'TECHSUITE',
     jurisdiction: 'EU',
     niceClasses: [9, 35],
-    status: 'Registered',
+    status: 'registered',
     filingDate: '2021-08-22',
     renewalDate: '2026-07-20',
     sourceRegistry: 'EUIPO',
     mocked: true,
   },
-];
+].map((mark) => ({ ...mark, registryReference: "MOCK-" + mark.id, registrationDate: null, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" })) as PortfolioMark[];
 
 const mockPortfolioDetails: Record<string, PortfolioMarkDetail> = Object.fromEntries(mockPortfolioMarks.map((mark) => [mark.id, {
   ...mark,
   statusHistory: [
     { id: `${mark.id}-history-filed`, status: 'Filed', effectiveAt: mark.filingDate, source: mark.sourceRegistry, note: 'Application received by registry.' },
-    { id: `${mark.id}-history-current`, status: mark.status, effectiveAt: mark.status === 'Pending' ? mark.filingDate : '2023-05-18', source: mark.sourceRegistry, note: 'Current mock registry status.' },
+    { id: `${mark.id}-history-current`, status: mark.status, effectiveAt: mark.status === 'pending' ? mark.filingDate : '2023-05-18', source: mark.sourceRegistry, note: 'Current mock registry status.' },
   ],
 }])) as Record<string, PortfolioMarkDetail>;
 
@@ -517,11 +517,14 @@ export const handlers = [
       markText: body.markText,
       jurisdiction: body.jurisdiction,
       niceClasses: body.niceClasses,
-      status: 'Draft',
+      status: 'pending',
       filingDate: new Date().toISOString().slice(0, 10),
       renewalDate: body.renewalDate,
       sourceRegistry: 'Manual entry (mock)',
-      mocked: true,
+      registryReference: 'MOCK-MANUAL',
+      registrationDate: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     }, { status: 201, headers: { 'X-Mock-Response': 'true' } });
   }),
 
@@ -533,9 +536,9 @@ export const handlers = [
     const created: PortfolioMark = {
       id: `portfolio-import-${result.id}`,
       firmId: 'f1', ownerUserId: 'u1', markText: result.candidateMarkText, jurisdiction: result.jurisdiction,
-      niceClasses: result.niceClasses, status: result.status, filingDate: result.filingDate,
+      niceClasses: result.niceClasses, status: 'pending', filingDate: result.filingDate,
       renewalDate: result.filingDate.replace(/^\d{4}/, String(Number(result.filingDate.slice(0, 4)) + 10)),
-      sourceRegistry: `${result.candidateSource} search import (mock)`, mocked: true,
+      sourceRegistry: 'MOCK SEARCH IMPORT', registryReference: 'MOCK-IMPORT', registrationDate: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
     };
     if (!mockPortfolioMarks.some(({ id }) => id === created.id)) mockPortfolioMarks.push(created);
     return HttpResponse.json(created, { status: 201, headers: { 'X-Mock-Response': 'true' } });
