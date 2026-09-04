@@ -111,6 +111,26 @@ export class PortfolioMarkService {
     return record;
   }
 
+  async getPortfolioMarkDetail({ firmId, portfolioMarkId }) {
+    const scopedFirmId = firmScope(firmId);
+    const parsedId = parsePortfolioMarkId(portfolioMarkId);
+    const record = await this.repository.get({
+      firmId: scopedFirmId, portfolioMarkId: parsedId,
+    });
+    if (!record) throw notFound();
+    const statusHistory = typeof this.repository.getStatusHistory === 'function'
+      ? await this.repository.getStatusHistory({ firmId: scopedFirmId, portfolioMarkId: parsedId })
+      : [];
+    const attachments = typeof this.repository.getAttachments === 'function'
+      ? await this.repository.getAttachments({ firmId: scopedFirmId, portfolioMarkId: parsedId })
+      : [];
+    return {
+      ...record,
+      statusHistory,
+      attachments,
+    };
+  }
+
   async updatePortfolioMark({ firmId, actorUserId, portfolioMarkId, input, requestContext = null }) {
     const scopedFirmId = firmScope(firmId);
     const parsedId = parsePortfolioMarkId(portfolioMarkId);

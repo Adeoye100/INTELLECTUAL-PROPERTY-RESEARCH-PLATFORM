@@ -2,14 +2,14 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, ChevronLeft, Search as SearchIcon, FileText, Link, RefreshCw } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, Search as SearchIcon, FileText, RefreshCw } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
 import { Table, TableRow, TableCell } from '../../components/Table';
 import { Modal } from '../../components/Modal';
-import type { OfficeActionRef, PortfolioMark } from '../../types';
+import type { OfficeActionSearchResponse, OfficeActionSearchResult, PortfolioMark } from '../../types';
 import { listPortfolioMarks } from '../portfolio/portfolioApi';
-import { linkOfficeAction, searchOfficeActions } from './officeActionApi';
+import { createOfficeActionRef, searchOfficeActions } from './officeActionApi';
 
 interface SearchFilters {
   markText: string;
@@ -19,7 +19,7 @@ interface SearchFilters {
 export const OfficeActionResearchScreen: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [selectedOfficeAction, setSelectedOfficeAction] = useState<OfficeActionRef | null>(null);
+  const [selectedOfficeAction, setSelectedOfficeAction] = useState<OfficeActionSearchResult | null>(null);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [submittedFilters, setSubmittedFilters] = useState<SearchFilters | null>(null);
   const [linkMessage, setLinkMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -31,12 +31,14 @@ export const OfficeActionResearchScreen: React.FC = () => {
     },
   });
 
-  const { data: officeActions, isLoading, isError, refetch: retrySearch } = useQuery<OfficeActionRef[]>({
+  const { data: searchResponse, isLoading, isError, refetch: retrySearch } = useQuery<OfficeActionSearchResponse>({
     queryKey: ['office-actions', submittedFilters],
     queryFn: () => searchOfficeActions(submittedFilters!),
     enabled: submittedFilters !== null,
     retry: false,
   });
+
+  const officeActions = searchResponse?.results ?? [];
 
   // Get portfolio marks for linking
   const portfolioMarks = useQuery<PortfolioMark[]>({
@@ -50,17 +52,18 @@ export const OfficeActionResearchScreen: React.FC = () => {
   });
 
   const linkMutation = useMutation({
-    mutationFn: ({ officeActionId, portfolioMarkId }: { officeActionId: string; portfolioMarkId: string }) => linkOfficeAction(officeActionId, portfolioMarkId),
+    mutationFn: ({ portfolioMarkId, item }: { portfolioMarkId: string; item: OfficeActionSearchResult }) =>
+      createOfficeActionRef(portfolioMarkId, item),
     onSuccess: async () => {
       setIsLinkModalOpen(false);
       setSelectedOfficeAction(null);
-      setLinkMessage({ type: 'success', text: 'Office action linked to the selected portfolio mark.' });
+      setLinkMessage({ type: 'success', text: 'Office action reference linked to the selected portfolio mark.' });
       await queryClient.invalidateQueries({ queryKey: ['office-actions'] });
     },
     onError: (error) => setLinkMessage({ type: 'error', text: error instanceof Error ? error.message : 'The office action could not be linked. Please retry.' }),
   });
 
-  const handleLinkOfficeAction = (officeAction: OfficeActionRef) => {
+  const handleLinkOfficeAction = (officeAction: OfficeActionSearchResult) => {
     setLinkMessage(null);
     setSelectedOfficeAction(officeAction);
     setIsLinkModalOpen(true);
@@ -68,7 +71,7 @@ export const OfficeActionResearchScreen: React.FC = () => {
 
   const handleLinkToPortfolioMark = (portfolioMarkId: string) => {
     if (!selectedOfficeAction) return;
-    linkMutation.mutate({ officeActionId: selectedOfficeAction.id, portfolioMarkId });
+    linkMutation.mutate({ portfolioMarkId, item: selectedOfficeAction });
   };
 
   return (
@@ -140,25 +143,26 @@ export const OfficeActionResearchScreen: React.FC = () => {
               <p>Search encountered an error. No precedent results are being presented as current.</p>
               <Button className="mt-4" variant="outline" onClick={() => void retrySearch()}><RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />Retry search</Button>
             </div>
-          ) : officeActions?.length === 0 ? (
+          ) : officeActions.length === 0 ? (
             <div className="p-12 text-center bg-surface-card rounded-lg border border-forge-silver-300">
               No Office Actions found. Try different search criteria.
             </div>
           ) : (
             <div className="space-y-4">
               <div className="flex items-center justify-between text-sm text-text-secondary px-2">
-                <span>Showing {officeActions?.length} Office Action precedents</span>
+                <span>Showing {officeActions.length} Office Action precedents</span>
                 <span>Sorted by relevance</span>
               </div>
               
               <Card>
-                <Table headers={['Reference', 'Examiner Reasoning', 'Status', 'Actions']}>
-                  {officeActions?.map((officeAction) => (
-                    <TableRow key={officeAction.id}>
+                <Table headers={['Reference', 'Examiner Reasoning', 'Document Type', 'Actions']}>
+                  {officeActions.map((officeAction) => (
+                    <TableRow key={officeAction.sourceReferenceId || officeAction.applicationNumber}>
                       <TableCell className="max-w-xs">
                         <div className="font-medium text-text-primary mb-1">
-                          {officeAction.referenceText}
+                          {officeAction.markText} ({officeAction.sourceRegistry} {officeAction.applicationNumber})
                         </div>
+                        <div className="text-xs text-text-secondary font-mono">{officeAction.sourceReferenceId}</div>
                       </TableCell>
                       <TableCell className="max-w-md">
                         <p className="text-sm text-text-secondary line-clamp-3">
@@ -166,23 +170,16 @@ export const OfficeActionResearchScreen: React.FC = () => {
                         </p>
                       </TableCell>
                       <TableCell>
-                        {officeAction.portfolioMarkId ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-forge-teal-100 text-forge-teal-700">
-                            <Link className="w-3 h-3 mr-1" aria-hidden="true" />
-                            LINKED
-                          </span>
-                        ) : (
-                          <span className="text-text-secondary text-xs">Available</span>
-                        )}
+                        <span className="text-xs font-semibold text-text-secondary">{officeAction.documentType}</span>
+                        {officeAction.officeActionDate && <span className="block text-[10px] text-text-secondary">{officeAction.officeActionDate}</span>}
                       </TableCell>
                       <TableCell>
                         <Button 
                           variant="outline" 
                           size="sm"
                           onClick={() => handleLinkOfficeAction(officeAction)}
-                          disabled={!!officeAction.portfolioMarkId}
                         >
-                          {officeAction.portfolioMarkId ? 'Already Linked' : 'Link to Case File'}
+                          Link to Mark
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -198,7 +195,7 @@ export const OfficeActionResearchScreen: React.FC = () => {
       <Modal
         isOpen={isLinkModalOpen}
         onClose={() => setIsLinkModalOpen(false)}
-        title="Link to Case File"
+        title="Link to Portfolio Mark"
         footer={
           <Button variant="secondary" onClick={() => setIsLinkModalOpen(false)}>
             Cancel
@@ -209,7 +206,7 @@ export const OfficeActionResearchScreen: React.FC = () => {
           {selectedOfficeAction && (
             <div className="p-4 bg-surface-base rounded border">
               <h4 className="font-bold text-text-primary mb-2">Selected Office Action</h4>
-              <p className="text-sm font-medium">{selectedOfficeAction.referenceText}</p>
+              <p className="text-sm font-medium">{selectedOfficeAction.markText} ({selectedOfficeAction.sourceRegistry} {selectedOfficeAction.applicationNumber})</p>
               <p className="text-xs text-text-secondary mt-1">
                 {selectedOfficeAction.examinerReasoningSummary.substring(0, 150)}...
               </p>

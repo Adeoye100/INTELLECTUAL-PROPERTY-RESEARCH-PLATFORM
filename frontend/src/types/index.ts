@@ -228,6 +228,29 @@ export interface OfficeActionRef {
   linkedPrecedentRef: string | null;
 }
 
+export interface OfficeActionSearchResult {
+  sourceRegistry: string;
+  sourceReferenceId: string;
+  applicationNumber: string;
+  markText: string;
+  owner: string;
+  jurisdiction: string;
+  documentType: string;
+  officeActionDate: string;
+  examinerName: string;
+  examinerReasoningSummary: string;
+  summaryMethod: string;
+  sourceDocumentUrl?: string;
+  sourceMetadata?: Record<string, unknown>;
+}
+
+export interface OfficeActionSearchResponse {
+  results: OfficeActionSearchResult[];
+  sourceStatuses: SourceStatusEntry[];
+  partial?: boolean;
+  requestId?: string;
+}
+
 export interface Subscription {
   id: string;
   firmId: string;

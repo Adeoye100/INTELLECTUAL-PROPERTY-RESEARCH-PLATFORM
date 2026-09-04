@@ -13,6 +13,7 @@ import { createAlertRouter } from './routes/alert-routes.js';
 import { createAuditLogRouter } from './routes/audit-log-routes.js';
 import { createUserRouter } from './routes/user-routes.js';
 import { createOfficeActionRefRouter, createOfficeActionSearchRouter } from './routes/office-action-routes.js';
+import { createMatterRouter } from './routes/matter-routes.js';
 import { createAuditRequestContextMiddleware } from './audit/request-context.js';
 import { createExportRouter } from './routes/export-routes.js';
 import { createHealthRouter } from './routes/health-routes.js';
@@ -44,6 +45,7 @@ export function createApp({
   readinessChecks = [],
   dashboardAnalyticsService = null,
   billingService = null,
+  matterService = null,
 }) {
   if (!Number.isSafeInteger(trustProxyHops) || trustProxyHops < 0 || trustProxyHops > 10) {
     throw new Error('trustProxyHops must be an integer between 0 and 10.');
@@ -112,6 +114,9 @@ export function createApp({
   }
   if (exportService) {
     app.use('/api/v1', createExportRouter(authenticate, exportService));
+  }
+  if (matterService) {
+    app.use('/api/v1', createMatterRouter(authenticate, matterService));
   }
 
   app.use((_request, response) => {

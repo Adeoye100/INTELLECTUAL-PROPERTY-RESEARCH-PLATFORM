@@ -18,6 +18,13 @@ function lazyComponent(loader: () => Promise<RouteModule>, exportName: string) {
   };
 }
 
+import { features } from '../config/features';
+
+const SearchScreen = lazy(() => import('../features/search/SearchScreen').then(({ SearchScreen }) => ({ default: SearchScreen })));
+const RiskDetailScreen = lazy(() => import('../features/search/RiskDetailScreen').then(({ RiskDetailScreen }) => ({ default: RiskDetailScreen })));
+const OfficeActionResearchScreen = lazy(() => import('../features/office-action/OfficeActionResearchScreen').then(({ OfficeActionResearchScreen }) => ({ default: OfficeActionResearchScreen })));
+const WatchesScreen = lazy(() => import('../features/watches/WatchesScreen').then(({ WatchesScreen }) => ({ default: WatchesScreen })));
+
 const router = createBrowserRouter([
   {
     path: '/',
@@ -48,12 +55,48 @@ const router = createBrowserRouter([
     children: [
       { path: 'dashboard', lazy: lazyComponent(() => import('../features/dashboard/DashboardScreen'), 'DashboardScreen') },
       { path: 'app', element: <RoleHomeRedirect /> },
-      { path: 'search', element: <FeatureUnavailable title="Federated trademark search is not available" detail="It remains disabled until Elasticsearch is provisioned and the attributed registry documents are fully reprojected." /> },
-      { path: 'search/risk/:id', element: <FeatureUnavailable title="Risk analysis is not available" detail="Search-backed risk analysis is disabled with the federated search integration." /> },
-      { path: 'office-actions', element: <FeatureUnavailable title="Office Action search is not available" detail="It remains disabled until a licensed provider and its server-side integration are configured and verified." /> },
+      {
+        path: 'search',
+        element: features.searchEnabled ? (
+          <Suspense fallback={<RouteLoading />}><SearchScreen /></Suspense>
+        ) : (
+          <FeatureUnavailable title="Federated trademark search is not available" detail="It remains disabled until Elasticsearch is provisioned and the attributed registry documents are fully reprojected." />
+        ),
+      },
+      {
+        path: 'search/risk/:id',
+        element: features.searchEnabled ? (
+          <Suspense fallback={<RouteLoading />}><RiskDetailScreen /></Suspense>
+        ) : (
+          <FeatureUnavailable title="Risk analysis is not available" detail="Search-backed risk analysis is disabled with the federated search integration." />
+        ),
+      },
+      {
+        path: 'search-results/:searchId',
+        element: features.searchEnabled ? (
+          <Suspense fallback={<RouteLoading />}><RiskDetailScreen /></Suspense>
+        ) : (
+          <FeatureUnavailable title="Risk analysis is not available" detail="Search-backed risk analysis is disabled with the federated search integration." />
+        ),
+      },
+      {
+        path: 'office-actions',
+        element: features.officeActionSearchEnabled ? (
+          <Suspense fallback={<RouteLoading />}><OfficeActionResearchScreen /></Suspense>
+        ) : (
+          <FeatureUnavailable title="Office Action search is not available" detail="It remains disabled until a licensed provider and its server-side integration are configured and verified." />
+        ),
+      },
       { path: 'portfolio', lazy: lazyComponent(() => import('../features/portfolio/PortfolioScreen'), 'PortfolioScreen') },
       { path: 'portfolio/:markId', lazy: lazyComponent(() => import('../features/portfolio/PortfolioDetailScreen'), 'PortfolioDetailScreen') },
-      { path: 'watches', element: <FeatureUnavailable title="Watch monitoring is not available" detail="It remains disabled until Redis and the separate watch worker are configured and verified." /> },
+      {
+        path: 'watches',
+        element: features.watchEnabled ? (
+          <Suspense fallback={<RouteLoading />}><WatchesScreen /></Suspense>
+        ) : (
+          <FeatureUnavailable title="Watch monitoring is not available" detail="It remains disabled until Redis and the separate watch worker are configured and verified." />
+        ),
+      },
       { path: 'permission-denied', lazy: lazyComponent(() => import('../features/auth/PermissionDeniedScreen'), 'PermissionDeniedScreen') },
       { path: 'admin', element: <RequireAdmin><Navigate to="/admin/users" replace /></RequireAdmin> },
       { path: 'admin/users', element: <RequireAdmin><AdminUsersScreen /></RequireAdmin> },

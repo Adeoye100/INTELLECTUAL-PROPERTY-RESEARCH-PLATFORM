@@ -1,6 +1,6 @@
 const WATCH_COLUMNS = `
-  id, firm_id, portfolio_mark_id, owner_user_id, state, poll_interval_minutes,
-  next_poll_at, last_polled_at, last_poll_status, last_error_code, created_at, updated_at`;
+  id, firm_id, portfolio_mark_id, owner_user_id, state, alert_channel, alert_mode,
+  poll_interval_minutes, next_poll_at, last_polled_at, last_poll_status, last_error_code, created_at, updated_at`;
 
 function timestamp(value) {
   if (value === null || value === undefined) return null;
@@ -14,6 +14,9 @@ export function watchFromRow(row) {
     portfolioMarkId: row.portfolio_mark_id,
     ownerUserId: row.owner_user_id,
     state: row.state,
+    active: row.state === 'enabled',
+    alertChannel: row.alert_channel ?? 'in-app',
+    alertMode: row.alert_mode ?? 'real-time',
     pollIntervalMinutes: row.poll_interval_minutes,
     nextPollAt: timestamp(row.next_poll_at),
     lastPolledAt: timestamp(row.last_polled_at),
@@ -67,11 +70,11 @@ export class WatchRepository {
   async create({ firmId, actorUserId, input, nextPollAt, transaction = null }) {
     const result = await executor(this, transaction).query(
       `INSERT INTO watches (
-        firm_id, portfolio_mark_id, owner_user_id, state, poll_interval_minutes, next_poll_at
+        firm_id, portfolio_mark_id, owner_user_id, state, alert_channel, alert_mode, poll_interval_minutes, next_poll_at
       ) VALUES (
-        $1, $2, (SELECT id FROM users WHERE supabase_user_id = $3 AND firm_id = $1), $4, $5, $6
+        $1, $2, (SELECT id FROM users WHERE supabase_user_id = $3 AND firm_id = $1), $4, $5, $6, $7, $8
       ) RETURNING ${WATCH_COLUMNS}`,
-      [firmId, input.portfolioMarkId, actorUserId, input.state, input.pollIntervalMinutes, nextPollAt],
+      [firmId, input.portfolioMarkId, actorUserId, input.state, input.alertChannel ?? 'in-app', input.alertMode ?? 'real-time', input.pollIntervalMinutes, nextPollAt],
     );
     return result.rowCount ? watchFromRow(result.rows[0]) : null;
   }
@@ -97,7 +100,13 @@ export class WatchRepository {
   }
 
   async update({ firmId, watchId, input, transaction = null }) {
-    const names = { state: 'state', pollIntervalMinutes: 'poll_interval_minutes', nextPollAt: 'next_poll_at' };
+    const names = {
+      state: 'state',
+      alertChannel: 'alert_channel',
+      alertMode: 'alert_mode',
+      pollIntervalMinutes: 'poll_interval_minutes',
+      nextPollAt: 'next_poll_at',
+    };
     const values = [firmId, watchId];
     const assignments = Object.entries(input).map(([field, value]) => {
       values.push(value);

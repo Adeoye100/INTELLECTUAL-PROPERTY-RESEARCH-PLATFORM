@@ -1,7 +1,7 @@
 import { badRequest } from '../errors.js';
 
 const SUPPORTED_PARAMETERS = new Set([
-  'mark', 'jurisdiction', 'class', 'status', 'owner', 'filedFrom', 'filedTo',
+  'mark', 'jurisdiction', 'class', 'niceClass', 'status', 'owner', 'filedFrom', 'filedTo',
 ]);
 const STATUSES = new Set(['pending', 'registered', 'abandoned']);
 
@@ -77,7 +77,8 @@ export function parseSearchQuery(query) {
   }
 
   const jurisdictions = parseJurisdictions(query.jurisdiction);
-  const niceClasses = parseNiceClasses(query.class);
+  const classValue = query.class !== undefined ? query.class : query.niceClass;
+  const niceClasses = parseNiceClasses(classValue);
 
   const statusValue = optionalScalar(query, 'status');
   const status = statusValue?.trim() || null;

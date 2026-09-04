@@ -54,11 +54,15 @@ export default {
         "forge-text-onDark": "#FFFFFF",
         "forge-subtext-onDark": "#9FC2D4",
 
-        // Working-surface neutrals
-        "surface-base": "#F8FAFC",
-        "surface-card": "#FFFFFF",
-        "text-primary": "#0E2540",
-        "text-secondary": "#5B6470",
+        // Working-surface neutrals (adaptive CSS variables)
+        "surface-base": "var(--background, #F8FAFC)",
+        "surface-card": "var(--card, #FFFFFF)",
+        "text-primary": "var(--foreground, #0E2540)",
+        "text-secondary": "var(--muted-foreground, #5B6470)",
+        background: "var(--background, #F8FAFC)",
+        card: "var(--card, #FFFFFF)",
+        foreground: "var(--foreground, #0E2540)",
+        border: "var(--border, #E7EAEE)",
 
         // Risk semantics
         "risk-low": "#166B46",

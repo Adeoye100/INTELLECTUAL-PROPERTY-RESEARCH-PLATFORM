@@ -2,8 +2,8 @@ import { badRequest } from '../errors.js';
 
 export const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const WATCH_STATES = new Set(['enabled', 'paused']);
-const CREATE_FIELDS = new Set(['portfolioMarkId', 'state', 'pollIntervalMinutes']);
-const PATCH_FIELDS = new Set(['state', 'pollIntervalMinutes']);
+const CREATE_FIELDS = new Set(['portfolioMarkId', 'state', 'active', 'alertChannel', 'alertMode', 'pollIntervalMinutes']);
+const PATCH_FIELDS = new Set(['state', 'active', 'alertChannel', 'alertMode', 'pollIntervalMinutes']);
 const FILTER_FIELDS = new Set(['page', 'pageSize', 'state', 'portfolioMarkId']);
 
 function invalid(field, message) {
@@ -23,6 +23,20 @@ function uuid(value, field) {
 function state(value, field = 'state') {
   if (typeof value !== 'string' || !WATCH_STATES.has(value.trim().toLowerCase())) {
     invalid(field, 'state must be enabled or paused.');
+  }
+  return value.trim().toLowerCase();
+}
+
+function alertChannel(value, field = 'alertChannel') {
+  if (typeof value !== 'string' || !['email', 'in-app'].includes(value.trim().toLowerCase())) {
+    invalid(field, 'alertChannel must be email or in-app.');
+  }
+  return value.trim().toLowerCase();
+}
+
+function alertMode(value, field = 'alertMode') {
+  if (typeof value !== 'string' || !['real-time', 'digest'].includes(value.trim().toLowerCase())) {
+    invalid(field, 'alertMode must be real-time or digest.');
   }
   return value.trim().toLowerCase();
 }
@@ -60,9 +74,19 @@ export function parseWatchCreate(input, defaultPollIntervalMinutes) {
   const body = object(input, 'body');
   known(body, CREATE_FIELDS);
   if (!Object.hasOwn(body, 'portfolioMarkId')) invalid('portfolioMarkId', 'portfolioMarkId is required.');
+
+  let watchState = 'enabled';
+  if (body.state !== undefined) {
+    watchState = state(body.state);
+  } else if (body.active !== undefined) {
+    watchState = body.active ? 'enabled' : 'paused';
+  }
+
   return {
     portfolioMarkId: uuid(body.portfolioMarkId, 'portfolioMarkId'),
-    state: body.state === undefined ? 'enabled' : state(body.state),
+    state: watchState,
+    alertChannel: body.alertChannel === undefined ? 'in-app' : alertChannel(body.alertChannel),
+    alertMode: body.alertMode === undefined ? 'real-time' : alertMode(body.alertMode),
     pollIntervalMinutes: body.pollIntervalMinutes === undefined
       ? interval(defaultPollIntervalMinutes) : interval(body.pollIntervalMinutes),
   };
@@ -74,6 +98,9 @@ export function parseWatchPatch(input) {
   if (Object.keys(body).length === 0) invalid('body', 'PATCH body must contain at least one mutable field.');
   const parsed = {};
   if (Object.hasOwn(body, 'state')) parsed.state = state(body.state);
+  if (Object.hasOwn(body, 'active')) parsed.state = body.active ? 'enabled' : 'paused';
+  if (Object.hasOwn(body, 'alertChannel')) parsed.alertChannel = alertChannel(body.alertChannel);
+  if (Object.hasOwn(body, 'alertMode')) parsed.alertMode = alertMode(body.alertMode);
   if (Object.hasOwn(body, 'pollIntervalMinutes')) parsed.pollIntervalMinutes = interval(body.pollIntervalMinutes);
   return parsed;
 }

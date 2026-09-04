@@ -178,4 +178,57 @@ export class PortfolioMarkRepository {
       client.release();
     }
   }
+
+  async getStatusHistory({ firmId, portfolioMarkId }) {
+    const result = await this.database.query(
+      `SELECT id, portfolio_mark_id, firm_id, status, effective_at, source, note, created_at
+       FROM portfolio_mark_status_history
+       WHERE firm_id = $1 AND portfolio_mark_id = $2
+       ORDER BY effective_at DESC`,
+      [firmId, portfolioMarkId],
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      portfolioMarkId: row.portfolio_mark_id,
+      status: row.status,
+      effectiveAt: timestampValue(row.effective_at),
+      source: row.source,
+      note: row.note ?? '',
+    }));
+  }
+
+  async addStatusHistory({ firmId, portfolioMarkId, status, source = 'manual', note = '', transaction = null }) {
+    const result = await executor(this, transaction).query(
+      `INSERT INTO portfolio_mark_status_history (portfolio_mark_id, firm_id, status, source, note)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, portfolio_mark_id, firm_id, status, effective_at, source, note`,
+      [portfolioMarkId, firmId, status, source, note],
+    );
+    return {
+      id: result.rows[0].id,
+      portfolioMarkId: result.rows[0].portfolio_mark_id,
+      status: result.rows[0].status,
+      effectiveAt: timestampValue(result.rows[0].effective_at),
+      source: result.rows[0].source,
+      note: result.rows[0].note ?? '',
+    };
+  }
+
+  async getAttachments({ firmId, portfolioMarkId }) {
+    const result = await this.database.query(
+      `SELECT id, portfolio_mark_id, firm_id, file_name, content_type, availability, created_at
+       FROM portfolio_mark_attachments
+       WHERE firm_id = $1 AND portfolio_mark_id = $2
+       ORDER BY created_at DESC`,
+      [firmId, portfolioMarkId],
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      portfolioMarkId: row.portfolio_mark_id,
+      fileName: row.file_name,
+      contentType: row.content_type,
+      availability: row.availability,
+      uploadedAt: timestampValue(row.created_at),
+    }));
+  }
 }

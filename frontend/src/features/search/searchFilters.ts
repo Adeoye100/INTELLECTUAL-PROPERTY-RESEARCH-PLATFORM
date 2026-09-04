@@ -33,7 +33,7 @@ export const defaultSearchFilters: SearchFilters = {
   filedTo: '',
 };
 
-const filterParamNames = ['mark', 'jurisdiction', 'class', 'status', 'owner', 'filedFrom', 'filedTo'];
+const filterParamNames = ['mark', 'jurisdiction', 'class', 'niceClass', 'status', 'owner', 'filedFrom', 'filedTo'];
 
 export const hasSearchFilterParams = (params: URLSearchParams) =>
   filterParamNames.some((name) => params.has(name));
@@ -53,7 +53,10 @@ export const searchFiltersToParams = (filters: SearchFilters) => {
   const params = new URLSearchParams();
   if (normalized.mark) params.set('mark', normalized.mark);
   normalized.jurisdictions.forEach((jurisdiction) => params.append('jurisdiction', jurisdiction));
-  if (normalized.niceClass) params.set('class', normalized.niceClass);
+  if (normalized.niceClass) {
+    params.set('class', normalized.niceClass);
+    params.set('niceClass', normalized.niceClass);
+  }
   if (normalized.status) params.set('status', normalized.status);
   if (normalized.owner) params.set('owner', normalized.owner);
   if (normalized.filedFrom) params.set('filedFrom', normalized.filedFrom);
@@ -64,7 +67,7 @@ export const searchFiltersToParams = (filters: SearchFilters) => {
 export const searchFiltersFromParams = (params: URLSearchParams): SearchFilters => ({
   mark: params.get('mark') ?? '',
   jurisdictions: params.getAll('jurisdiction').length ? params.getAll('jurisdiction') : ['US'],
-  niceClass: params.get('class') ?? '',
+  niceClass: params.get('niceClass') ?? params.get('class') ?? '',
   status: (['pending', 'registered', 'abandoned'].includes(params.get('status') ?? '') ? params.get('status') : '') as SearchFilters['status'],
   owner: params.get('owner') ?? '',
   filedFrom: params.get('filedFrom') ?? '',
@@ -77,13 +80,15 @@ export const buildSearchRequestUrl = (filters: SearchFilters) =>
 const riskWeight = { high: 3, medium: 2, low: 1 } as const;
 
 export const rankSearchResults = (results: SearchResult[]) => [...results].sort((left, right) => {
-  const leftRisk = left.riskScore?.compositeRating;
-  const rightRisk = right.riskScore?.compositeRating;
+  const leftRiskObj = left.riskAnalysis ?? left.riskScore;
+  const rightRiskObj = right.riskAnalysis ?? right.riskScore;
+  const leftRisk = leftRiskObj?.compositeRating;
+  const rightRisk = rightRiskObj?.compositeRating;
   const riskDifference = (rightRisk ? riskWeight[rightRisk] : 0) - (leftRisk ? riskWeight[leftRisk] : 0);
   if (riskDifference !== 0) return riskDifference;
 
-  const leftSimilarity = left.riskScore ? Math.max(left.riskScore.phoneticScore, left.riskScore.visualScore) : 0;
-  const rightSimilarity = right.riskScore ? Math.max(right.riskScore.phoneticScore, right.riskScore.visualScore) : 0;
+  const leftSimilarity = leftRiskObj ? Math.max(leftRiskObj.phoneticScore, leftRiskObj.visualScore) : 0;
+  const rightSimilarity = rightRiskObj ? Math.max(rightRiskObj.phoneticScore, rightRiskObj.visualScore) : 0;
   if (rightSimilarity !== leftSimilarity) return rightSimilarity - leftSimilarity;
   return left.candidateMarkText.localeCompare(right.candidateMarkText);
 });

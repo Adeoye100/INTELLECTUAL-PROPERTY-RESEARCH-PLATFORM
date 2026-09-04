@@ -3,10 +3,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const directory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../migrations');
-const expected = Array.from({ length: 15 }, (_, index) => String(index + 1).padStart(3, '0'));
 const files = (await readdir(directory)).filter((file) => /^\d{3}_.+\.sql$/.test(file)).sort();
+const expected = Array.from({ length: files.length }, (_, index) => String(index + 1).padStart(3, '0'));
 const prefixes = files.map((file) => file.slice(0, 3));
-if (prefixes.join(',') !== expected.join(',')) throw new Error('Migration inventory must contain ordered migrations 001 through 015 exactly once.');
+if (prefixes.join(',') !== expected.join(',')) throw new Error(`Migration inventory must contain ordered migrations 001 through ${String(files.length).padStart(3, '0')} exactly once.`);
 for (const file of files) {
   const sql = await readFile(path.join(directory, file), 'utf8');
   if (/\bDROP\s+(DATABASE|SCHEMA)\b/i.test(sql)) throw new Error(`Migration ${file} contains a prohibited destructive statement.`);

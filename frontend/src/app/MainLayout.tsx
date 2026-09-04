@@ -6,7 +6,10 @@ import {
   LogOut,
   Users,
   BriefcaseBusiness,
-  CreditCard
+  CreditCard,
+  Search as SearchIcon,
+  FileText,
+  Eye
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from '../components/Button';
@@ -15,6 +18,25 @@ import { authRequest } from '../features/auth/authApi';
 import { SessionExpiryMonitor } from '../features/auth/SessionExpiryMonitor';
 import { appQueryClient } from '../lib/queryClient';
 import { navigationForRole } from '../features/auth/capabilities';
+
+function getNavIcon(path: string) {
+  switch (path) {
+    case '/dashboard':
+      return <LayoutDashboard size={20} />;
+    case '/search':
+      return <SearchIcon size={20} />;
+    case '/office-actions':
+      return <FileText size={20} />;
+    case '/portfolio':
+      return <BriefcaseBusiness size={20} />;
+    case '/watches':
+      return <Eye size={20} />;
+    case '/admin/billing':
+      return <CreditCard size={20} />;
+    default:
+      return <Users size={20} />;
+  }
+}
 
 export const MainLayout: React.FC = () => {
   const navigate = useNavigate();
@@ -65,7 +87,7 @@ export const MainLayout: React.FC = () => {
         <aside className="w-20 xl:w-64 bg-forge-navy-800 text-white flex flex-col sticky top-16 h-[calc(100vh-64px)] overflow-y-auto transition-[width]">
           <nav className="flex-1 p-3 xl:p-4 space-y-1" aria-label="Application">
             {navigationForRole(user?.role).map((item) => (
-              <NavItem key={item.to} to={item.to} icon={item.to === '/dashboard' ? <LayoutDashboard size={20} /> : item.to === '/portfolio' ? <BriefcaseBusiness size={20} /> : item.to === '/admin/billing' ? <CreditCard size={20} /> : <Users size={20} />} label={item.label} />
+              <NavItem key={item.to} to={item.to} icon={getNavIcon(item.to)} label={item.label} />
             ))}
           </nav>
           

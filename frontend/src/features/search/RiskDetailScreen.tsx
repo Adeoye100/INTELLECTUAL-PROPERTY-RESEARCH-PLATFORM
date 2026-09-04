@@ -164,7 +164,7 @@ export const RiskDetailScreen: React.FC = () => {
   const [discarded, setDiscarded] = useState(false);
 
   // ---- Derived ----
-  const score = result?.riskScore;
+  const score = result?.riskAnalysis ?? result?.riskScore;
   const rp = score ? riskPresentation[score.compositeRating] : null;
 
 

@@ -6,10 +6,18 @@ export const searchTrademarks = (filters: SearchFilters) =>
   getApiClient().requestJson<SearchResponse>(buildSearchRequestUrl(filters));
 
 export const getSearchResult = (resultId: string) =>
-  getApiClient().requestJson<SearchResponse>(`/search?resultId=${encodeURIComponent(resultId)}`);
+  getApiClient().requestJson<SearchResponse>(`/search-results/${encodeURIComponent(resultId)}`);
 
-export const importSearchResultToPortfolio = (searchResultId: string) =>
-  getApiClient().requestJson<PortfolioMark>('/portfolio/import', {
+export const importSearchResultToPortfolio = (result: Partial<SearchResult>) =>
+  getApiClient().requestJson<PortfolioMark>('/portfolio-marks', {
     method: 'POST',
-    body: { searchResultId },
+    body: {
+      markText: result.candidateMarkText ?? '',
+      jurisdiction: result.jurisdiction ?? 'US',
+      sourceRegistry: result.candidateSource ?? 'USPTO',
+      registryReference: result.candidateRef ?? result.id ?? '',
+      niceClasses: result.niceClasses ?? [],
+      status: result.status ?? 'pending',
+      filingDate: result.filingDate ?? null,
+    },
   });
