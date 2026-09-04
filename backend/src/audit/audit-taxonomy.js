@@ -21,6 +21,8 @@ export const AUDIT_ACTIONS = Object.freeze({
   OFFICE_ACTION_REF_UPDATED: 'office_action_ref.updated',
   OFFICE_ACTION_REF_DELETED: 'office_action_ref.deleted',
   SEARCH_EXECUTED: 'search.executed',
+  BILLING_CHECKOUT_INITIALIZED: 'billing.checkout_initialized',
+  BILLING_PAYMENT_CONFIRMED: 'billing.payment_confirmed',
 });
 
 export const AUDIT_ENTITY_TYPES = Object.freeze({
@@ -32,6 +34,7 @@ export const AUDIT_ENTITY_TYPES = Object.freeze({
   EXPORT: 'export',
   OFFICE_ACTION_REF: 'office_action_ref',
   SEARCH_RESULT: 'search_result',
+  BILLING_TRANSACTION: 'billing_transaction',
 });
 
 export const AUDIT_ACTION_VALUES = Object.freeze(Object.values(AUDIT_ACTIONS));

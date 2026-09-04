@@ -59,7 +59,9 @@ Rotate secret-manager references with overlapping validation where supported;
 revoke old values only after successful staging verification. Agree audit
 retention/archive and legal hold policy before cleanup. Review capacity, backups,
 dependency advisories, registry limits, and independent-audit findings each
-renewal period. BE-14 billing remains explicitly deferred.
+renewal period. BE-14 billing remains disabled until the live Paystack
+configuration and reconciliation gates in
+`22-production-billing-registry-auth-security.md` are completed.
 
 Current gates: provider decision, migration application, staging smoke/auth/RBAC
 checks, private storage/Redis/network validation, P95 measurements, dependency

@@ -60,3 +60,49 @@ services:
         value: "false"
       - key: PDF_EXPORT_ENABLED
         value: "false"
+      - key: PAYSTACK_ENABLED
+        value: "false"
+      - key: PAYSTACK_MODE
+        value: live
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      - key: PAYSTACK_STARTER_PLAN_CODE
+        sync: false
+      - key: PAYSTACK_STARTER_AMOUNT_SUBUNIT
+        sync: false
+      - key: PAYSTACK_STARTER_CURRENCY
+        value: NGN
+      - key: PAYSTACK_PROFESSIONAL_PLAN_CODE
+        sync: false
+      - key: PAYSTACK_PROFESSIONAL_AMOUNT_SUBUNIT
+        sync: false
+      - key: PAYSTACK_PROFESSIONAL_CURRENCY
+        value: NGN
+
+  - type: cron
+    name: iprp-uspto-ingestion
+    runtime: node
+    rootDir: backend
+    schedule: "15 07 * * *"
+    buildCommand: corepack enable && pnpm install --frozen-lockfile
+    startCommand: pnpm ingest:uspto
+    autoDeploy: false
+    envVars:
+      - key: NODE_VERSION
+        value: 22.14.0
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_SSL
+        value: "true"
+      - key: DATABASE_POOL_MAX
+        value: "3"
+      - key: DATABASE_CONNECTION_TIMEOUT_MS
+        value: "10000"
+      - key: DATABASE_STATEMENT_TIMEOUT_MS
+        value: "60000"
+      - key: USPTO_BULK_LISTING_URL
+        sync: false
+      - key: USPTO_INGESTION_OVERLAP_DAYS
+        value: "3"

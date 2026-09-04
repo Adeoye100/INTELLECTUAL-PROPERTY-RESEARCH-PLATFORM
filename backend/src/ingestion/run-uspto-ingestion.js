@@ -6,23 +6,29 @@ import { RegistryTrademarkRepository } from './registry-trademark-repository.js'
 
 function argument(name) {
   const index = process.argv.indexOf(name);
-  return index === -1 ? undefined : process.argv[index + 1];
+  if (index !== -1) return process.argv[index + 1];
+  return process.argv.find((value) => value.startsWith(`${name}=`))?.slice(name.length + 1);
 }
 
 const sinceValue = argument('--since');
-if (process.argv.includes('--since') && !sinceValue) {
+if (process.argv.some((value) => value === '--since' || value.startsWith('--since=')) && !sinceValue) {
   throw new Error('--since requires a YYYY-MM-DD value.');
 }
 if (sinceValue && !/^\d{4}-\d{2}-\d{2}$/.test(sinceValue)) {
   throw new Error('--since must use YYYY-MM-DD format.');
 }
-const since = sinceValue ? new Date(`${sinceValue}T00:00:00.000Z`) : new Date();
+const config = loadUsptoIngestionConfig();
+const since = sinceValue ? new Date(`${sinceValue}T00:00:00.000Z`) : (() => {
+  const value = new Date();
+  value.setUTCHours(0, 0, 0, 0);
+  value.setUTCDate(value.getUTCDate() - config.usptoIngestionOverlapDays);
+  return value;
+})();
 if (Number.isNaN(since.getTime()) || (sinceValue && since.toISOString().slice(0, 10) !== sinceValue)) {
   throw new Error('--since must be a valid calendar date.');
 }
 
-const config = loadUsptoIngestionConfig();
-const pool = createPool(config.databaseUrl);
+const pool = createPool(config.databaseUrl, config);
 try {
   const adapter = new UsptoBulkXmlAdapter({
     listingUrl: config.usptoBulkListingUrl,
@@ -32,7 +38,7 @@ try {
     repository: new RegistryTrademarkRepository(pool),
     since,
   });
-  console.log('USPTO ingestion complete', result);
+  console.log('USPTO ingestion complete', { ...result, since: since.toISOString().slice(0, 10) });
 } finally {
   await pool.end();
 }

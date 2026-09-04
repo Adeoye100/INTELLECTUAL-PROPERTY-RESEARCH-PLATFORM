@@ -16,6 +16,9 @@
 - [Vercel deployment checklist](18-vercel-deployment-checklist.md)
 - [Initial deployment runbook](19-initial-deployment-runbook.md)
 - [Post-deployment smoke checklist](20-post-deployment-smoke-checklist.md)
+- [Production billing, registry, auth, and security handoff](22-production-billing-registry-auth-security.md)
 
-BE-14 billing is deferred. Existing staging, independent-audit, P95, provider,
-and Multi-AZ failover gates remain pending until separately evidenced.
+BE-14 Paystack billing is implemented behind a disabled production feature gate.
+Live credentials, migration application, provider webhook verification, registry
+feed access, staging, independent-audit, P95, and Multi-AZ failover evidence are
+operational gates rather than repository implementation claims.

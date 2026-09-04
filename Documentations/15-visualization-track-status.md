@@ -9,5 +9,6 @@
 - [Visual system/component audit](14-visual-system-and-component-audit.md)
 - [Provider-neutral IaC](../infra/README.md)
 
-BE-14 remains deferred. Staging visual/P95 gates, independent audit sign-off,
+BE-14 is implemented but disabled pending provider acceptance. Staging
+visual/P95 gates, independent audit sign-off,
 and Multi-AZ failover evidence remain pending.

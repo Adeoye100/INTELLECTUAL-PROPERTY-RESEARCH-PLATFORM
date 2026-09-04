@@ -37,6 +37,9 @@ import { OfficeActionRefRepository } from './office-actions/office-action-ref-re
 import { OfficeActionRefService } from './office-actions/office-action-ref-service.js';
 import { createPdfExportRuntime } from './exports/pdf-export-runtime.js';
 import { DashboardAnalyticsRepository, DashboardAnalyticsService } from './dashboard/dashboard-analytics.js';
+import { PaystackClient } from './billing/paystack-client.js';
+import { BillingRepository } from './billing/billing-repository.js';
+import { BillingService } from './billing/billing-service.js';
 
 export async function createSystem(config, { officeActionSources = [], exportStorage = null } = {}) {
   const { searchSources, federatedSearchService, searchService } = createSearchRuntime(config);
@@ -115,6 +118,15 @@ export async function createSystem(config, { officeActionSources = [], exportSto
   const alertRepository = new AlertRepository(pool);
   const alertService = new AlertService({ repository: alertRepository, auditService });
   const dashboardAnalyticsService = new DashboardAnalyticsService({ repository: new DashboardAnalyticsRepository(pool), redisClient });
+  const billingRepository = config.paystackEnabled ? new BillingRepository(pool) : null;
+  const billingService = config.paystackEnabled ? new BillingService({
+    repository: billingRepository,
+    paystackClient: new PaystackClient({ secretKey: config.paystackSecretKey }),
+    plans: config.paystackPlans,
+    secretKey: config.paystackSecretKey,
+    callbackUrl: config.paystackCallbackUrl,
+    auditService,
+  }) : null;
   const userRoleService = new UserRoleService({ userRepository, auditService, roleFirmResolver });
   const officeActionRefRepository = new OfficeActionRefRepository(pool);
   const officeActionRefService = new OfficeActionRefService({ repository: officeActionRefRepository, auditService });
@@ -151,6 +163,7 @@ export async function createSystem(config, { officeActionSources = [], exportSto
       trustProxyHops: config.trustProxyHops,
       corsAllowedOrigins: config.corsAllowedOrigins,
       dashboardAnalyticsService,
+      billingService,
       readinessChecks: [
         async () => { await pool.query('SELECT 1'); },
         async () => { await redisClient.ping(); },
@@ -175,6 +188,8 @@ export async function createSystem(config, { officeActionSources = [], exportSto
     alertRepository,
     alertService,
     dashboardAnalyticsService,
+    billingRepository,
+    billingService,
     auditLogRepository,
     auditService,
     exportAuditService,

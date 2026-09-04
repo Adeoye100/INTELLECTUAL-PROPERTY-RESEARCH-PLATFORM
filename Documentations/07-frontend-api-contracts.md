@@ -298,8 +298,9 @@ with a sanitized warning under the `logoutIp` policy. Keys use only
 tokens, and session IDs are neither exposed nor stored as raw Redis key data.
 `TRUST_PROXY_HOPS=0` is the direct-connection default; production must configure
 the exact trusted reverse-proxy hop count so untrusted `X-Forwarded-For` values
-are ignored. BE-15 needs no migration. BE-14 remains deferred and BE-16 audit
-logging is still required before production-sensitive auth mutations sign off.
+are ignored. BE-15 needs no migration. The later Paystack implementation is
+documented in the BE-14 section below; BE-16 audit logging is required before
+production-sensitive auth mutations sign off.
 
 ## Required contracts with no candidate route
 
@@ -311,7 +312,6 @@ The product documents require these capabilities, but selecting HTTP methods or 
 | Authoritative onboarding status | Per-user completion flags derived from stored searches/portfolio records, update/reconciliation rules | Authenticated current user |
 | Firm member list | Pagination and user/seat/role status fields | Admin only |
 | Invite, revoke invitation, remove seat, change role | Target identifiers, allowed transitions, seat-limit conflicts, audit metadata | Admin only (invite is explicitly Admin-only in app flow) |
-| Subscription and usage | Provider-neutral plan, renewal, seat/search/watch usage, billing portal action | Admin only |
 | Notifications | In-app unread count, delivery preferences, read/seen semantics | Authenticated user; preference mutation scope unresolved |
 | Attachment upload/delete | Multipart/direct-upload flow, limits, malware scanning, retention, audit | Admin/Attorney mutation; Viewer read-only |
 | Report job/status/download if asynchronous | Job creation, polling/events, expiry and authorized download | Same object-level authorization as report request |
@@ -418,8 +418,20 @@ portfolio-mark create. The no-network `pnpm --dir backend phase2:readiness`
 command reports configuration gates for PostgreSQL, Redis, Supabase, required
 secrets, search, and the watch worker.
 
-BE-14 subscription/billing remains **Deferred by explicit decision**. It is not
-represented as a completed backend route or a Phase 2 staging pass.
+## BE-14 Paystack billing contract
+
+BE-14 is implemented behind `PAYSTACK_ENABLED`. `GET /api/v1/billing`,
+`POST /api/v1/billing/checkout`, and `POST /api/v1/billing/verify` require an
+authoritative firm Admin. `POST /api/v1/billing/webhook` is unauthenticated by
+design but requires Paystack's raw-body SHA-512 HMAC signature. Plan identifiers,
+amounts, currency, callback URL, firm, and role are server-owned. The browser
+receives only Paystack's hosted checkout URL and cannot submit a price or firm ID.
+
+Successful callback and webhook paths independently re-query Paystack and require
+an exact reference, amount, currency, firm, and tier match before an idempotent
+transaction changes subscription state. Card or bank credentials are never
+stored. Migration 015 and the external configuration gates in the production
+readiness runbook must be completed before enabling the feature.
 
 ## BE-18 implemented Office Action research contract
 
@@ -617,7 +629,8 @@ assistance—not legal advice or conclusions—and include a disclaimer, source
 attribution, generation time, export ID, and page numbers. Migration
 `012_create_exports.sql` was not applied. Redis, private storage permissions,
 the worker process, migration application, and disposable staging verification
-remain operational gates; BE-14 billing remains explicitly deferred.
+remain operational gates. The BE-14 statement in the original BE-20 delivery
+record is superseded by migration 015 and the `/api/v1/billing` contract.
 
 ## BE-21 API security boundary
 
@@ -639,7 +652,9 @@ calls must rely on the verified membership represented by the Bearer token.
 Production origin/proxy/TLS deployment values and the private storage root are
 operational configuration, not a frontend-controlled contract. The full
 repository-local review and its BE-22 handoff are recorded in
-`09-internal-security-review.md`; BE-14 remains explicitly deferred.
+`09-internal-security-review.md`. That review predates the separately authorized
+BE-14 implementation; current billing security and acceptance gates are in
+`22-production-billing-registry-auth-security.md`.
 
 ## BE-25 health and readiness contract
 

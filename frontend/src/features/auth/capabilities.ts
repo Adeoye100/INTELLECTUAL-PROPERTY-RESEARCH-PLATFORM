@@ -7,10 +7,11 @@ export type Capability =
   | "members:manage"
   | "invitations:manage"
   | "firm:write"
-  | "firm:read";
+  | "firm:read"
+  | "billing:manage";
 
 const capabilities: Record<UserRole, ReadonlySet<Capability>> = {
-  admin: new Set(["dashboard:view", "portfolio:view", "portfolio:write", "members:manage", "invitations:manage", "firm:write", "firm:read"]),
+  admin: new Set(["dashboard:view", "portfolio:view", "portfolio:write", "members:manage", "invitations:manage", "firm:write", "firm:read", "billing:manage"]),
   attorney: new Set(["dashboard:view", "portfolio:view", "portfolio:write", "firm:write", "firm:read"]),
   viewer: new Set(["dashboard:view", "portfolio:view", "firm:read"]),
 };
@@ -29,6 +30,7 @@ const functionalNavigation: readonly NavigationItem[] = [
   { to: "/dashboard", label: "Dashboard", capability: "dashboard:view" },
   { to: "/portfolio", label: "Portfolio", capability: "portfolio:view" },
   { to: "/admin/users", label: "Users & Invitations", capability: "members:manage" },
+  { to: "/admin/billing", label: "Billing", capability: "billing:manage" },
 ];
 
 export function navigationForRole(role: UserRole | null | undefined) {

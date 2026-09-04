@@ -79,3 +79,37 @@ June 18, 2026. `USPTO_BULK_LISTING_URL` is configurable so deployment can point
 the same adapter at the client-authorized listing/mirror without changing XML
 normalization or the Postgres-first pipeline. Do not silently substitute TSDR as
 a bulk source: its adapter intentionally rejects `fetchUpdates`.
+
+## Production update cadence
+
+The product corpus is trademark data. The Render blueprint runs the USPTO
+trademark application ingestion every day at **07:15 UTC** and replays the last
+three UTC days. Replays are intentional: the PostgreSQL unique key and upsert
+logic make them idempotent, while the overlap recovers from a late publication
+or one missed cron execution. Keep `USPTO_INGESTION_OVERLAP_DAYS=3`; increase it
+temporarily (maximum 30) after a longer outage. An operator can backfill with:
+
+```sh
+pnpm --dir backend ingest:uspto -- --since=2026-08-01
+```
+
+`USPTO_BULK_LISTING_URL` must point to the account-authorized USPTO listing or a
+client-authorized, append-only mirror. The application does not bypass portal
+registration, geography controls, licensing, or access restrictions. If the
+feed is unavailable, keep `SEARCH_ENABLED=false`; portfolio and billing remain
+usable, but federated search must continue to report itself unavailable.
+
+## Patent bulk products are a separate corpus
+
+USPTO patent application full-text XML and patent grant full-text XML are
+published as weekly products. They have different document models, identifiers,
+classification systems, and legal-status meaning from trademarks. This
+trademark platform therefore does **not** insert patent XML into
+`registry_trademarks` or the trademark Elasticsearch index. Adding patents is a
+separate product change requiring its own schema, verified fixtures, parser,
+search index, attribution, licensing review, and acceptance tests.
+
+For other trademark registries (for example WIPO or EUIPO), use only an
+authorized bulk/API agreement and implement the existing `RegistryAdapter`
+contract. Do not scrape interactive registry sites or relabel third-party data
+as authoritative.

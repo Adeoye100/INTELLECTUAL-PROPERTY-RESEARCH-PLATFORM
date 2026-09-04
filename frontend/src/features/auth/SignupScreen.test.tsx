@@ -99,7 +99,7 @@ describe('SignupScreen', () => {
       <MemoryRouter initialEntries={['/auth/signup']}>
         <Routes>
           <Route path="/auth/signup" element={<SignupScreen />} />
-          <Route path="/dashboard" element={<h1>Dashboard workspace</h1>} />
+          <Route path="/admin/users" element={<h1>Organization administration</h1>} />
         </Routes>
       </MemoryRouter>,
     );
@@ -107,7 +107,7 @@ describe('SignupScreen', () => {
     await completeSignupForm(user);
     await user.click(screen.getByRole('button', { name: 'Create organization' }));
 
-    expect(await screen.findByRole('heading', { name: 'Dashboard workspace' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Organization administration' })).toBeVisible();
     expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/provisioning/organization-intents');
     expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/provisioning/firm');
     expect(new Headers(fetchMock.mock.calls[1][1]?.headers).get('Authorization')).toBe('Bearer verified-signup-token');

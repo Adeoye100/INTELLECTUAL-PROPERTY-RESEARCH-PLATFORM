@@ -150,7 +150,7 @@ describe('OAuthCallbackScreen', () => {
 
     render(
       <StrictMode><MemoryRouter initialEntries={['/auth/callback?code=duplicate-code']}>
-        <Routes><Route path="/auth/callback" element={<OAuthCallbackScreen />} /><Route path="/dashboard" element={<h1>Dashboard destination</h1>} /></Routes>
+        <Routes><Route path="/auth/callback" element={<OAuthCallbackScreen />} /><Route path="/admin/users" element={<h1>Admin users destination</h1>} /></Routes>
       </MemoryRouter></StrictMode>,
     );
     await waitFor(() => expect(auth.exchangeCodeForSession).toHaveBeenCalledOnce());
@@ -159,7 +159,7 @@ describe('OAuthCallbackScreen', () => {
         access_token: 'oauth-token', user: { id: 'u1', email: 'admin@example.test', user_metadata: {} },
       } }, error: null,
     });
-    await screen.findByRole('heading', { name: 'Dashboard destination' });
+    await screen.findByRole('heading', { name: 'Admin users destination' });
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(auth.exchangeCodeForSession).toHaveBeenCalledOnce();
   });
@@ -179,11 +179,11 @@ describe('OAuthCallbackScreen', () => {
 
     render(
       <MemoryRouter initialEntries={['/auth/callback?code=consumed-code']}>
-        <Routes><Route path="/auth/callback" element={<OAuthCallbackScreen />} /><Route path="/dashboard" element={<h1>Dashboard destination</h1>} /></Routes>
+        <Routes><Route path="/auth/callback" element={<OAuthCallbackScreen />} /><Route path="/admin/users" element={<h1>Admin users destination</h1>} /></Routes>
       </MemoryRouter>,
     );
 
-    expect(await screen.findByRole('heading', { name: 'Dashboard destination' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Admin users destination' })).toBeVisible();
     expect(auth.getSession).toHaveBeenCalledOnce();
   });
 
