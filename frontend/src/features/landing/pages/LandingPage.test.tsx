@@ -101,8 +101,9 @@ describe('LandingPage boot gate', () => {
     })));
     renderLanding({ fontReady: resolvedFonts, preloadImages: resolvedAssets });
 
-    expect(await screen.findByTestId('landing-hero')).toBeVisible();
-    expect(screen.getByText('').parentElement).not.toHaveClass('animate-bounce-slow');
+    const hero = await screen.findByTestId('landing-hero');
+    expect(hero).toBeVisible();
+    expect(hero.querySelector('.animate-bounce-slow')).toBeNull();
   });
 
   it('cleans up its timeout when unmounted', async () => {
