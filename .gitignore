@@ -75,3 +75,4 @@ lerna-debug.log*
 tmp/
 temp/
 .tmp/
+/IPRP_conversation
