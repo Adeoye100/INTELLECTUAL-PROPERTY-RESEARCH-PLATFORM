@@ -37,7 +37,7 @@ export function HeroSection({
               className="h-4 w-4 text-forge-subtext-onDark"
               aria-hidden="true"
             />
-            Evidence-led intellectual property research
+            Evidence-backed IP research
           </div>
 
           <h1 className="mt-7 max-w-4xl font-heading text-[clamp(3.4rem,8vw,7.5rem)] font-semibold leading-[0.82] tracking-[-0.055em] text-white">
@@ -48,9 +48,8 @@ export function HeroSection({
           </h1>
 
           <p className="mt-7 max-w-2xl text-base leading-7 text-[#F7FAFC] sm:text-lg sm:leading-8">
-            Search registries, examine confusion risk, research office actions,
-            and monitor portfolios from one defensible workspace built for
-            modern IP teams.
+            Search registries, analyze risk, track office actions,
+            and monitor portfolios from one workspace built for IP teams.
           </p>
 
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
@@ -58,14 +57,14 @@ export function HeroSection({
               to="/auth/create-organization"
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-semibold text-forge-navy transition hover:-translate-y-0.5 hover:bg-forge-teal-100"
             >
-              Start your research workspace
+              Start your workspace
               <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
             </Link>
             <a
               href="#capabilities"
               className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/25 bg-white/5 px-6 py-3 text-sm font-medium text-white transition hover:border-white/45 hover:bg-white/10"
             >
-              Explore capabilities
+              Explore features
             </a>
           </div>
 
@@ -85,10 +84,10 @@ export function HeroSection({
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <div>
                 <p className="font-subheading text-sm tracking-[0.18em] text-forge-silver-300">
-                  Research surface
+                  Research overview
                 </p>
                 <p className="mt-1 text-xs text-white/55">
-                  One query. Connected evidence.
+                  One query. Complete evidence.
                 </p>
               </div>
               <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white">
@@ -107,7 +106,7 @@ export function HeroSection({
                 <div className="h-48" aria-hidden="true" />
               )}
               <div className="space-y-3">
-                {["Registry search", "Risk analysis", "Watch intelligence"].map(
+                {["Registry search", "Risk analysis", "Portfolio watch"].map(
                   (label, index) => (
                     <div
                       key={label}
@@ -131,7 +130,7 @@ export function HeroSection({
                   6
                 </p>
                 <p className="text-[10px] uppercase tracking-[0.16em] text-white/50">
-                  Core capabilities
+                  Core tools
                 </p>
               </div>
               <div className="bg-white/6 px-3 py-3">
@@ -139,7 +138,7 @@ export function HeroSection({
                   1
                 </p>
                 <p className="text-[10px] uppercase tracking-[0.16em] text-white/50">
-                  System of record
+                  Single platform
                 </p>
               </div>
             </div>
