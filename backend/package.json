@@ -14,7 +14,7 @@
     "watch:worker:dev": "node --env-file=.env src/watch/run-watch-worker.js",
     "pdf-export:worker": "node src/exports/run-pdf-export-worker.js",
     "pdf-export:worker:dev": "node --env-file=.env src/exports/run-pdf-export-worker.js",
-    "migrate": "node src/db/migrate.js",
+    "migrate": "node --env-file-if-exists=.env src/db/migrate.js",
     "indices:elasticsearch": "node scripts/create-elasticsearch-indices.js",
     "ingest:uspto": "node src/ingestion/run-uspto-ingestion.js",
     "sync:elasticsearch": "node src/ingestion/run-elasticsearch-sync.js",

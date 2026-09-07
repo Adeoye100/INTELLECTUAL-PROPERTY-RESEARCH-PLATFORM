@@ -11,7 +11,7 @@ import { SearchScreen } from './SearchScreen';
 
 const renderSearch = (initialEntry = '/search', response = mockSearchResponse) => {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const body = String(input).includes('/api/v1/portfolio/import') && init?.method === 'POST'
+    const body = String(input).includes('/portfolio') && init?.method === 'POST'
       ? { id: 'portfolio-import-1', firmId: 'f1', ownerUserId: 'search-user', markText: 'FORGE TEK', jurisdiction: 'US', niceClasses: [9, 42], status: 'Pending', filingDate: '2025-02-14', renewalDate: '2035-02-14', sourceRegistry: 'USPTO search import (mock)', mocked: true }
       : response;
     return new Response(JSON.stringify(body), {
@@ -153,8 +153,8 @@ describe('SearchScreen', () => {
     await screen.findByRole('table', { name: /ranked by explicit risk/i });
     fireEvent.click(screen.getAllByRole('button', { name: 'Import to portfolio' })[0]);
     expect(await screen.findByText(/FORGE TEK was imported to the portfolio/i)).toBeVisible();
-    const request = fetchMock.mock.calls.find(([input]) => String(input).includes('/api/v1/portfolio/import'));
-    expect(JSON.parse(String(request?.[1]?.body))).toEqual({ searchResultId: '1' });
+    const request = fetchMock.mock.calls.find(([input]) => String(input).includes('/portfolio'));
+    expect(JSON.parse(String(request?.[1]?.body))).toMatchObject({ markText: 'FORGE TEK' });
   }, 20_000);
 
   it('has no automated accessibility violations before or after results load', async () => {

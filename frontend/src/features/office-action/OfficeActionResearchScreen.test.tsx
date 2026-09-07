@@ -1,18 +1,18 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OfficeActionResearchScreen } from './OfficeActionResearchScreen';
 
 const mark = { id: 'p1', firmId: 'f1', ownerUserId: 'u1', markText: 'FORGE GLOBAL', jurisdiction: 'US', niceClasses: [9], status: 'registered', filingDate: '2020-01-01', renewalDate: '2030-01-01', sourceRegistry: 'USPTO', registryReference: 'TEST-1', registrationDate: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
-const officeAction = { id: 'oa1', portfolioMarkId: null, referenceText: 'USPTO OA-2025-10', examinerReasoningSummary: 'Shared dominant term and related software services.', linkedPrecedentRef: null };
+const officeAction = { id: 'oa1', portfolioMarkId: null, sourceReferenceId: 'USPTO OA-2025-10', referenceText: 'USPTO OA-2025-10', examinerReasoningSummary: 'Shared dominant term and related software services.', linkedPrecedentRef: null };
 
 function renderScreen(action = officeAction) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
-    const body = url.includes('/office-actions/search') ? [action]
-      : url.includes('/office-actions/link') ? { success: true, message: 'Linked', linkedOfficeActionId: 'oa1', linkedPortfolioMarkId: 'p1' }
+    const body = url.includes('/office-actions/search') ? { results: [action] }
+      : url.includes('/office-action-refs') || url.includes('/office-actions/link') ? { id: 'ref-1', portfolioMarkId: 'p1', referenceText: 'USPTO OA-2025-10', examinerReasoningSummary: 'Shared dominant term', linkedPrecedentRef: 'oa1', createdAt: '2026-01-01T00:00:00.000Z' }
         : { items: [mark], pagination: { page: 1, pageSize: 25, total: 1, totalPages: 1 } };
     return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
   });
@@ -42,18 +42,17 @@ describe('OfficeActionResearchScreen', () => {
     await user.keyboard('{Enter}');
     expect(await screen.findByText('USPTO OA-2025-10')).toBeVisible();
 
-    const openLink = screen.getByRole('button', { name: 'Link to Case File' });
+    const openLink = screen.getByRole('button', { name: 'Link to Mark' });
     openLink.focus();
     await user.keyboard('{Enter}');
     const markChoice = await screen.findByRole('button', { name: /FORGE GLOBAL/ });
-    markChoice.focus();
-    await user.keyboard('{Enter}');
-    expect(await screen.findByRole('status')).toHaveTextContent('Office action linked');
+    fireEvent.click(markChoice);
+    expect(await screen.findByRole('status')).toHaveTextContent(/Office action reference linked/i);
   }, 20_000);
 
   it('renders Office Action metadata as text rather than markup', async () => {
     const user = userEvent.setup();
-    renderScreen({ ...officeAction, referenceText: '<office-action-reference>', examinerReasoningSummary: '<office-action-summary>' });
+    renderScreen({ id: 'oa1', portfolioMarkId: null, sourceReferenceId: '<office-action-reference>', referenceText: '<office-action-reference>', examinerReasoningSummary: '<office-action-summary>', linkedPrecedentRef: null });
     await user.type(screen.getByRole('textbox', { name: 'Mark Text' }), 'FORGE');
     await user.click(screen.getByRole('button', { name: 'Apply Filters' }));
     expect(await screen.findByText('<office-action-reference>')).toBeVisible();

@@ -318,14 +318,14 @@ export const RiskDetailScreen: React.FC = () => {
             <div className="flex flex-col items-stretch gap-6 py-2 md:flex-row md:items-center md:justify-between">
               {/* Proposed / protected mark */}
               <div className="flex-1 text-center md:text-left">
-                <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-text-secondary">
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
                   Your protected mark
                 </p>
-                <p className="font-mono text-2xl font-black uppercase tracking-tighter text-forge-navy-950">
+                <p className="font-mono text-2xl font-black uppercase tracking-tighter text-foreground">
                   {proposedMark?.markText ?? '—'}
                 </p>
                 {proposedMark && (
-                  <p className="mt-1 text-xs italic text-text-secondary">
+                  <p className="mt-1 text-xs italic text-muted-foreground">
                     Jurisdiction: {proposedMark.jurisdiction}
                     {proposedMark.niceClasses.length > 0 && (
                       <> &nbsp;|&nbsp; Classes: {proposedMark.niceClasses.join(', ')}</>
@@ -336,14 +336,14 @@ export const RiskDetailScreen: React.FC = () => {
 
               {/* VS divider */}
               <div className="flex flex-row items-center gap-4 md:flex-col md:items-center">
-                <div className="h-px flex-1 bg-forge-silver-300 md:h-8 md:w-px" aria-hidden="true" />
+                <div className="h-px flex-1 bg-border md:h-8 md:w-px" aria-hidden="true" />
                 <div
-                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-forge-silver-100 font-bold text-forge-navy-950"
+                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-muted font-bold text-foreground"
                   aria-hidden="true"
                 >
                   VS
                 </div>
-                <div className="h-px flex-1 bg-forge-silver-300 md:h-8 md:w-px" aria-hidden="true" />
+                <div className="h-px flex-1 bg-border md:h-8 md:w-px" aria-hidden="true" />
               </div>
 
               {/* Candidate / conflicting mark */}

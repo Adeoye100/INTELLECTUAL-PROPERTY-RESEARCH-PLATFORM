@@ -3,7 +3,8 @@ import tailwindConfig from '../../tailwind.config.js';
 
 const colours = tailwindConfig.theme.extend.colors;
 
-function luminance(hex: string) {
+function luminance(colorStr: string) {
+  const hex = colorStr.startsWith('var(') ? (colorStr.match(/#(?:[0-9a-fA-F]{3}){1,2}/)?.[0] ?? '#000000') : colorStr;
   const channels = hex.slice(1).match(/.{2}/g)!.map((value) => {
     const channel = Number.parseInt(value, 16) / 255;
     return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;

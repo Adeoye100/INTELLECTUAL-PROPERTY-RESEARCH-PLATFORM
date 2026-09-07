@@ -9,7 +9,7 @@ import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
 import { PdfExport } from '../../components/PdfExport';
 import { SourceStatusIndicator } from '../../components/SourceStatusIndicator';
-import type { PortfolioMark, SearchResponse, RiskDetailRouteState, SearchResult } from '../../types';
+import type { PortfolioMark, SearchResponse, RiskDetailRouteState, SearchResult, MatchedMarkRef } from '../../types';
 import { useAuthStore } from '../auth/authStore';
 import { useOnboardingStore } from '../onboarding/onboardingStore';
 import {
@@ -162,27 +162,27 @@ export const SearchScreen: React.FC = () => {
           <Card title="Search filters" className="lg:sticky lg:top-24">
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
               <div>
-                <label htmlFor="search-mark" className="mb-1 block text-xs font-bold uppercase text-text-secondary">Mark</label>
-                <div className="relative"><SearchIcon className="absolute left-3 top-2.5 h-4 w-4 text-forge-silver-500" aria-hidden="true" /><input {...register('mark')} id="search-mark" aria-invalid={Boolean(errors.mark)} aria-describedby={errors.mark ? 'search-mark-error' : undefined} className="w-full rounded border border-forge-silver-300 py-2 pl-9 pr-3 outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2" /></div>
+                <label htmlFor="search-mark" className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Mark</label>
+                <div className="relative"><SearchIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" /><input {...register('mark')} id="search-mark" aria-invalid={Boolean(errors.mark)} aria-describedby={errors.mark ? 'search-mark-error' : undefined} className="w-full rounded border border-input bg-background py-2 pl-9 pr-3 text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring" /></div>
                 {errors.mark && <p id="search-mark-error" className="mt-1 text-xs text-risk-high">{errors.mark.message}</p>}
               </div>
 
               <fieldset>
-                <legend className="mb-1 text-xs font-bold uppercase text-text-secondary">Jurisdiction</legend>
+                <legend className="mb-1 text-xs font-bold uppercase text-muted-foreground">Jurisdiction</legend>
                 <div className="space-y-2">
-                  {jurisdictions.map(([value, label]) => <label key={value} className="flex cursor-pointer items-center gap-2 text-sm text-text-primary"><input type="checkbox" value={value} {...register('jurisdictions')} className="rounded text-accent focus:ring-accent" />{label}</label>)}
+                  {jurisdictions.map(([value, label]) => <label key={value} className="flex cursor-pointer items-center gap-2 text-sm text-foreground"><input type="checkbox" value={value} {...register('jurisdictions')} className="rounded text-accent focus:ring-accent" />{label}</label>)}
                 </div>
                 {errors.jurisdictions && <p className="mt-1 text-xs text-risk-high">{errors.jurisdictions.message}</p>}
               </fieldset>
 
-              <div><label htmlFor="search-class" className="mb-1 block text-xs font-bold uppercase text-text-secondary">Nice class</label><input {...register('niceClass')} id="search-class" placeholder="9, 35, 42" aria-invalid={Boolean(errors.niceClass)} aria-describedby={errors.niceClass ? 'search-class-error' : undefined} className="w-full rounded border border-forge-silver-300 px-3 py-2 outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2" />{errors.niceClass && <p id="search-class-error" className="mt-1 text-xs text-risk-high">{errors.niceClass.message}</p>}</div>
-              <div><label htmlFor="search-status" className="mb-1 block text-xs font-bold uppercase text-text-secondary">Status</label><select {...register('status')} id="search-status" className="w-full rounded border border-forge-silver-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"><option value="">Any status</option><option value="pending">Pending</option><option value="registered">Registered</option><option value="abandoned">Abandoned</option></select></div>
-              <div><label htmlFor="search-owner" className="mb-1 block text-xs font-bold uppercase text-text-secondary">Owner</label><input {...register('owner')} id="search-owner" className="w-full rounded border border-forge-silver-300 px-3 py-2 outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2" /></div>
+              <div><label htmlFor="search-class" className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Nice class</label><input {...register('niceClass')} id="search-class" placeholder="9, 35, 42" aria-invalid={Boolean(errors.niceClass)} aria-describedby={errors.niceClass ? 'search-class-error' : undefined} className="w-full rounded border border-input bg-background px-3 py-2 text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring" />{errors.niceClass && <p id="search-class-error" className="mt-1 text-xs text-risk-high">{errors.niceClass.message}</p>}</div>
+              <div><label htmlFor="search-status" className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Status</label><select {...register('status')} id="search-status" className="w-full rounded border border-input bg-background px-3 py-2 text-foreground focus-visible:ring-2 focus-visible:ring-ring"><option value="">Any status</option><option value="pending">Pending</option><option value="registered">Registered</option><option value="abandoned">Abandoned</option></select></div>
+              <div><label htmlFor="search-owner" className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Owner</label><input {...register('owner')} id="search-owner" className="w-full rounded border border-input bg-background px-3 py-2 text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring" /></div>
 
               <fieldset className="space-y-3">
-                <legend className="text-xs font-bold uppercase text-text-secondary">Filing-date range</legend>
-                <div><label htmlFor="search-filed-from" className="mb-1 block text-xs font-semibold text-text-secondary">From</label><input {...register('filedFrom')} id="search-filed-from" type="date" className="w-full rounded border border-forge-silver-300 px-3 py-2 outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2" /></div>
-                <div><label htmlFor="search-filed-to" className="mb-1 block text-xs font-semibold text-text-secondary">To</label><input {...register('filedTo')} id="search-filed-to" type="date" aria-invalid={Boolean(errors.filedTo)} aria-describedby={errors.filedTo ? 'search-date-error' : undefined} className="w-full rounded border border-forge-silver-300 px-3 py-2 outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2" />{errors.filedTo && <p id="search-date-error" className="mt-1 text-xs text-risk-high">{errors.filedTo.message}</p>}</div>
+                <legend className="text-xs font-bold uppercase text-muted-foreground">Filing-date range</legend>
+                <div><label htmlFor="search-filed-from" className="mb-1 block text-xs font-semibold text-muted-foreground">From</label><input {...register('filedFrom')} id="search-filed-from" type="date" className="w-full rounded border border-input bg-background px-3 py-2 text-foreground focus-visible:ring-2 focus-visible:ring-ring" /></div>
+                <div><label htmlFor="search-filed-to" className="mb-1 block text-xs font-semibold text-muted-foreground">To</label><input {...register('filedTo')} id="search-filed-to" type="date" aria-invalid={Boolean(errors.filedTo)} aria-describedby={errors.filedTo ? 'search-date-error' : undefined} className="w-full rounded border border-input bg-background px-3 py-2 text-foreground focus-visible:ring-2 focus-visible:ring-ring" />{errors.filedTo && <p id="search-date-error" className="mt-1 text-xs text-risk-high">{errors.filedTo.message}</p>}</div>
               </fieldset>
 
               <div className="flex flex-col gap-2"><Button type="submit" className="w-full" disabled={isSubmitting}>{isSubmitting ? 'Searching…' : 'Search trademarks'}</Button><Button type="button" variant="ghost" className="w-full" onClick={clearFilters}><FilterX className="mr-2 h-4 w-4" aria-hidden="true" />Clear filters</Button></div>
@@ -226,7 +226,7 @@ export const SearchScreen: React.FC = () => {
                             searchQuery: submittedFilters.mark,
                           };
                           return (
-                            <tr key={result.id} className="bg-white hover:bg-surface-base">
+                            <tr key={result.id} className="bg-card hover:bg-muted">
                               <td className="px-3 py-3"><input type="checkbox" checked={selectedIds.has(result.id)} onChange={() => toggleSelection(result.id)} aria-label={`Select ${result.candidateMarkText}`} className="rounded text-accent focus:ring-accent" /></td>
                               <td className="px-3 py-3 font-bold text-text-primary">{index + 1}</td>
                               <th scope="row" className="px-3 py-3 font-mono text-sm font-bold uppercase text-text-primary">{result.candidateMarkText}</th>
@@ -243,7 +243,7 @@ export const SearchScreen: React.FC = () => {
                                       <Badge risk={riskObj?.compositeRating}>{riskObj ? `${riskObj.compositeRating} risk` : 'Not scored'}</Badge>
                                       {riskObj && (
                                         <ul className="mt-2 max-w-52 space-y-1 text-xs text-text-secondary" aria-label={`Evidence for ${result.candidateMarkText} risk rating`}>
-                                          {(riskObj.matchedMarkRefs ?? []).slice(0, 2).map((reference) => <li key={`${reference.type}-${reference.evidence}`}><strong>{reference.type}:</strong> {reference.evidence} ({reference.score})</li>)}
+                                          {(riskObj.matchedMarkRefs ?? []).slice(0, 2).map((reference: MatchedMarkRef) => <li key={`${reference.type}-${reference.evidence}`}><strong>{reference.type}:</strong> {reference.evidence} ({reference.score})</li>)}
                                           <li><strong>Class overlap:</strong> {riskObj.classOverlap ? 'Yes' : 'No'}</li>
                                         </ul>
                                       )}

@@ -22,7 +22,7 @@ describe('MainLayout', () => {
     expect(screen.getByRole('navigation', { name: 'Application' })).toBeVisible();
     expect(screen.getByRole('link', { name: 'Portfolio' })).toHaveAttribute('href', '/portfolio');
     expect(screen.queryByRole('link', { name: /Notifications/ })).toBeNull();
-    expect(container.querySelector('aside')).toHaveClass('w-20', 'xl:w-64');
+    expect(container.querySelector('aside')).toHaveClass('w-72', 'lg:w-64');
     expect(container.querySelector('main')).toHaveClass('p-4', 'md:p-6', 'xl:p-8');
   });
 });

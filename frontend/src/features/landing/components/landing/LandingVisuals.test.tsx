@@ -50,7 +50,7 @@ describe("Landing Page Visual Regressions", () => {
     it("uses the approved near-white text token for the hero paragraph", () => {
       renderHero({ animated: false });
       const paragraph = screen.getByText(
-        /Search registries, examine confusion risk/i,
+        /Search registries, analyze risk/i,
       );
       expect(paragraph).toHaveClass("text-[#F7FAFC]");
     });

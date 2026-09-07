@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import type { SearchResult } from '../../types';
+import type { SearchResult, RiskLevel } from '../../types';
 
 const optionalText = z.string().trim();
 
@@ -77,7 +77,7 @@ export const searchFiltersFromParams = (params: URLSearchParams): SearchFilters 
 export const buildSearchRequestUrl = (filters: SearchFilters) =>
   `/search?${searchFiltersToParams(filters).toString()}`;
 
-const riskWeight = { high: 3, medium: 2, low: 1 } as const;
+const riskWeight: Record<RiskLevel, number> = { high: 3, medium: 2, low: 1 };
 
 export const rankSearchResults = (results: SearchResult[]) => [...results].sort((left, right) => {
   const leftRiskObj = left.riskAnalysis ?? left.riskScore;

@@ -1,5 +1,5 @@
 import { getApiClient } from '../../lib/api/client';
-import type { PortfolioMark, SearchResponse } from '../../types';
+import type { PortfolioMark, SearchResponse, SearchResult } from '../../types';
 import { buildSearchRequestUrl, type SearchFilters } from './searchFilters';
 
 export const searchTrademarks = (filters: SearchFilters) =>

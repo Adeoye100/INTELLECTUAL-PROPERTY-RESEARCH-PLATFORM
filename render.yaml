@@ -4,6 +4,7 @@ services:
     runtime: node
     rootDir: backend
     buildCommand: corepack enable && pnpm install --frozen-lockfile
+    preDeployCommand: pnpm migrate
     startCommand: pnpm start
     healthCheckPath: /healthz
     autoDeploy: false
@@ -12,6 +13,18 @@ services:
         value: 22.14.0
       - key: NODE_ENV
         value: production
+      - key: PUBLIC_FIRM_SIGNUP_ENABLED
+        value: "false"
+      - key: ORGANIZATION_INTENT_TTL_SECONDS
+        value: "3600"
+      - key: PUBLIC_APP_URL
+        value: "https://intellectual-property-research-plat.vercel.app"
+      - key: INVITATION_MAILER_PROVIDER
+        value: resend
+      - key: INVITATION_MAILER_API_KEY
+        sync: false
+      - key: INVITATION_MAILER_FROM
+        sync: false
       - key: DATABASE_URL
         sync: false
       - key: DATABASE_SSL

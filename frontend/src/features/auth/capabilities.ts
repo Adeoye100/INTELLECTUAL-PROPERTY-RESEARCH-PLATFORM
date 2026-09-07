@@ -73,11 +73,9 @@ const functionalNavigation: readonly NavigationItem[] = [
 ];
 
 export function navigationForRole(role: UserRole | null | undefined) {
-  return functionalNavigation.filter((item) => {
-    if (!hasCapability(role, item.capability)) return false;
-    if (item.featureFlag && !features[item.featureFlag]) return false;
-    return true;
-  });
+  return functionalNavigation.filter((item) =>
+    hasCapability(role, item.capability)
+  );
 }
 
 export const roleDescriptions: Record<UserRole, string> = {

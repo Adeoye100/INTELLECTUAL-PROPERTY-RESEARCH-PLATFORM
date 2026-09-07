@@ -133,6 +133,7 @@ export interface SearchResult {
   /** Current filing status as returned by the source registry. */
   status: string;
   riskScore?: RiskScore; // Joined data
+  riskAnalysis?: RiskScore; // Joined data alias
 }
 
 export interface SearchResponse {

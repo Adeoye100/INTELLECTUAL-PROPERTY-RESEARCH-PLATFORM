@@ -55,7 +55,7 @@ export function PortfolioMarkForm({ initialValues, formId, submitLabel, cancelLa
   const [errors, setErrors] = useState<Record<string, string>>({});
   const change = <Key extends keyof Values>(field: Key, value: Values[Key]) => { setValues((current) => ({ ...current, [field]: value })); setErrors((current) => ({ ...current, [field]: "" })); };
   const submit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const result = parse(values); setErrors(result.errors); if (result.input) await onSubmit(result.input); };
-  const cls = "w-full rounded border border-forge-silver-300 bg-white px-3 py-2 text-text-primary";
+  const cls = "w-full rounded border border-input bg-background px-3 py-2 text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
   const error = (name: keyof Values) => errors[name] ? <p className="mt-1 text-xs text-risk-high" role="alert">{errors[name]}</p> : null;
   return <form id={formId} onSubmit={(event) => void submit(event)} className="space-y-4" noValidate>
     <Field label="Mark text" name="markText" values={values} onChange={change} inputClass={cls} error={error("markText")} autoFocus />
