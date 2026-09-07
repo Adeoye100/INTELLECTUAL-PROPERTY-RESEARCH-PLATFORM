@@ -18,6 +18,7 @@
     "indices:elasticsearch": "node scripts/create-elasticsearch-indices.js",
     "ingest:uspto": "node src/ingestion/run-uspto-ingestion.js",
     "sync:elasticsearch": "node src/ingestion/run-elasticsearch-sync.js",
+    "refresh:uspto-search": "node --env-file-if-exists=.env src/ingestion/run-uspto-search-refresh.js",
     "verify:supabase-token": "node --env-file=.env scripts/verify-supabase-token.js",
     "verify:supabase-rbac": "node --env-file=.env scripts/verify-supabase-rbac.js",
     "phase2:readiness": "node scripts/phase2-readiness.js",

@@ -132,21 +132,31 @@ export class UsptoBulkXmlAdapter extends RegistryAdapter {
     yield* records;
   }
 
+  async *fetchUpdate(update) {
+    if (!update || typeof update.url !== 'string' || !(update.date instanceof Date) || Number.isNaN(update.date.getTime())) {
+      throw new TypeError('fetchUpdate requires a valid update object with url and date.');
+    }
+    if (new URL(update.url).origin !== this.listingOrigin) {
+      throw new Error(`${this.sourceName} archive URL origin does not match listing origin.`);
+    }
+    const request = await requestBoundedResponse({
+      fetchImpl: this.fetchImpl, url: update.url, sourceName: this.sourceName,
+      operation: 'daily archive download', accept: 'application/zip,application/octet-stream', timeoutMs: REGISTRY_TIMEOUT_MS,
+      maxCompressedBytes: this.maxArchiveCompressedBytes, maxDecompressedBytes: this.maxArchiveCompressedBytes,
+    });
+    if (!request.response.ok) {
+      request.close();
+      throw new RegistryHttpError(this.sourceName, 'daily archive download', request.response.status);
+    }
+    try {
+      yield* this.parseArchive(request.body);
+    } finally { request.close(); }
+  }
+
   async *fetchUpdates(since) {
     const updates = await this.discoverUpdates(since);
     for (const update of updates) {
-      const request = await requestBoundedResponse({
-        fetchImpl: this.fetchImpl, url: update.url, sourceName: this.sourceName,
-        operation: 'daily archive download', accept: 'application/zip,application/octet-stream', timeoutMs: REGISTRY_TIMEOUT_MS,
-        maxCompressedBytes: this.maxArchiveCompressedBytes, maxDecompressedBytes: this.maxArchiveCompressedBytes,
-      });
-      if (!request.response.ok) {
-        request.close();
-        throw new RegistryHttpError(this.sourceName, 'daily archive download', request.response.status);
-      }
-      try {
-        yield* this.parseArchive(request.body);
-      } finally { request.close(); }
+      yield* this.fetchUpdate(update);
     }
   }
 

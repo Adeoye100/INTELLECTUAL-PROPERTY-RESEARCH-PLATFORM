@@ -1,6 +1,7 @@
 const COLUMNS = `
   id, firm_id, requested_by_user_id, request_id, query_snapshot, results_snapshot,
-  source_statuses, partial, result_count, methodology_versions, created_at`;
+  source_statuses, partial, result_count, methodology_versions, created_at,
+  data_through_date, source_indexed_at, registry_refresh_run_id`;
 
 function timestamp(value) {
   if (value === null || value === undefined) return null;
@@ -20,6 +21,9 @@ export function searchResultFromRow(row) {
     resultCount: row.result_count,
     methodologyVersions: row.methodology_versions,
     createdAt: timestamp(row.created_at),
+    dataThroughDate: row.data_through_date ? (row.data_through_date instanceof Date ? row.data_through_date.toISOString().slice(0, 10) : String(row.data_through_date).slice(0, 10)) : null,
+    sourceIndexedAt: timestamp(row.source_indexed_at),
+    registryRefreshRunId: row.registry_refresh_run_id ?? null,
   };
   if (row.requested_by_actor_user_id !== undefined) {
     result.requestedByActorUserId = row.requested_by_actor_user_id;
@@ -61,8 +65,9 @@ export class SearchResultRepository {
       )
       INSERT INTO search_results (
         id, firm_id, requested_by_user_id, request_id, query_snapshot, results_snapshot,
-        source_statuses, partial, result_count, methodology_versions, created_at
-      ) SELECT $1, $2, requester.id, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8, $9, $10::jsonb, $11
+        source_statuses, partial, result_count, methodology_versions, created_at,
+        data_through_date, source_indexed_at, registry_refresh_run_id
+      ) SELECT $1, $2, requester.id, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8, $9, $10::jsonb, $11, $12, $13, $14
       FROM requester
       ON CONFLICT (firm_id, request_id) DO NOTHING
       RETURNING ${COLUMNS}`,
@@ -71,6 +76,7 @@ export class SearchResultRepository {
         JSON.stringify(snapshot.querySnapshot), JSON.stringify(snapshot.resultsSnapshot),
         JSON.stringify(snapshot.sourceStatuses), snapshot.partial, snapshot.resultCount,
         JSON.stringify(snapshot.methodologyVersions), snapshot.createdAt,
+        snapshot.dataThroughDate ?? null, snapshot.sourceIndexedAt ?? null, snapshot.registryRefreshRunId ?? null,
       ],
     );
     return result.rowCount ? searchResultFromRow(result.rows[0]) : null;
@@ -90,6 +96,7 @@ export class SearchResultRepository {
               search_results.request_id, search_results.query_snapshot, search_results.results_snapshot,
               search_results.source_statuses, search_results.partial, search_results.result_count,
               search_results.methodology_versions, search_results.created_at,
+              search_results.data_through_date, search_results.source_indexed_at, search_results.registry_refresh_run_id,
               users.supabase_user_id AS requested_by_actor_user_id
        FROM search_results
        JOIN users ON users.id = search_results.requested_by_user_id

@@ -324,6 +324,12 @@ function boundedPositiveInteger(env, name, fallback, minimum, maximum) {
 
 function loadSearchConfig(env) {
   const enabled = searchEnabled(env);
+  const expectedIntervalHours = boundedPositiveInteger(
+    env, 'SEARCH_REFRESH_EXPECTED_INTERVAL_HOURS', 24, 1, 168,
+  );
+  const maxMissedRefreshRuns = boundedPositiveInteger(
+    env, 'SEARCH_MAX_MISSED_REFRESH_RUNS', 2, 1, 7,
+  );
   if (!enabled) {
     return {
       searchEnabled: false,
@@ -333,6 +339,8 @@ function loadSearchConfig(env) {
         env, 'SEARCH_SOURCE_TIMEOUT_MS', 3_000, MIN_SEARCH_TIMEOUT_MS, MAX_SEARCH_TIMEOUT_MS,
       ),
       searchMaxResults: boundedPositiveInteger(env, 'SEARCH_MAX_RESULTS', 50, 1, 100),
+      searchRefreshExpectedIntervalHours: expectedIntervalHours,
+      searchMaxMissedRefreshRuns: maxMissedRefreshRuns,
     };
   }
   return {
@@ -343,6 +351,8 @@ function loadSearchConfig(env) {
       env, 'SEARCH_SOURCE_TIMEOUT_MS', 3_000, MIN_SEARCH_TIMEOUT_MS, MAX_SEARCH_TIMEOUT_MS,
     ),
     searchMaxResults: boundedPositiveInteger(env, 'SEARCH_MAX_RESULTS', 50, 1, 100),
+    searchRefreshExpectedIntervalHours: expectedIntervalHours,
+    searchMaxMissedRefreshRuns: maxMissedRefreshRuns,
   };
 }
 
@@ -541,6 +551,25 @@ export function loadUsptoIngestionConfig(env = process.env) {
     usptoBulkListingUrl: env.USPTO_BULK_LISTING_URL === undefined
       ? undefined : registryListingUrl(env.USPTO_BULK_LISTING_URL),
     usptoIngestionOverlapDays: boundedPositiveInteger(env, 'USPTO_INGESTION_OVERLAP_DAYS', 3, 1, 30),
+  };
+}
+
+export function loadUsptoSearchRefreshConfig(env = process.env) {
+  const environment = nodeEnvironment(env);
+  return {
+    environment,
+    ...databaseConfig(env, environment),
+    usptoBulkListingUrl: env.USPTO_BULK_LISTING_URL === undefined
+      ? undefined : registryListingUrl(env.USPTO_BULK_LISTING_URL),
+    usptoIngestionOverlapDays: boundedPositiveInteger(env, 'USPTO_INGESTION_OVERLAP_DAYS', 3, 1, 30),
+    elasticsearchUrl: elasticsearchSearchUrl(env),
+    elasticsearchIndex: elasticsearchIndexName(env.ELASTICSEARCH_INDEX?.trim() || 'trademarks_composite'),
+    searchRefreshExpectedIntervalHours: boundedPositiveInteger(
+      env, 'SEARCH_REFRESH_EXPECTED_INTERVAL_HOURS', 24, 1, 168,
+    ),
+    searchMaxMissedRefreshRuns: boundedPositiveInteger(
+      env, 'SEARCH_MAX_MISSED_REFRESH_RUNS', 2, 1, 7,
+    ),
   };
 }
 

@@ -196,10 +196,35 @@ export const SearchScreen: React.FC = () => {
           ) : searchQuery.isLoading ? (
             <div className="space-y-3" role="status" aria-label="Loading trademark results"><div className="h-12 animate-pulse rounded bg-forge-silver-100" /><div className="h-64 animate-pulse rounded bg-forge-silver-100" /><span className="sr-only">Loading trademark results…</span></div>
           ) : searchQuery.isError ? (
-            <div className="rounded-lg border border-risk-high/30 bg-risk-high/10 p-8 text-center" role="alert"><AlertTriangle className="mx-auto mb-3 h-8 w-8 text-risk-high" aria-hidden="true" /><h2 className="font-bold text-text-primary">Search could not be completed</h2><p className="mt-1 text-sm text-text-secondary">Your filters are preserved. Retry when the registry connection is available.</p><Button className="mt-4" onClick={() => void searchQuery.refetch()}>Retry search</Button></div>
+            (() => {
+              const isStaleError = (searchQuery.error as any)?.serverCode === 'SEARCH_DATA_STALE';
+              return (
+                <div className="rounded-lg border border-risk-high/30 bg-risk-high/10 p-8 text-center" role="alert">
+                  <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-risk-high" aria-hidden="true" />
+                  <h2 className="font-bold text-text-primary">
+                    {isStaleError ? 'Trademark search unavailable' : 'Search could not be completed'}
+                  </h2>
+                  <p className="mt-1 text-sm text-text-secondary">
+                    {isStaleError
+                      ? 'Trademark search is temporarily unavailable while registry data is being refreshed.'
+                      : 'Your filters are preserved. Retry when the registry connection is available.'}
+                  </p>
+                  <Button className="mt-4" onClick={() => void searchQuery.refetch()}>
+                    {isStaleError ? 'Check availability' : 'Retry search'}
+                  </Button>
+                </div>
+              );
+            })()
           ) : (
             <div className="space-y-4">
               <SourceStatusIndicator statuses={sourceStatuses} />
+              {searchQuery.data?.dataFreshness && (
+                <div className="rounded border border-border bg-card px-3 py-2 text-xs text-text-secondary" role="status" aria-label="Data freshness">
+                  {searchQuery.data.dataFreshness.source} data through {new Date(`${searchQuery.data.dataFreshness.dataThrough}T00:00:00.000Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  {searchQuery.data.dataFreshness.status === 'refreshing' && ' · Latest refresh in progress'}
+                  {searchQuery.data.dataFreshness.status === 'degraded' && ' · Latest refresh delayed'}
+                </div>
+              )}
               {allSourcesUnavailable && rankedResults.length === 0 ? (
                 <div className="rounded-lg border border-risk-high/30 bg-risk-high/10 p-8 text-center" role="alert"><h2 className="font-bold text-text-primary">All registry sources are unavailable</h2><p className="mt-1 text-sm text-text-secondary">No reliable result set can be shown yet. Your filters remain saved.</p><Button className="mt-4" onClick={() => void searchQuery.refetch()}>Retry sources</Button></div>
               ) : rankedResults.length === 0 ? (

@@ -105,4 +105,14 @@ export class RegistryTrademarkRepository {
         AND trademark.updated_at = projected."updatedAt"
     `, [versions]);
   }
+
+  async projectionBacklogCount() {
+    const result = await this.pool.query(`
+      SELECT count(*)::integer AS count
+      FROM registry_trademarks
+      WHERE elasticsearch_synced_at IS NULL
+         OR elasticsearch_synced_at < updated_at
+    `);
+    return result.rows[0].count;
+  }
 }

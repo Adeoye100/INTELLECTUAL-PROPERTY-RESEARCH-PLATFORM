@@ -241,6 +241,7 @@ function validateResult(value, searchId) {
 export function validateSearchSnapshot({
   id, firmId, requestedByUserId, requestId, querySnapshot, resultsSnapshot,
   sourceStatuses, partial, resultCount, methodologyVersions, createdAt,
+  dataThroughDate = null, sourceIndexedAt = null, registryRefreshRunId = null,
 }) {
   const snapshotId = parseSearchSnapshotId(id, 'searchId');
   const scopedFirmId = parseSearchSnapshotId(firmId, 'firmId');
@@ -281,6 +282,10 @@ export function validateSearchSnapshot({
     throw snapshotError('SEARCH_SNAPSHOT_RISK_EVIDENCE_INVALID', 'Search methodology versions are inconsistent.');
   }
   const normalizedCreatedAt = isoTimestamp(createdAt, 'SEARCH_SNAPSHOT_INVALID', 'Search createdAt is invalid.');
+  const normalizedDataThroughDate = dataThroughDate ? date(dataThroughDate, 'dataThroughDate') : null;
+  const normalizedSourceIndexedAt = sourceIndexedAt ? isoTimestamp(sourceIndexedAt, 'SEARCH_SNAPSHOT_INVALID', 'Search sourceIndexedAt is invalid.') : null;
+  const normalizedRefreshRunId = registryRefreshRunId ? parseSearchSnapshotId(registryRefreshRunId, 'registryRefreshRunId') : null;
+
   const snapshot = {
     id: snapshotId,
     firmId: scopedFirmId,
@@ -293,6 +298,9 @@ export function validateSearchSnapshot({
     resultCount,
     methodologyVersions: versions,
     createdAt: normalizedCreatedAt,
+    dataThroughDate: normalizedDataThroughDate,
+    sourceIndexedAt: normalizedSourceIndexedAt,
+    registryRefreshRunId: normalizedRefreshRunId,
   };
   let serialized;
   try { serialized = JSON.stringify(snapshot); } catch { throw snapshotError('SEARCH_SNAPSHOT_INVALID', 'Search snapshot is invalid.'); }

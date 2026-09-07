@@ -136,6 +136,13 @@ export interface SearchResult {
   riskAnalysis?: RiskScore; // Joined data alias
 }
 
+export interface SearchDataFreshness {
+  source: string;
+  status: 'ready' | 'refreshing' | 'degraded';
+  dataThrough: string;
+  indexedAt: string;
+}
+
 export interface SearchResponse {
   results: SearchResult[];
   sourceStatuses: SourceStatusEntry[];
@@ -143,6 +150,7 @@ export interface SearchResponse {
   partial?: boolean;
   /** Correlates progressive responses for the same submitted search. */
   requestId?: string;
+  dataFreshness?: SearchDataFreshness | null;
 }
 
 export interface DashboardAlert {

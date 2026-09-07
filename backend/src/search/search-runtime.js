@@ -1,6 +1,7 @@
 import { ElasticsearchSearchSource } from './elasticsearch-search-source.js';
 import { FederatedSearchService } from './federated-search-service.js';
 import { RiskEnrichedSearchService } from '../risk/risk-enriched-search-service.js';
+import { FreshnessGuardedSearchService } from './freshness-guarded-search-service.js';
 
 /** Creates the optional, feature-gated Elasticsearch-backed search runtime. */
 export function createSearchRuntime(config, {
@@ -8,6 +9,7 @@ export function createSearchRuntime(config, {
   logger,
   requestIdFactory,
   riskScorer,
+  freshnessService = null,
 } = {}) {
   if (!config?.searchEnabled) {
     return { searchSources: [], federatedSearchService: null, searchService: null };
@@ -25,10 +27,17 @@ export function createSearchRuntime(config, {
     ...(logger === undefined ? {} : { logger }),
     ...(requestIdFactory === undefined ? {} : { requestIdFactory }),
   });
-  const searchService = new RiskEnrichedSearchService({
+  const riskEnrichedSearchService = new RiskEnrichedSearchService({
     searchService: federatedSearchService,
     riskScorer,
   });
+
+  const searchService = freshnessService
+    ? new FreshnessGuardedSearchService({
+      searchService: riskEnrichedSearchService,
+      freshnessService,
+    })
+    : riskEnrichedSearchService;
 
   return { searchSources, federatedSearchService, searchService };
 }

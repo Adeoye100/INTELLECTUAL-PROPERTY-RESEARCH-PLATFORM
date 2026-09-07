@@ -98,7 +98,7 @@ services:
     rootDir: backend
     schedule: "15 07 * * *"
     buildCommand: corepack enable && pnpm install --frozen-lockfile
-    startCommand: pnpm ingest:uspto
+    startCommand: pnpm refresh:uspto-search
     autoDeploy: false
     envVars:
       - key: NODE_VERSION
@@ -119,3 +119,11 @@ services:
         sync: false
       - key: USPTO_INGESTION_OVERLAP_DAYS
         value: "3"
+      - key: ELASTICSEARCH_URL
+        sync: false
+      - key: ELASTICSEARCH_INDEX
+        value: trademarks_composite
+      - key: SEARCH_REFRESH_EXPECTED_INTERVAL_HOURS
+        value: "24"
+      - key: SEARCH_MAX_MISSED_REFRESH_RUNS
+        value: "2"

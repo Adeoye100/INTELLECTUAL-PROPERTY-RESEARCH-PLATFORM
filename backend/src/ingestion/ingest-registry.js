@@ -1,7 +1,6 @@
-export async function ingestRegistryUpdates({
-  adapter,
+export async function ingestRegistryRecords({
+  records,
   repository,
-  since,
   batchSize = 500,
 }) {
   if (!Number.isSafeInteger(batchSize) || batchSize <= 0) {
@@ -18,11 +17,25 @@ export async function ingestRegistryUpdates({
     batch = [];
   };
 
-  for await (const record of adapter.fetchUpdates(since)) {
+  for await (const record of records) {
     batch.push(record);
     if (batch.length >= batchSize) await flush();
   }
   await flush();
 
-  return { sourceName: adapter.sourceName, processed, changed };
+  return { processed, changed };
+}
+
+export async function ingestRegistryUpdates({
+  adapter,
+  repository,
+  since,
+  batchSize = 500,
+}) {
+  const result = await ingestRegistryRecords({
+    records: adapter.fetchUpdates(since),
+    repository,
+    batchSize,
+  });
+  return { sourceName: adapter.sourceName, ...result };
 }

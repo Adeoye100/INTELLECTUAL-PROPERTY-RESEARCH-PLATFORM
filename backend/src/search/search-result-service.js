@@ -78,6 +78,12 @@ function toApiResponse(record) {
     sourceStatuses: cloneSearchSnapshot(snapshot.sourceStatuses),
     partial: snapshot.partial,
     requestId: snapshot.requestId,
+    dataFreshness: snapshot.dataThroughDate ? {
+      source: 'USPTO',
+      status: 'ready',
+      dataThrough: snapshot.dataThroughDate,
+      indexedAt: snapshot.sourceIndexedAt,
+    } : null,
   };
 }
 
@@ -94,6 +100,12 @@ function toRetrievedResponse(record) {
     resultCount: snapshot.resultCount,
     methodologyVersions: cloneSearchSnapshot(snapshot.methodologyVersions),
     createdAt: snapshot.createdAt,
+    dataFreshness: snapshot.dataThroughDate ? {
+      source: 'USPTO',
+      status: 'ready',
+      dataThrough: snapshot.dataThroughDate,
+      indexedAt: snapshot.sourceIndexedAt,
+    } : null,
   };
 }
 
@@ -135,6 +147,7 @@ export class SearchResultService {
 
   buildSnapshot({ id, firmId, requestedByUserId, query, searchResponse, createdAt: occurredAt }) {
     const response = mapRiskEnrichedSearchResponse(id, searchResponse);
+    const freshness = searchResponse?.dataFreshness ?? null;
     return validateSearchSnapshot({
       id,
       firmId,
@@ -147,6 +160,9 @@ export class SearchResultService {
       resultCount: response.results.length,
       methodologyVersions: methodologyVersions(response.results),
       createdAt: occurredAt,
+      dataThroughDate: freshness?.dataThrough ?? null,
+      sourceIndexedAt: freshness?.indexedAt ?? null,
+      registryRefreshRunId: freshness?.refreshRunId ?? null,
     });
   }
 

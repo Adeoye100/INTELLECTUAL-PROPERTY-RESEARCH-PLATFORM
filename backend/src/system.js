@@ -22,6 +22,8 @@ import { PortfolioMarkService } from './portfolio/portfolio-mark-service.js';
 import { createSearchRuntime } from './search/search-runtime.js';
 import { SearchResultRepository } from './search/search-result-repository.js';
 import { SearchResultService } from './search/search-result-service.js';
+import { RegistryRefreshRepository } from './ingestion/registry-refresh-repository.js';
+import { SearchFreshnessService } from './search/search-freshness-service.js';
 import { WatchRepository } from './watch/watch-repository.js';
 import { WatchService } from './watch/watch-service.js';
 import { createWatchRuntime } from './watch/watch-runtime.js';
@@ -42,7 +44,17 @@ import { BillingRepository } from './billing/billing-repository.js';
 import { BillingService } from './billing/billing-service.js';
 
 export async function createSystem(config, { officeActionSources = [], exportStorage = null } = {}) {
-  const { searchSources, federatedSearchService, searchService } = createSearchRuntime(config);
+  const pool = createPool(config.databaseUrl, config);
+  const registryRefreshRepository = new RegistryRefreshRepository(pool);
+  const searchFreshnessService = new SearchFreshnessService({
+    repository: registryRefreshRepository,
+    expectedIntervalHours: config.searchRefreshExpectedIntervalHours,
+    maxMissedRefreshRuns: config.searchMaxMissedRefreshRuns,
+  });
+
+  const { searchSources, federatedSearchService, searchService } = createSearchRuntime(config, {
+    freshnessService: searchFreshnessService,
+  });
   const {
     officeActionSources: configuredOfficeActionSources,
     federatedOfficeActionSearchService,
@@ -59,7 +71,6 @@ export async function createSystem(config, { officeActionSources = [], exportSto
     secretKey: config.supabaseSecretKey,
   });
 
-  const pool = createPool(config.databaseUrl, config);
   const organizationProvisioningRepository = new OrganizationProvisioningRepository(pool);
   const invitationRepository = new InvitationRepository(pool);
   const redisClient = createClient({ url: config.redisUrl });
@@ -206,6 +217,8 @@ export async function createSystem(config, { officeActionSources = [], exportSto
     searchSources,
     federatedSearchService,
     searchService,
+    searchFreshnessService,
+    registryRefreshRepository,
     searchResultRepository,
     searchResultService,
     async close() {
