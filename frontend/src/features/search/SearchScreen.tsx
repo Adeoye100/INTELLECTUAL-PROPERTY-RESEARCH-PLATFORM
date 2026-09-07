@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { ApiError } from '../../lib/api/client';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -197,7 +198,7 @@ export const SearchScreen: React.FC = () => {
             <div className="space-y-3" role="status" aria-label="Loading trademark results"><div className="h-12 animate-pulse rounded bg-forge-silver-100" /><div className="h-64 animate-pulse rounded bg-forge-silver-100" /><span className="sr-only">Loading trademark results…</span></div>
           ) : searchQuery.isError ? (
             (() => {
-              const isStaleError = (searchQuery.error as any)?.serverCode === 'SEARCH_DATA_STALE';
+              const isStaleError = searchQuery.error instanceof ApiError && searchQuery.error.serverCode === 'SEARCH_DATA_STALE';
               return (
                 <div className="rounded-lg border border-risk-high/30 bg-risk-high/10 p-8 text-center" role="alert">
                   <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-risk-high" aria-hidden="true" />
