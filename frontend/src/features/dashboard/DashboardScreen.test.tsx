@@ -87,4 +87,21 @@ describe('DashboardScreen data states', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retry dashboard' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
   });
+
+  it('renders unassessed risk as a neutral row without mapping to low', async () => {
+    const analyticsWithUnknown: DashboardAnalytics = {
+      ...mockAnalytics,
+      portfolio: {
+        ...mockAnalytics.portfolio,
+        byRisk: [
+          ...mockAnalytics.portfolio.byRisk,
+          { risk: 'unknown', count: 5 },
+        ],
+      },
+    };
+    renderDashboard(analyticsWithUnknown);
+    expect(await screen.findByText('Total marks')).toBeVisible();
+    expect(screen.getByText('Unassessed')).toBeVisible();
+    expect(screen.getByText('Unassessed risk')).toBeVisible();
+  });
 });

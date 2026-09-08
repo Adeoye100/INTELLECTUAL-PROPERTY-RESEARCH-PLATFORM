@@ -63,7 +63,7 @@ function AnalyticsDashboard({
   onRangeChange: (r: DashboardRange) => void;
   onRetry: () => void;
 }) {
-  const riskRows = data.portfolio.byRisk.filter((entry) => ['low', 'medium', 'high'].includes(entry.risk));
+  const riskRows = data.portfolio.byRisk.filter((entry) => ['low', 'medium', 'high', 'unknown'].includes(entry.risk));
   const points = data.watchActivity.points;
 
   return (
@@ -109,7 +109,7 @@ function AnalyticsDashboard({
                   <span className="font-semibold text-text-primary">{entry.count} marks</span>
                 </div>
               ))}
-              <AccessibleDataTable caption="Portfolio risk distribution" rows={riskRows.map((entry) => ({ label: `${entry.risk} risk`, value: String(entry.count), detail: 'marks' }))} />
+              <AccessibleDataTable caption="Portfolio risk distribution" rows={riskRows.map((entry) => ({ label: entry.risk === 'unknown' ? 'Unassessed risk' : `${entry.risk} risk`, value: String(entry.count), detail: 'marks' }))} />
             </div>
           ) : (
             <ChartEmptyState message="No portfolio risk data is available yet." />

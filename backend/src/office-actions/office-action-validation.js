@@ -196,6 +196,7 @@ export function parseOfficeActionRefId(value, field = 'id') {
 }
 
 function queryScalar(value, field) {
+  if (typeof value === 'number') return String(value);
   if (typeof value !== 'string') invalid(field, `${field} must be a scalar value.`);
   return value;
 }

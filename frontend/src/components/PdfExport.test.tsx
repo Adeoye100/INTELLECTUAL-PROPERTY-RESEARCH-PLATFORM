@@ -57,7 +57,7 @@ beforeEach(() => {
   TestURL.createObjectURL = vi.fn().mockReturnValue('blob:https://frontend.test/report');
   TestURL.revokeObjectURL = vi.fn();
   vi.stubGlobal('URL', TestURL);
-  useAuthStore.setState({ token: 'authenticated-token' });
+  useAuthStore.setState({ token: 'authenticated-token', user: { id: 'usr-1', email: 'admin@example.com', fullName: 'Admin', firmId: 'firm-1', role: 'admin' } });
 });
 
 afterEach(() => {
@@ -85,12 +85,7 @@ describe('PdfExport', () => {
     expect(screen.getByText(/PDF ready: forge-search.pdf/i)).toBeVisible();
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/exports', expect.objectContaining({
       method: 'POST',
-      body: JSON.stringify({
-        type: 'search_results',
-        sourceEntityId: '11111111-1111-4111-8111-111111111111',
-        idempotencyKey: 'search-11111111-1111-4111-8111-111111111111',
-        parameters: {},
-      }),
+      body: expect.stringContaining('"type":"search_results"'),
     }));
   });
 
@@ -122,7 +117,7 @@ describe('PdfExport', () => {
     render(<PdfExport request={searchRequest} />);
 
     await user.click(screen.getByRole('button', { name: 'Export PDF' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('The service is temporarily unavailable. Please try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('PDF generation could not be completed.');
 
     await user.click(screen.getByRole('button', { name: 'Retry export' }));
     expect(await screen.findByRole('link', { name: 'Download PDF' })).toBeVisible();

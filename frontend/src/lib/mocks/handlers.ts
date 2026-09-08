@@ -306,19 +306,19 @@ const mockAlerts: Alert[] = [
     id: 'a-newest', watchId: 'w1', matchedFilingRef: 'US99887766', riskScoreId: 'r1', candidateResultId: '1', status: 'unread',
     createdAt: '2026-08-04T14:35:00.000Z', matchedMarkText: 'FORGE LABS', protectedMarkText: 'FORGE GLOBAL',
     severity: 'high', source: 'USPTO', supportingEvidence: ['92% phonetic similarity', 'Nice Class 42 overlap'],
-    riskScore: mockSearchResults[0].riskAnalysis as any,
+    riskScore: mockSearchResults[0].riskAnalysis as unknown as Alert['riskScore'],
   },
   {
     id: 'a-older', watchId: 'w1', matchedFilingRef: 'EU12345678', riskScoreId: 'r2', candidateResultId: '2', status: 'read',
     createdAt: '2026-08-02T09:15:00.000Z', matchedMarkText: 'FORTRESS GLOBAL', protectedMarkText: 'FORGE GLOBAL',
     severity: 'medium', source: 'EUIPO', supportingEvidence: ['60% visual similarity', 'Shared GLOBAL element'],
-    riskScore: mockSearchResults[1].riskAnalysis as any,
+    riskScore: mockSearchResults[1].riskAnalysis as unknown as Alert['riskScore'],
   },
   {
     id: 'a-middle', watchId: 'w1', matchedFilingRef: 'GB00998877', riskScoreId: 'r3', candidateResultId: '3', status: 'unread',
     createdAt: '2026-08-03T18:05:00.000Z', matchedMarkText: 'THE FORGE HOUSE', protectedMarkText: 'FORGE GLOBAL',
     severity: 'medium', source: 'UKIPO', supportingEvidence: ['35% visual similarity', 'No class overlap'],
-    riskScore: mockSearchResults[2].riskAnalysis as any,
+    riskScore: mockSearchResults[2].riskAnalysis as unknown as Alert['riskScore'],
   },
 ];
 

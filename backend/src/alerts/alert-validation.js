@@ -7,7 +7,7 @@ const ACTIONS = new Set(['read', 'dismiss']);
 const FILTERS = new Set(['page', 'pageSize', 'status', 'severity', 'watchId', 'portfolioMarkId', 'createdFrom', 'createdTo']);
 
 function invalid(field, message) { throw badRequest('VALIDATION_ERROR', message, { field }); }
-function scalar(value, field) { if (typeof value !== 'string') invalid(field, `${field} must be a scalar value.`); return value; }
+function scalar(value, field) { if (typeof value === 'number') return String(value); if (typeof value !== 'string') invalid(field, `${field} must be a scalar value.`); return value; }
 function id(value, field) { if (typeof value !== 'string' || !UUID_PATTERN.test(value)) invalid(field, `${field} must be a UUID.`); return value; }
 function date(value, field) {
   const raw = scalar(value, field).trim();

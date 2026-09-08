@@ -13,7 +13,8 @@ export type Capability =
   | "invitations:manage"
   | "firm:write"
   | "firm:read"
-  | "billing:manage";
+  | "billing:manage"
+  | "reports:export";
 
 const capabilities: Record<UserRole, ReadonlySet<Capability>> = {
   admin: new Set([
@@ -29,6 +30,7 @@ const capabilities: Record<UserRole, ReadonlySet<Capability>> = {
     "firm:write",
     "firm:read",
     "billing:manage",
+    "reports:export",
   ]),
   attorney: new Set([
     "dashboard:view",
@@ -40,6 +42,7 @@ const capabilities: Record<UserRole, ReadonlySet<Capability>> = {
     "watches:write",
     "firm:write",
     "firm:read",
+    "reports:export",
   ]),
   viewer: new Set([
     "dashboard:view",

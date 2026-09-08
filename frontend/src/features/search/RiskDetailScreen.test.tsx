@@ -79,7 +79,7 @@ const mockResult: SearchResult = {
   niceClasses: [9, 42],
   filingDate: '2025-03-14',
   status: 'Pending',
-  riskAnalysis: mockScore as any,
+  riskAnalysis: mockScore as unknown as SearchResult['riskAnalysis'],
 };
 
 const mockResultNoConceptual: SearchResult = {
@@ -88,7 +88,7 @@ const mockResultNoConceptual: SearchResult = {
   candidateMarkText: 'FORTRESS GLOBAL',
   candidateSource: 'EUIPO',
   candidateRef: 'EU12345678',
-  riskAnalysis: mockScoreNoConceptual as any,
+  riskAnalysis: mockScoreNoConceptual as unknown as SearchResult['riskAnalysis'],
 };
 
 const routeState: RiskDetailRouteState = {
@@ -285,13 +285,13 @@ describe('RiskDetailScreen — role-gated actions', () => {
     expect(screen.getByRole('button', { name: /export risk report/i })).toBeInTheDocument();
   });
 
-  it('hides Save / Research / Discard for viewer; shows only Export', () => {
+  it('hides Save / Research / Discard / Export for viewer', () => {
     setMockRole('viewer');
     renderScreen();
     expect(screen.queryByRole('button', { name: /save to matter/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /research office actions/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /discard result/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /export risk report/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /export risk report/i })).not.toBeInTheDocument();
     expect(screen.getByText(/attorney or admin role/i)).toBeInTheDocument();
   });
 });

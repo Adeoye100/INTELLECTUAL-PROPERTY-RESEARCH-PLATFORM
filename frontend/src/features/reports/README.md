@@ -1,15 +1,17 @@
-# PDF report integration boundary
+# PDF Export Feature & API Integration
 
-FE-17 provides one accessible export component for search results, risk detail, and portfolio summary screens. Each trigger sends a typed report type plus the current screen context to the mock-only candidate `POST /api/v1/reports/pdf` and handles disabled, loading, authenticated blob download, server filename, content-type validation, retry, and failure states.
+`frontend/src/features/reports` provides the `PdfExport` component and `reportsApi` integration for asynchronous PDF export generation across Search Results, Risk Detail, and Portfolio Summary screens.
 
-Real PDF generation is backend-blocked. The development-only MSW handler in `src/lib/mocks/handlers.ts` returns a small download fixture solely while the endpoint is unavailable and must be removed when the real service lands.
+## Async Export Workflow
 
-The backend remains required to:
+1. **Job Enqueue**: Initial export triggers a `POST /api/v1/exports` request with an idempotency key (`pdf:<uuid>`), report type (`search_results`, `risk_report`, or `portfolio_summary`), and context parameters.
+2. **Polling Resumption**: The client polls `GET /api/v1/exports/:id` until `status` becomes `completed` or `failed`. If polling times out or encounters network interruption, retry reuses the existing `exportId` or idempotency key. Explicit regeneration creates a fresh idempotency key.
+3. **Authenticated Download**: Once completed, the client downloads the PDF via `GET /api/v1/exports/:id/download` and revokes the temporary object URL on unmount.
 
-- authenticate the request and authorize the user against the report's firm, matter, search, result, and portfolio records;
-- regenerate report data from authoritative stored records rather than trusting IDs or display values supplied by the browser;
-- generate, encrypt, retain, and expire the PDF according to the agreed data-handling policy;
-- return a non-empty `application/pdf` response with a `Content-Disposition` filename (or agree and document a job/short-lived URL contract); and
-- write an `export.generate` audit event without leaking cross-tenant report existence.
+## Security & Capability Gating
 
-Frontend route guards and the temporary MSW response do not provide report authorization.
+- **Capability**: Required capability is `"reports:export"` (Admin & Attorney = true, Viewer = false).
+- **Feature Flag**: `features.pdfExportEnabled` must be enabled.
+- **Tenant Isolation**: Backend enforces firm-scoped isolation. Cross-tenant export requests return 404 `EXPORT_JOB_NOT_FOUND`.
+- **Data Provenance**: Report document models preserve historical `dataFreshness` stored in persisted search snapshots without performing Elasticsearch or registry queries during export.
+

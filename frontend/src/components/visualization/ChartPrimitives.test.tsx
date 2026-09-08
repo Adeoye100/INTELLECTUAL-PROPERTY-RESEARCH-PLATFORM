@@ -8,7 +8,7 @@ describe('visual primitives', () => {
   it('renders explicit risk labels and safely handles unknown ratings', () => {
     render(<><RiskBadge rating="low" score={12} /><RiskBadge rating="unknown" /></>);
     expect(screen.getByLabelText(/Low risk, score 12/)).toBeInTheDocument();
-    expect(screen.getByLabelText('Unknown risk')).toBeInTheDocument();
+    expect(screen.getByLabelText('Unassessed')).toBeInTheDocument();
   });
   it('uses neutral renewal states with deterministic date boundaries', () => {
     const today = new Date('2026-08-22T12:00:00Z');

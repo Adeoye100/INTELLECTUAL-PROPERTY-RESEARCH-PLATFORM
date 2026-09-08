@@ -26,11 +26,25 @@ function sourceStatus(lines, statuses, partial) {
   for (const status of statuses) lines.push(`Source ${value(status.source)}: ${status.status} (${status.resultCount} result(s))`);
 }
 
+function freshnessText(dataFreshness) {
+  if (dataFreshness && dataFreshness.dataThrough) {
+    const src = dataFreshness.source || 'USPTO';
+    return `${src} data through: ${dataFreshness.dataThrough}`;
+  }
+  return 'Registry freshness metadata: Not available for this saved search';
+}
+
 export function createExportDocumentModel(model) {
   if (!model || typeof model !== 'object') throw new TypeError('An export document model is required.');
   if (model.kind === 'search_results') {
     const output = base('Search Results Research Report', model.sourceAttribution);
-    const overview = pairs({ 'Persisted search ID': model.searchId, 'Request ID': model.requestId, 'Created at': model.createdAt, 'Methodology versions': model.methodologyVersions.join(', ') || NOT_AVAILABLE });
+    const overview = pairs({
+      'Persisted search ID': model.searchId,
+      'Request ID': model.requestId,
+      'Created at': model.createdAt,
+      'Data freshness': freshnessText(model.dataFreshness),
+      'Methodology versions': model.methodologyVersions.join(', ') || NOT_AVAILABLE,
+    });
     sourceStatus(overview, model.sourceStatuses, model.partial);
     output.sections.push({ heading: 'Search context', lines: [...overview, ...pairs(model.query)] });
     model.results.forEach((result, index) => output.sections.push({ heading: `Result ${index + 1}`, lines: evidenceLines(result) }));
@@ -39,7 +53,13 @@ export function createExportDocumentModel(model) {
   }
   if (model.kind === 'risk_report') {
     const output = base('Individual Confusion-Risk Research Report', model.sourceAttribution);
-    const overview = pairs({ 'Persisted search ID': model.searchId, 'Request ID': model.requestId, 'Created at': model.createdAt, 'Methodology versions': model.methodologyVersions.join(', ') || NOT_AVAILABLE });
+    const overview = pairs({
+      'Persisted search ID': model.searchId,
+      'Request ID': model.requestId,
+      'Created at': model.createdAt,
+      'Data freshness': freshnessText(model.dataFreshness),
+      'Methodology versions': model.methodologyVersions.join(', ') || NOT_AVAILABLE,
+    });
     sourceStatus(overview, model.sourceStatuses, model.partial);
     output.sections.push({ heading: 'Search context', lines: [...overview, ...pairs(model.query)] });
     output.sections.push({ heading: 'Stored risk evidence', lines: evidenceLines(model.result) });

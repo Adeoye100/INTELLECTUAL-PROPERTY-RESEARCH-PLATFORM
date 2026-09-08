@@ -2,9 +2,13 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { CheckCircle, Download, FileDown, LoaderCircle, RotateCcw } from 'lucide-react';
 import { Button } from './Button';
 import { cn } from '../lib/utils';
+import { features } from '../config/features';
+import { hasCapability } from '../features/auth/capabilities';
+import { useAuthStore } from '../features/auth/authStore';
 import {
   type CreateExportInput,
   type ExportStatus,
+  mapExportFailureCode,
   pollExportAndDownload,
 } from '../features/reports/reportsApi';
 
@@ -38,18 +42,26 @@ interface PdfExportProps {
   label?: string;
 }
 
-type ExportState =
+type ExportUiState =
   | { status: 'idle' }
-  | { status: 'loading'; jobStatus?: ExportStatus }
-  | { status: 'success'; downloadUrl: string; fileName: string; objectUrl: boolean; mocked: boolean }
-  | { status: 'error'; message: string };
+  | { status: 'loading'; jobStatus?: ExportStatus | 'creating' }
+  | { status: 'pending_status'; exportId: string; message: string }
+  | { status: 'success'; downloadUrl: string; fileName: string }
+  | { status: 'error'; message: string; isPollingFailure?: boolean };
 
-function buildCreateExportInput(request: PdfReportRequest): CreateExportInput {
+function generateIdempotencyKey(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `pdf:${crypto.randomUUID()}`;
+  }
+  return `pdf:${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function buildCreateExportInput(request: PdfReportRequest, idempotencyKey: string): CreateExportInput {
   if (request.reportType === 'search-results') {
     return {
       type: 'search_results',
       sourceEntityId: request.context.searchId,
-      idempotencyKey: `search-${request.context.searchId}`,
+      idempotencyKey,
       parameters: {},
     };
   }
@@ -57,14 +69,14 @@ function buildCreateExportInput(request: PdfReportRequest): CreateExportInput {
     return {
       type: 'risk_report',
       sourceEntityId: request.context.searchId,
-      idempotencyKey: `risk-${request.context.searchId}-${request.context.resultId}`,
+      idempotencyKey,
       parameters: { resultId: request.context.resultId },
     };
   }
   return {
     type: 'portfolio_summary',
     sourceEntityId: request.context.portfolioMarkId,
-    idempotencyKey: `portfolio-${request.context.portfolioMarkId}`,
+    idempotencyKey,
     parameters: {
       ...(request.context.includeWatches !== undefined ? { includeWatches: request.context.includeWatches } : {}),
       ...(request.context.includeAlerts !== undefined ? { includeAlerts: request.context.includeAlerts } : {}),
@@ -78,43 +90,94 @@ export const PdfExport: React.FC<PdfExportProps> = ({
   className,
   label = 'Export PDF',
 }) => {
-  const [state, setState] = useState<ExportState>({ status: 'idle' });
+  const user = useAuthStore((state) => state.user);
+  const canExport = features.pdfExportEnabled && hasCapability(user?.role, 'reports:export');
+
+  const [state, setState] = useState<ExportUiState>({ status: 'idle' });
   const statusId = useId();
   const objectUrlRef = useRef<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Idempotency and export identity tracking for 3 retry cases
+  const idempotencyKeyRef = useRef<string | null>(null);
+  const exportIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
+      abortControllerRef.current?.abort();
       if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     };
   }, []);
 
-  const generate = async () => {
+  if (!canExport) return null;
+
+  const startExport = async (isRegeneration = false) => {
     if (disabled || state.status === 'loading') return;
+
     if (request.reportType === 'search-results' && !request.context.searchId) return;
     if (request.reportType === 'risk-detail' && (!request.context.searchId || !request.context.resultId)) return;
     if (request.reportType === 'portfolio-summary' && !request.context.portfolioMarkId) return;
+
     if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     objectUrlRef.current = null;
-    setState({ status: 'loading', jobStatus: 'queued' });
+
+    // Case C: Regenerate -> NEW idempotency key, reset exportId
+    if (isRegeneration || !idempotencyKeyRef.current) {
+      idempotencyKeyRef.current = generateIdempotencyKey();
+      exportIdRef.current = null;
+    }
+
+    // Cancel existing in-flight polling if any
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    setState({ status: 'loading', jobStatus: exportIdRef.current ? 'processing' : 'creating' });
 
     try {
-      const exportInput = buildCreateExportInput(request);
-      const result = await pollExportAndDownload(exportInput, (jobStatus) => {
-        setState((current) => current.status === 'loading' ? { ...current, jobStatus } : current);
+      const exportInput = buildCreateExportInput(request, idempotencyKeyRef.current);
+      const result = await pollExportAndDownload(exportInput, {
+        exportId: exportIdRef.current ?? undefined,
+        signal: controller.signal,
+        onExportCreated: (newId) => {
+          exportIdRef.current = newId;
+        },
+        onProgress: (jobStatus) => {
+          if (!controller.signal.aborted) {
+            setState((current) => current.status === 'loading' ? { ...current, jobStatus } : current);
+          }
+        },
       });
+
+      if (controller.signal.aborted) return;
+
       const downloadUrl = URL.createObjectURL(result.blob);
       objectUrlRef.current = downloadUrl;
       setState({
         status: 'success',
         downloadUrl,
         fileName: result.fileName,
-        objectUrl: true,
-        mocked: result.mocked,
       });
     } catch (error) {
+      if (controller.signal.aborted) return;
+
+      if (error && typeof error === 'object' && 'code' in error && (error as { code: string }).code === 'TIMEOUT') {
+        // Section 19: Client polling timeout -> Keep exportId, allow Check status again (Case B)
+        setState({
+          status: 'pending_status',
+          exportId: exportIdRef.current ?? '',
+          message: 'The report is still being prepared.',
+        });
+        return;
+      }
+
+      const serverCode = error && typeof error === 'object' && 'serverCode' in error ? String((error as { serverCode: unknown }).serverCode) : null;
+      const message = mapExportFailureCode(serverCode || (error instanceof Error ? error.message : null));
+
       setState({
         status: 'error',
-        message: error instanceof Error ? error.message : 'PDF generation failed. Please try again.',
+        message,
+        isPollingFailure: Boolean(exportIdRef.current),
       });
     }
   };
@@ -131,16 +194,23 @@ export const PdfExport: React.FC<PdfExportProps> = ({
             <Download className="mr-2 h-4 w-4" aria-hidden="true" />
             Download PDF
           </a>
-          <Button variant="ghost" size="sm" onClick={generate} aria-label="Generate a new PDF">
+          <Button variant="ghost" size="sm" onClick={() => void startExport(true)} aria-label="Generate a new PDF">
             <RotateCcw className="mr-2 h-4 w-4" aria-hidden="true" />
             Regenerate
+          </Button>
+        </div>
+      ) : state.status === 'pending_status' ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => void startExport(false)}>
+            <RotateCcw className="mr-2 h-4 w-4" aria-hidden="true" />
+            Check status again
           </Button>
         </div>
       ) : (
         <Button
           variant="outline"
           size="sm"
-          onClick={generate}
+          onClick={() => void startExport(false)}
           disabled={disabled || state.status === 'loading'}
           aria-describedby={disabled ? statusId : undefined}
         >
@@ -160,16 +230,13 @@ export const PdfExport: React.FC<PdfExportProps> = ({
         {state.status === 'loading' && (
           state.jobStatus === 'processing' ? 'Generating report pages…' : 'Queued PDF export job…'
         )}
-        {state.status === 'success' && !state.mocked && (
+        {state.status === 'pending_status' && (
+          <span className="text-text-secondary">{state.message}</span>
+        )}
+        {state.status === 'success' && (
           <span className="inline-flex items-center gap-1 text-forge-teal-700">
             <CheckCircle className="h-3 w-3" aria-hidden="true" />
             PDF ready: {state.fileName}
-          </span>
-        )}
-        {state.status === 'success' && state.mocked && (
-          <span className="inline-flex items-start gap-1 text-risk-medium">
-            <CheckCircle className="mt-0.5 h-3 w-3 flex-shrink-0" aria-hidden="true" />
-            Development fixture ready. Real PDF generation and authorization remain backend-blocked.
           </span>
         )}
         {state.status === 'error' && <span role="alert" className="text-risk-high">{state.message}</span>}

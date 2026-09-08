@@ -20,7 +20,7 @@ export function RiskBadge({ rating, score, compact = false }: { rating: string |
   const normalized = typeof rating === 'string' ? rating.toLowerCase() : '';
   const safe = (['low', 'medium', 'high'] as const).includes(normalized as RiskRating) ? normalized as RiskRating : null;
   const Icon = safe === 'low' ? ShieldCheck : safe === 'medium' ? ShieldAlert : safe === 'high' ? AlertCircle : ShieldQuestion;
-  const label = safe ? `${safe[0].toUpperCase()}${safe.slice(1)} risk` : 'Unknown risk';
+  const label = safe ? `${safe[0].toUpperCase()}${safe.slice(1)} risk` : normalized === 'unknown' ? 'Unassessed' : 'Unknown risk';
   return <span className={`inline-flex items-center gap-1 rounded border px-2 py-1 text-xs font-bold uppercase tracking-wide ${safe ? `risk-${safe}` : 'border-forge-silver-300 bg-forge-silver-100 text-text-secondary'} ${compact ? 'text-[0.65rem]' : ''}`} aria-label={`${label}${typeof score === 'number' ? `, score ${score} out of 100` : ''}`}>
     <Icon className="h-3.5 w-3.5" aria-hidden="true" />{label}{typeof score === 'number' && <span className="font-mono">{Math.round(score)}/100</span>}
   </span>;

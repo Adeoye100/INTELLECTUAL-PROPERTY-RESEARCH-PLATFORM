@@ -73,6 +73,10 @@ services:
         value: "false"
       - key: PDF_EXPORT_ENABLED
         value: "false"
+      - key: PDF_EXPORT_STORAGE_PROVIDER
+        value: database
+      - key: PDF_EXPORT_QUEUE_KEY
+        value: queue:pdf_export
       - key: PAYSTACK_ENABLED
         value: "false"
       - key: PAYSTACK_MODE
@@ -219,5 +223,7 @@ services:
         value: "true"
       - key: PDF_EXPORT_STORAGE_PROVIDER
         value: database
+      - key: PDF_EXPORT_QUEUE_KEY
+        value: queue:pdf_export
       - key: WORKER_HEARTBEAT_TTL_SECONDS
         value: "60"

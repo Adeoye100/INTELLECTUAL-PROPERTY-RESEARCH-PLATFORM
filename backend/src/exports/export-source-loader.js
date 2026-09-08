@@ -71,6 +71,11 @@ export class ExportSourceLoader {
         kind: 'search_results', sourceAttribution: 'Persisted search snapshot', searchId: snapshot.id,
         requestId: snapshot.requestId, query: snapshot.query, results: snapshot.results.map(riskEvidence),
         sourceStatuses: snapshot.sourceStatuses.map(statusLine), partial: snapshot.partial,
+        dataFreshness: snapshot.dataFreshness ? {
+          source: safe(snapshot.dataFreshness.source, 100),
+          status: safe(snapshot.dataFreshness.status, 50),
+          dataThrough: safe(snapshot.dataFreshness.dataThrough || snapshot.dataFreshness.asOf, 100),
+        } : null,
         methodologyVersions: safeList(snapshot.methodologyVersions, 20), createdAt: snapshot.createdAt,
       };
     }
@@ -82,20 +87,25 @@ export class ExportSourceLoader {
         kind: 'risk_report', sourceAttribution: 'Persisted search snapshot', searchId: snapshot.id,
         requestId: snapshot.requestId, query: snapshot.query, result: riskEvidence(selected),
         sourceStatuses: snapshot.sourceStatuses.map(statusLine), partial: snapshot.partial,
+        dataFreshness: snapshot.dataFreshness ? {
+          source: safe(snapshot.dataFreshness.source, 100),
+          status: safe(snapshot.dataFreshness.status, 50),
+          dataThrough: safe(snapshot.dataFreshness.dataThrough || snapshot.dataFreshness.asOf, 100),
+        } : null,
         methodologyVersions: safeList(snapshot.methodologyVersions, 20), createdAt: snapshot.createdAt,
       };
     }
     try {
       const portfolioMark = await this.portfolioMarkService.getPortfolioMark({ firmId: record.firmId, portfolioMarkId: record.sourceEntityId });
       const officeActions = await this.officeActionRefService.listOfficeActionRefs({
-        firmId: record.firmId, portfolioMarkId: portfolioMark.id, pagination: { page: 1, pageSize: MAX_LINKED_ITEMS },
+        firmId: record.firmId, portfolioMarkId: portfolioMark.id, pagination: { page: '1', pageSize: String(MAX_LINKED_ITEMS) },
       });
       const [watches, alerts] = await Promise.all([
         record.parameters.includeWatches === false || !this.watchService ? { items: [] } : this.watchService.listWatches({
-          firmId: record.firmId, filters: { portfolioMarkId: portfolioMark.id }, pagination: { page: 1, pageSize: MAX_LINKED_ITEMS },
+          firmId: record.firmId, filters: { portfolioMarkId: portfolioMark.id }, pagination: { page: '1', pageSize: String(MAX_LINKED_ITEMS) },
         }),
         record.parameters.includeAlerts === false || !this.alertService ? { items: [] } : this.alertService.listAlerts({
-          firmId: record.firmId, filters: { portfolioMarkId: portfolioMark.id }, pagination: { page: 1, pageSize: MAX_LINKED_ITEMS },
+          firmId: record.firmId, filters: { portfolioMarkId: portfolioMark.id }, pagination: { page: '1', pageSize: String(MAX_LINKED_ITEMS) },
         }),
       ]);
       return {

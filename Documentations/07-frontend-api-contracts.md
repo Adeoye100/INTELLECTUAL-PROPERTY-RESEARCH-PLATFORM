@@ -68,8 +68,9 @@ and environment configuration.
 | `POST /api/v1/office-actions/link` | Not a canonical backend route | — | — | Replaced by nested portfolio-mark Office Action reference routes |
 | `GET /api/v1/matters` | No body | `Matter[]` | Admin, Attorney, Viewer within firm | Entire route; frontend currently uses local storage instead of this mock handler |
 | `POST /api/v1/matters` | Candidate `{ name, clientRef? }` | `201 Matter` | Admin, Attorney | Entire create contract, required client/firm data, audit event |
-| `POST /api/v1/matters/:matterId/risk-results` | `MatterSaveRequest` risk snapshot | `MatterSaveResult` | Admin, Attorney | Snapshot authority, versioning, idempotency, whether browser-supplied scores are accepted (they should not be authoritative) |
-| `POST /api/v1/reports/pdf` | `PdfReportRequest`: one of search-results context, risk-detail context, or portfolio-summary context | Required frontend target: direct non-empty `application/pdf` blob with `Content-Disposition` filename | Authenticated user authorized for every referenced firm/matter/search/result/mark; Viewer export permission unresolved | Route existence, accepted IDs, synchronous vs job model, filename encoding, size/time limits, error model |
+| `POST /api/v1/exports` | `{ type, sourceEntityId, idempotencyKey, parameters? }` | Implemented `202 ExportDto`: `{ id, type, status, sourceEntityId, requestId, parameters, mimeType, byteSize, checksumSha256, failureCode, queuedAt, ... }` | Admin, Attorney (`reports:export` capability) | Asynchronous PDF export job enqueued; idempotency key format `pdf:<uuid>`; Viewer export disallowed |
+| `GET /api/v1/exports/:id` | UUID path parameter | Implemented `200 ExportDto` | Admin, Attorney (`reports:export` capability) | Firm-scoped export job status polling |
+| `GET /api/v1/exports/:id/download` | UUID path parameter | Implemented `200 application/pdf` binary stream | Admin, Attorney (`reports:export` capability) | Firm-scoped authenticated PDF download with `Content-Disposition` |
 
 Type definitions referenced above live in `frontend/src/types/index.ts`; PDF request variants live in `frontend/src/components/PdfExport.tsx`. These are frontend expectations, not an authoritative schema.
 
