@@ -1,14 +1,9 @@
 import { getApiClient } from '../../lib/api/client';
-import type { Alert, WatchSummary, WatchUpsertRequest } from '../../types';
+import type { Alert, AlertListResponse, WatchSummary, WatchListResponse, WatchUpsertRequest } from '../../types';
 import { buildAlertsRequestUrl, type AlertFilters } from './watchAlertDomain';
 
-interface ListResponse<T> {
-  items: T[];
-  pagination?: { page: number; pageSize: number; total: number; totalPages: number };
-}
-
 export const listWatches = () =>
-  getApiClient().requestJson<ListResponse<WatchSummary> | WatchSummary[]>('/watches').then((response) =>
+  getApiClient().requestJson<WatchListResponse | WatchSummary[]>('/watches').then((response) =>
     Array.isArray(response) ? response : response.items ?? [],
   );
 
@@ -22,14 +17,14 @@ export const updateWatch = (watchId: string, request: Partial<WatchUpsertRequest
   });
 
 export const listAlerts = (filters: AlertFilters) =>
-  getApiClient().requestJson<ListResponse<Alert> | Alert[]>(buildAlertsRequestUrl(filters)).then((response) =>
+  getApiClient().requestJson<AlertListResponse | Alert[]>(buildAlertsRequestUrl(filters)).then((response) =>
     Array.isArray(response) ? response : response.items ?? [],
   );
 
-export const updateAlertReadState = (alertId: string, read: boolean) =>
+export const markAlertRead = (alertId: string) =>
   getApiClient().requestJson<Alert>(`/alerts/${encodeURIComponent(alertId)}`, {
     method: 'PATCH',
-    body: { action: read ? 'read' : 'dismiss' },
+    body: { action: 'read' },
   });
 
 export const dismissAlert = (alertId: string) =>

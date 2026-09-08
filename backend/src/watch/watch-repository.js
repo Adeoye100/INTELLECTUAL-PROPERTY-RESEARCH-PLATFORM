@@ -172,19 +172,22 @@ export class WatchRepository {
 
   async loadForProcessing({ firmId, watchId }) {
     const result = await this.database.query(
-      `SELECT w.*, p.id AS portfolio_id, p.firm_id AS portfolio_firm_id,
+      `SELECT w.*, u.email AS owner_email, p.id AS portfolio_id, p.firm_id AS portfolio_firm_id,
        p.mark_text AS portfolio_mark_text, p.jurisdiction AS portfolio_jurisdiction,
        p.nice_classes AS portfolio_nice_classes, p.source_registry AS portfolio_source_registry,
        p.registry_reference AS portfolio_registry_reference, p.status AS portfolio_status
-       FROM watches w JOIN portfolio_marks p
-         ON p.id = w.portfolio_mark_id AND p.firm_id = w.firm_id
+       FROM watches w
+       LEFT JOIN users u ON u.id = w.owner_user_id AND u.firm_id = w.firm_id
+       JOIN portfolio_marks p ON p.id = w.portfolio_mark_id AND p.firm_id = w.firm_id
        WHERE w.firm_id = $1 AND w.id = $2`,
       [firmId, watchId],
     );
     if (!result.rowCount) return null;
     const row = result.rows[0];
+    const watch = watchFromRow(row);
+    if (row.owner_email) watch.ownerEmail = row.owner_email;
     return {
-      watch: watchFromRow(row),
+      watch,
       portfolioMark: {
         id: row.portfolio_id, firmId: row.portfolio_firm_id, markText: row.portfolio_mark_text,
         jurisdiction: row.portfolio_jurisdiction, niceClasses: [...row.portfolio_nice_classes],

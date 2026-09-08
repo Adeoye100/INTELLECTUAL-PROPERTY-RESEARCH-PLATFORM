@@ -269,26 +269,26 @@ const mockAttachments: Record<string, PortfolioAttachment[]> = {
 };
 
 const mockWatches: WatchSummary[] = [
-  { id: 'w1', portfolioMarkId: 'p1', userId: 'u1', alertChannel: 'email', alertMode: 'real-time', active: true, markText: 'FORGE GLOBAL', jurisdiction: 'US', mocked: true },
+  { id: 'w1', portfolioMarkId: 'p1', ownerUserId: 'u1', state: 'enabled', alertChannel: 'email', alertMode: 'real-time', markText: 'FORGE GLOBAL', jurisdiction: 'US' },
 ];
 
 const mockAlerts: Alert[] = [
   {
-    id: 'a-newest', watchId: 'w1', matchedFilingRef: 'US99887766', riskScoreId: 'r1', riskResultId: '1', read: false,
+    id: 'a-newest', watchId: 'w1', matchedFilingRef: 'US99887766', riskScoreId: 'r1', candidateResultId: '1', status: 'unread',
     createdAt: '2026-08-04T14:35:00.000Z', matchedMarkText: 'FORGE LABS', protectedMarkText: 'FORGE GLOBAL',
-    severity: 'high', source: 'USPTO', supportingEvidence: ['92% phonetic similarity', 'Nice Class 42 overlap'], mocked: true,
+    severity: 'high', source: 'USPTO', supportingEvidence: ['92% phonetic similarity', 'Nice Class 42 overlap'],
     riskScore: mockSearchResults[0].riskAnalysis as any,
   },
   {
-    id: 'a-older', watchId: 'w1', matchedFilingRef: 'EU12345678', riskScoreId: 'r2', riskResultId: '2', read: true,
+    id: 'a-older', watchId: 'w1', matchedFilingRef: 'EU12345678', riskScoreId: 'r2', candidateResultId: '2', status: 'read',
     createdAt: '2026-08-02T09:15:00.000Z', matchedMarkText: 'FORTRESS GLOBAL', protectedMarkText: 'FORGE GLOBAL',
-    severity: 'medium', source: 'EUIPO', supportingEvidence: ['60% visual similarity', 'Shared GLOBAL element'], mocked: true,
+    severity: 'medium', source: 'EUIPO', supportingEvidence: ['60% visual similarity', 'Shared GLOBAL element'],
     riskScore: mockSearchResults[1].riskAnalysis as any,
   },
   {
-    id: 'a-middle', watchId: 'w1', matchedFilingRef: 'GB00998877', riskScoreId: 'r3', riskResultId: '3', read: false,
+    id: 'a-middle', watchId: 'w1', matchedFilingRef: 'GB00998877', riskScoreId: 'r3', candidateResultId: '3', status: 'unread',
     createdAt: '2026-08-03T18:05:00.000Z', matchedMarkText: 'THE FORGE HOUSE', protectedMarkText: 'FORGE GLOBAL',
-    severity: 'low', source: 'UKIPO', supportingEvidence: ['35% visual similarity', 'No class overlap'], mocked: true,
+    severity: 'medium', source: 'UKIPO', supportingEvidence: ['35% visual similarity', 'No class overlap'],
     riskScore: mockSearchResults[2].riskAnalysis as any,
   },
 ];
@@ -550,14 +550,17 @@ export const handlers = [
     const body = await request.json() as Omit<WatchUpsertRequest, 'portfolioMarkId'>;
     const existing = mockWatches.find(({ portfolioMarkId }) => portfolioMarkId === mark.id);
     if (existing) return HttpResponse.json(existing, { headers: { 'X-Mock-Response': 'true' } });
-    const created: WatchSummary = { id: `watch-mock-${Date.now()}`, portfolioMarkId: mark.id, userId: 'u1', alertChannel: body.alertChannel, alertMode: body.alertMode, active: body.active, markText: mark.markText, jurisdiction: mark.jurisdiction, mocked: true };
+    const created: WatchSummary = { id: `watch-mock-${Date.now()}`, portfolioMarkId: mark.id, ownerUserId: 'u1', alertChannel: body.alertChannel, alertMode: body.alertMode, active: body.active, markText: mark.markText, jurisdiction: mark.jurisdiction, state: body.active ? 'enabled' : 'paused' };
     mockWatches.push(created);
     return HttpResponse.json(created, { status: 201, headers: { 'X-Mock-Response': 'true' } });
   }),
 
   http.get('/api/v1/watches', async () => {
     await delay(600);
-    return HttpResponse.json(mockWatches, { headers: { 'X-Mock-Response': 'true' } });
+    return HttpResponse.json({
+      items: mockWatches,
+      pagination: { page: 1, pageSize: 25, total: mockWatches.length, totalPages: 1 },
+    }, { headers: { 'X-Mock-Response': 'true' } });
   }),
 
   // MOCK FE-15 watch mutations. Server-side tenant/role authorization and
@@ -567,7 +570,15 @@ export const handlers = [
     if (!['email', 'in-app'].includes(body.alertChannel) || !['real-time', 'digest'].includes(body.alertMode) || !body.portfolioMarkId) return HttpResponse.json({ message: 'Invalid mock watch configuration', mocked: true }, { status: 422, headers: { 'X-Mock-Response': 'true' } });
     const mark = mockPortfolioMarks.find(({ id }) => id === body.portfolioMarkId);
     if (!mark) return HttpResponse.json({ message: 'Portfolio mark not found', mocked: true }, { status: 404, headers: { 'X-Mock-Response': 'true' } });
-    const created: WatchSummary = { ...body, id: `watch-mock-${Date.now()}`, userId: 'u1', markText: mark.markText, jurisdiction: mark.jurisdiction, mocked: true };
+    const created: WatchSummary = {
+      ...body,
+      id: `watch-mock-${Date.now()}`,
+      state: body.state ?? (body.active ? 'enabled' : 'paused'),
+      alertChannel: body.alertChannel,
+      alertMode: body.alertMode,
+      markText: mark.markText,
+      jurisdiction: mark.jurisdiction,
+    };
     mockWatches.push(created);
     return HttpResponse.json(created, { status: 201, headers: { 'X-Mock-Response': 'true' } });
   }),
@@ -577,35 +588,37 @@ export const handlers = [
     if (index < 0) return HttpResponse.json({ message: 'Watch not found', mocked: true }, { status: 404, headers: { 'X-Mock-Response': 'true' } });
     const body = await request.json() as WatchUpsertRequest;
     const mark = mockPortfolioMarks.find(({ id }) => id === body.portfolioMarkId);
-    mockWatches[index] = { ...mockWatches[index], ...body, markText: mark?.markText ?? mockWatches[index].markText, jurisdiction: mark?.jurisdiction ?? mockWatches[index].jurisdiction, mocked: true };
+    const updatedState = body.state ?? (body.active !== undefined ? (body.active ? 'enabled' : 'paused') : mockWatches[index].state);
+    mockWatches[index] = { ...mockWatches[index], ...body, state: updatedState, markText: mark?.markText ?? mockWatches[index].markText, jurisdiction: mark?.jurisdiction ?? mockWatches[index].jurisdiction };
     return HttpResponse.json(mockWatches[index], { headers: { 'X-Mock-Response': 'true' } });
   }),
 
   http.get('/api/v1/alerts', async ({ request }) => {
     await delay(700);
     const params = new URL(request.url).searchParams;
-    const readState = params.get('read');
+    const status = params.get('status') ?? params.get('read');
     const severity = params.get('severity');
-    const source = params.get('source');
-    const dateFrom = params.get('dateFrom');
-    const dateTo = params.get('dateTo');
+    const createdFrom = params.get('createdFrom') ?? params.get('dateFrom');
+    const createdTo = params.get('createdTo') ?? params.get('dateTo');
     const filtered = mockAlerts.filter((alert) => {
-      if (readState === 'read' && !alert.read) return false;
-      if (readState === 'unread' && alert.read) return false;
+      if (status && (alert.status !== status && (status === 'read' ? !alert.status : false))) return false;
       if (severity && alert.severity !== severity) return false;
-      if (source && alert.source !== source) return false;
-      if (dateFrom && alert.createdAt < `${dateFrom}T00:00:00.000Z`) return false;
-      if (dateTo && alert.createdAt > `${dateTo}T23:59:59.999Z`) return false;
+      if (createdFrom && alert.createdAt < `${createdFrom}T00:00:00.000Z`) return false;
+      if (createdTo && alert.createdAt > `${createdTo}T23:59:59.999Z`) return false;
       return true;
     });
-    return HttpResponse.json(filtered, { headers: { 'X-Mock-Response': 'true' } });
+    return HttpResponse.json({
+      items: filtered,
+      pagination: { page: 1, pageSize: 25, total: filtered.length, totalPages: 1 },
+    }, { headers: { 'X-Mock-Response': 'true' } });
   }),
 
   http.patch('/api/v1/alerts/:alertId', async ({ params, request }) => {
     const index = mockAlerts.findIndex(({ id }) => id === String(params.alertId));
     if (index < 0) return HttpResponse.json({ message: 'Alert not found', mocked: true }, { status: 404, headers: { 'X-Mock-Response': 'true' } });
-    const body = await request.json() as { read?: boolean };
-    mockAlerts[index] = { ...mockAlerts[index], read: body.read ?? mockAlerts[index].read };
+    const body = await request.json() as { action?: 'read' | 'dismiss' };
+    const targetStatus = body.action === 'read' ? 'read' : 'dismissed';
+    mockAlerts[index] = { ...mockAlerts[index], status: targetStatus };
     return HttpResponse.json(mockAlerts[index], { headers: { 'X-Mock-Response': 'true' } });
   }),
 

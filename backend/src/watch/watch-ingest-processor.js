@@ -21,7 +21,7 @@ function searchQuery(mark) {
 }
 
 export class WatchIngestProcessor {
-  constructor({ repository, queue, searchService, alertGenerationService = null, clock = () => new Date() }) {
+  constructor({ repository, queue, searchService, alertGenerationService = null, alertDeliveryService = null, clock = () => new Date() }) {
     if (!repository || typeof repository.loadForProcessing !== 'function' || typeof repository.recordPollOutcome !== 'function') {
       throw new TypeError('WatchIngestProcessor needs a watch repository.');
     }
@@ -34,11 +34,15 @@ export class WatchIngestProcessor {
     if (alertGenerationService && typeof alertGenerationService.generateAlertsForWatchPoll !== 'function') {
       throw new TypeError('WatchIngestProcessor needs a valid alert generation service.');
     }
+    if (alertDeliveryService && typeof alertDeliveryService.recordDelivery !== 'function') {
+      throw new TypeError('WatchIngestProcessor needs a valid alert delivery service.');
+    }
     if (typeof clock !== 'function') throw new TypeError('WatchIngestProcessor needs a clock.');
     this.repository = repository;
     this.queue = queue;
     this.searchService = searchService;
     this.alertGenerationService = alertGenerationService;
+    this.alertDeliveryService = alertDeliveryService;
     this.clock = clock;
   }
 
@@ -72,6 +76,21 @@ export class WatchIngestProcessor {
               requestId: response.requestId, polledAt: nowIso(this.clock), results: response.results,
               sourceStatuses: response.sourceStatuses, partial: response.partial === true,
             });
+
+            if (this.alertDeliveryService && watch.ownerEmail && watch.alertChannel === 'email' && alerts?.alerts?.length > 0) {
+              for (const generatedAlert of alerts.alerts) {
+                await this.alertDeliveryService.recordDelivery({
+                  firmId: valid.firmId,
+                  alertId: generatedAlert.id,
+                  recipientEmail: watch.ownerEmail,
+                  channel: watch.alertChannel,
+                  mode: watch.alertMode,
+                });
+              }
+              if (watch.alertMode === 'real-time') {
+                await this.alertDeliveryService.processPendingRealTimeDeliveries().catch(() => {});
+              }
+            }
           } catch {
             try {
               await this.repository.recordPollOutcome({
@@ -98,16 +117,18 @@ export class WatchIngestProcessor {
             alerts,
           },
         };
-      } catch {
+      } catch (error) {
+        const isStale = error?.code === 'SEARCH_DATA_STALE' || String(error?.message ?? '').includes('SEARCH_DATA_STALE');
+        const errorCode = isStale ? 'WATCH_SEARCH_DATA_STALE' : 'WATCH_SEARCH_FAILED';
         try {
           await this.repository.recordPollOutcome({
             firmId: valid.firmId, watchId: valid.watchId, polledAt: nowIso(this.clock),
-            status: 'failed', errorCode: 'WATCH_SEARCH_FAILED',
+            status: 'failed', errorCode,
           });
         } catch {
           return { outcome: 'failed', code: 'WATCH_POLL_UPDATE_FAILED', retryable: valid.attempt + 1 < WATCH_MAX_ATTEMPTS };
         }
-        return { outcome: 'failed', code: 'WATCH_SEARCH_FAILED', retryable: valid.attempt + 1 < WATCH_MAX_ATTEMPTS };
+        return { outcome: 'failed', code: errorCode, retryable: valid.attempt + 1 < WATCH_MAX_ATTEMPTS };
       }
     } catch (error) {
       return {

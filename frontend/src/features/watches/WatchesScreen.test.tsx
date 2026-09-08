@@ -11,8 +11,8 @@ import { WatchesScreen } from './WatchesScreen';
 const mark: PortfolioMark = { id: 'p1', firmId: 'f1', ownerUserId: 'u1', markText: 'FORGE GLOBAL', jurisdiction: 'US', niceClasses: [9], status: 'registered', filingDate: '2020-01-01', renewalDate: '2030-01-01', sourceRegistry: 'USPTO', registryReference: 'TEST-1', registrationDate: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
 const watches: WatchSummary[] = [];
 const alerts: Alert[] = [
-  { id: 'older', watchId: 'w1', matchedFilingRef: 'EU1', riskScoreId: 'r2', riskResultId: '2', read: true, createdAt: '2026-08-01T22:00:00Z', matchedMarkText: 'FORTRESS', protectedMarkText: 'FORGE GLOBAL', severity: 'medium', source: 'EUIPO', supportingEvidence: ['Visual match'] },
-  { id: 'newest', watchId: 'w1', matchedFilingRef: 'US1', riskScoreId: 'r1', riskResultId: '1', read: false, createdAt: '2026-08-04T08:00:00Z', matchedMarkText: 'FORGE LABS', protectedMarkText: 'FORGE GLOBAL', severity: 'high', source: 'USPTO', supportingEvidence: ['Phonetic match'] },
+  { id: 'older', watchId: 'w1', matchedFilingRef: 'EU1', riskScoreId: 'r2', candidateResultId: '2', searchId: 's2', status: 'read', createdAt: '2026-08-01T22:00:00Z', matchedMarkText: 'FORTRESS', protectedMarkText: 'FORGE GLOBAL', severity: 'medium', source: 'EUIPO', supportingEvidence: ['Visual match'] },
+  { id: 'newest', watchId: 'w1', matchedFilingRef: 'US1', riskScoreId: 'r1', candidateResultId: '1', searchId: 's1', status: 'unread', createdAt: '2026-08-04T08:00:00Z', matchedMarkText: 'FORGE LABS', protectedMarkText: 'FORGE GLOBAL', severity: 'high', source: 'USPTO', supportingEvidence: ['Phonetic match'] },
 ];
 const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -22,15 +22,15 @@ const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringif
 const renderWatches = () => {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    if (url.includes('/api/v1/alerts') && init?.method === 'GET') return jsonResponse(alerts);
-    if (url.endsWith('/api/v1/watches') && init?.method === 'GET') return jsonResponse(watches);
+    if (url.includes('/api/v1/alerts') && init?.method === 'GET') return jsonResponse({ items: alerts, pagination: { page: 1, pageSize: 25, total: 2, totalPages: 1 } });
+    if (url.endsWith('/api/v1/watches') && init?.method === 'GET') return jsonResponse({ items: watches, pagination: { page: 1, pageSize: 25, total: 0, totalPages: 0 } });
     if (url.includes('/api/v1/portfolio-marks')) return jsonResponse({ items: [mark], pagination: { page: 1, pageSize: 25, total: 1, totalPages: 1 } });
-    if (url.endsWith('/api/v1/watches') && init?.method === 'POST') return jsonResponse({ id: 'w-new', userId: 'u1', markText: mark.markText, jurisdiction: mark.jurisdiction, mocked: true, ...JSON.parse(String(init.body)) }, 201);
+    if (url.endsWith('/api/v1/watches') && init?.method === 'POST') return jsonResponse({ id: 'w-new', userId: 'u1', markText: mark.markText, jurisdiction: mark.jurisdiction, state: 'enabled', ...JSON.parse(String(init.body)) }, 201);
     return jsonResponse({}, 500);
   });
   vi.stubGlobal('fetch', fetchMock);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/watches']}><Routes><Route path="/watches" element={<WatchesScreen />} /><Route path="/search/risk/:id" element={<div>Risk destination</div>} /></Routes></MemoryRouter></QueryClientProvider>);
+  render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/watches']}><Routes><Route path="/watches" element={<WatchesScreen />} /><Route path="/search/risk/:searchId/:resultId" element={<div>Risk destination</div>} /></Routes></MemoryRouter></QueryClientProvider>);
   return fetchMock;
 };
 
@@ -48,7 +48,7 @@ describe('WatchesScreen', () => {
     expect(await screen.findByText('FORTRESS')).toBeVisible();
     expect(screen.queryByText('FORGE LABS')).not.toBeInTheDocument();
     const riskLink = screen.getByRole('link', { name: /Analyze risk/ });
-    expect(riskLink).toHaveAttribute('href', '/search/risk/2?fromAlert=older');
+    expect(riskLink).toHaveAttribute('href', '/search/risk/s2/2');
     fireEvent.click(riskLink);
     expect(await screen.findByText('Risk destination')).toBeVisible();
   }, 20_000);
@@ -65,7 +65,7 @@ describe('WatchesScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create watch' }));
     expect(await screen.findByText(/FORGE GLOBAL watch created/i)).toBeVisible();
     const request = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST');
-    expect(JSON.parse(String(request?.[1]?.body))).toEqual({ portfolioMarkId: 'p1', alertChannel: 'in-app', alertMode: 'digest', active: true });
+    expect(JSON.parse(String(request?.[1]?.body))).toEqual({ portfolioMarkId: 'p1', state: 'enabled', alertChannel: 'in-app', alertMode: 'digest' });
   }, 20_000);
 
   it('supports keyboard watch creation', async () => {

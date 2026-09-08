@@ -30,6 +30,8 @@ import { createWatchRuntime } from './watch/watch-runtime.js';
 import { AlertRepository } from './alerts/alert-repository.js';
 import { AlertGenerationService } from './alerts/alert-generation-service.js';
 import { AlertService } from './alerts/alert-service.js';
+import { createAlertMailer } from './alerts/alert-mailer.js';
+import { AlertDeliveryService } from './alerts/alert-delivery-service.js';
 import { AuditLogRepository } from './audit/audit-log-repository.js';
 import { AuditService } from './audit/audit-service.js';
 import { ExportAuditService } from './audit/export-audit-service.js';
@@ -147,8 +149,11 @@ export async function createSystem(config, { officeActionSources = [], exportSto
   const matterService = new MatterService(matterRepository, { searchResultService });
   const alertGenerationService = config.watchEnabled
     ? new AlertGenerationService({ repository: alertRepository }) : null;
+  const alertMailer = createAlertMailer(config);
+  const alertDeliveryService = config.watchEnabled
+    ? new AlertDeliveryService({ database: pool, alertMailer }) : null;
   const watchRuntime = createWatchRuntime({
-    config, redisClient, watchRepository, searchService, alertGenerationService,
+    config, redisClient, watchRepository, searchService, alertGenerationService, alertDeliveryService,
   });
   // This runtime constructs its Redis queue and private storage only when the
   // explicitly disabled-by-default PDF flag is enabled.

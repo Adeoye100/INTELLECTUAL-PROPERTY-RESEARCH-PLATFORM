@@ -65,43 +65,82 @@ export interface PortfolioDetailRouteState {
   returnTo: string;
 }
 
+export type WatchState = 'enabled' | 'paused';
+
 export interface Watch {
   id: string;
+  firmId?: string;
   portfolioMarkId: string;
-  userId: string;
+  ownerUserId?: string;
+  state: WatchState;
+  active?: boolean;
   alertChannel: WatchAlertChannel;
   alertMode: WatchAlertMode;
-  active: boolean;
+  pollIntervalMinutes?: number;
+  nextPollAt?: string | null;
+  lastPolledAt?: string | null;
+  lastPollStatus?: 'completed' | 'partial' | 'failed' | null;
+  lastPollErrorCode?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface WatchSummary extends Watch {
   markText: string;
   jurisdiction: string;
-  mocked?: boolean;
+}
+
+export interface WatchListResponse {
+  items: WatchSummary[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export interface WatchUpsertRequest {
   portfolioMarkId: string;
+  state?: WatchState;
+  active?: boolean;
   alertChannel: WatchAlertChannel;
   alertMode: WatchAlertMode;
-  active: boolean;
+  pollIntervalMinutes?: number;
 }
 
 export interface Alert {
   id: string;
+  firmId?: string;
   watchId: string;
-  matchedFilingRef: string;
+  portfolioMarkId?: string;
   riskScoreId: string;
-  read: boolean;
+  severity: 'medium' | 'high';
+  status: 'unread' | 'read' | 'dismissed';
+  policyVersion?: string;
   createdAt: string;
-  matchedMarkText: string;
-  protectedMarkText: string;
-  riskResultId: string;
-  severity: RiskLevel;
-  source: string;
-  supportingEvidence: string[];
-  mocked?: boolean;
-  riskScore?: RiskScore; // Joined data
+  readAt?: string | null;
+  dismissedAt?: string | null;
+  updatedAt?: string;
+  riskScore?: RiskScore;
+  // UI computed / fallback properties
+  matchedFilingRef?: string;
+  matchedMarkText?: string;
+  protectedMarkText?: string;
+  searchId?: string;
+  candidateResultId?: string;
+  source?: string;
+  supportingEvidence?: string[];
+}
+
+export interface AlertListResponse {
+  items: Alert[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export interface Search {
@@ -224,6 +263,13 @@ export interface ScoringMethodology {
 
 export interface RiskScore {
   id: string;
+  firmId?: string;
+  watchId?: string;
+  portfolioMarkId?: string;
+  candidateSource?: string;
+  candidateRegistryReference?: string;
+  candidateMarkText?: string;
+  sourceRequestId?: string;
   searchResultId?: string;
   alertId?: string;
   phoneticScore: number;
@@ -232,7 +278,7 @@ export interface RiskScore {
   compositeScore?: number;
   /** null = conceptual scoring not supported for this source/version */
   conceptualScore: number | null;
-  classOverlap: boolean;
+  classOverlap?: boolean;
   compositeRating: RiskLevel;
   /** Scoring algorithm version and source attribution */
   methodology?: ScoringMethodology;

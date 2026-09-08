@@ -127,3 +127,65 @@ services:
         value: "24"
       - key: SEARCH_MAX_MISSED_REFRESH_RUNS
         value: "2"
+
+  - type: worker
+    name: iprp-watch-worker
+    runtime: node
+    rootDir: backend
+    buildCommand: corepack enable && pnpm install --frozen-lockfile
+    startCommand: pnpm watch:worker
+    autoDeploy: false
+    envVars:
+      - key: NODE_VERSION
+        value: 22.14.0
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_SSL
+        value: "true"
+      - key: DATABASE_POOL_MAX
+        value: "5"
+      - key: DATABASE_IDLE_TIMEOUT_MS
+        value: "30000"
+      - key: DATABASE_CONNECTION_TIMEOUT_MS
+        value: "5000"
+      - key: DATABASE_STATEMENT_TIMEOUT_MS
+        value: "15000"
+      - key: REDIS_URL
+        sync: false
+      - key: SEARCH_ENABLED
+        value: "true"
+      - key: WATCH_ENABLED
+        value: "true"
+      - key: ELASTICSEARCH_URL
+        sync: false
+      - key: ELASTICSEARCH_INDEX
+        value: trademarks_composite
+      - key: SEARCH_SOURCE_REGISTRIES
+        value: USPTO
+      - key: SEARCH_SOURCE_TIMEOUT_MS
+        value: "30000"
+      - key: SEARCH_MAX_RESULTS
+        value: "50"
+      - key: SEARCH_REFRESH_EXPECTED_INTERVAL_HOURS
+        value: "24"
+      - key: SEARCH_MAX_MISSED_REFRESH_RUNS
+        value: "2"
+      - key: WATCH_SCHEDULER_INTERVAL_MS
+        value: "60000"
+      - key: WATCH_SCHEDULER_BATCH_SIZE
+        value: "50"
+      - key: WATCH_POLL_INTERVAL_MINUTES
+        value: "1440"
+      - key: WORKER_HEARTBEAT_TTL_SECONDS
+        value: "60"
+      - key: INVITATION_MAILER_PROVIDER
+        value: resend
+      - key: INVITATION_MAILER_API_KEY
+        sync: false
+      - key: INVITATION_MAILER_FROM
+        sync: false
+      - key: PUBLIC_APP_URL
+        value: "https://intellectual-property-research-plat.vercel.app"
+
