@@ -300,6 +300,27 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/officeActionMark"
+          },
+          {
+            "$ref": "#/components/parameters/officeActionAppNum"
+          },
+          {
+            "$ref": "#/components/parameters/officeActionOwner"
+          },
+          {
+            "$ref": "#/components/parameters/officeActionDocType"
+          },
+          {
+            "$ref": "#/components/parameters/officeActionFiledFrom"
+          },
+          {
+            "$ref": "#/components/parameters/officeActionFiledTo"
+          },
+          {
+            "$ref": "#/components/parameters/officeActionJurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/officeActionMaxResults"
           }
         ],
         "responses": {
@@ -1437,6 +1458,63 @@
         "schema": {
           "type": "string",
           "maxLength": 200
+        }
+      },
+      "officeActionAppNum": {
+        "name": "applicationNumber",
+        "in": "query",
+        "schema": {
+          "type": "string",
+          "maxLength": 100
+        }
+      },
+      "officeActionOwner": {
+        "name": "owner",
+        "in": "query",
+        "schema": {
+          "type": "string",
+          "maxLength": 200
+        }
+      },
+      "officeActionDocType": {
+        "name": "documentType",
+        "in": "query",
+        "schema": {
+          "type": "string",
+          "maxLength": 80
+        }
+      },
+      "officeActionFiledFrom": {
+        "name": "filedFrom",
+        "in": "query",
+        "schema": {
+          "type": "string",
+          "format": "date"
+        }
+      },
+      "officeActionFiledTo": {
+        "name": "filedTo",
+        "in": "query",
+        "schema": {
+          "type": "string",
+          "format": "date"
+        }
+      },
+      "officeActionJurisdiction": {
+        "name": "jurisdiction",
+        "in": "query",
+        "schema": {
+          "type": "string",
+          "maxLength": 20
+        }
+      },
+      "officeActionMaxResults": {
+        "name": "maxResults",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
         }
       },
       "cursor": {

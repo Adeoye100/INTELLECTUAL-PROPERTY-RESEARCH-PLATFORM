@@ -55,4 +55,21 @@ export class MatterService {
       savedResult: saved,
     };
   }
+
+  async linkOfficeActionRef({ firmId, matterId, createdByUserId, officeActionRefId }) {
+    const matter = await this.getMatter({ firmId, id: matterId });
+    if (!matter) throw new AppError(404, 'MATTER_NOT_FOUND', 'Matter not found.');
+    return this.repository.addOfficeActionRef({
+      firmId,
+      matterId,
+      officeActionRefId,
+      createdByUserId,
+    });
+  }
+
+  async listOfficeActionRefs({ firmId, matterId }) {
+    const matter = await this.getMatter({ firmId, id: matterId });
+    if (!matter) throw new AppError(404, 'MATTER_NOT_FOUND', 'Matter not found.');
+    return this.repository.listOfficeActionRefs({ firmId, matterId });
+  }
 }

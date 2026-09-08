@@ -54,5 +54,31 @@ export function createMatterRouter(authenticate, matterService) {
     } catch (error) { next(error); }
   });
 
+  router.post('/matters/:id/office-action-refs', authenticate, requireRole(WRITE_ROLES), async (request, response, next) => {
+    try {
+      const officeActionRefId = String(request.body?.officeActionRefId || '');
+      if (!officeActionRefId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(officeActionRefId)) {
+        return response.status(400).json({ code: 'VALIDATION_ERROR', message: 'officeActionRefId must be a valid UUID.' });
+      }
+      const linked = await matterService.linkOfficeActionRef({
+        firmId: request.auth.firmId,
+        matterId: request.params.id,
+        createdByUserId: request.auth.userId,
+        officeActionRefId,
+      });
+      response.status(201).json(linked);
+    } catch (error) { next(error); }
+  });
+
+  router.get('/matters/:id/office-action-refs', authenticate, requireRole(READ_ROLES), async (request, response, next) => {
+    try {
+      const refs = await matterService.listOfficeActionRefs({
+        firmId: request.auth.firmId,
+        matterId: request.params.id,
+      });
+      response.json({ items: refs });
+    } catch (error) { next(error); }
+  });
+
   return router;
 }

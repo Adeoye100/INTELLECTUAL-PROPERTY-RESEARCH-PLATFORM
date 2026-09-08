@@ -17,6 +17,7 @@
     "migrate": "node --env-file-if-exists=.env src/db/migrate.js",
     "indices:elasticsearch": "node scripts/create-elasticsearch-indices.js",
     "ingest:uspto": "node src/ingestion/run-uspto-ingestion.js",
+    "ingest:office-actions": "node --env-file-if-exists=.env scripts/ingest-office-actions.js",
     "sync:elasticsearch": "node src/ingestion/run-elasticsearch-sync.js",
     "refresh:uspto-search": "node --env-file-if-exists=.env src/ingestion/run-uspto-search-refresh.js",
     "verify:supabase-token": "node --env-file=.env scripts/verify-supabase-token.js",

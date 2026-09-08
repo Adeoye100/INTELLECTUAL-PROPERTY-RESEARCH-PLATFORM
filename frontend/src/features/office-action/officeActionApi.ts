@@ -2,40 +2,48 @@ import { getApiClient } from '../../lib/api/client';
 import type { OfficeActionRef, OfficeActionSearchResponse, OfficeActionSearchResult } from '../../types';
 
 export interface OfficeActionSearchRequest {
-  markText: string;
-  niceClass: string;
+  markText?: string;
+  applicationNumber?: string;
+  owner?: string;
+  jurisdiction?: string;
+  documentType?: string;
+  filedFrom?: string;
+  filedTo?: string;
 }
 
-export const searchOfficeActions = ({ markText, niceClass }: OfficeActionSearchRequest) => {
+export const searchOfficeActions = (filters: OfficeActionSearchRequest) => {
   const params = new URLSearchParams();
-  if (markText) params.set('markText', markText);
-  if (niceClass) params.set('niceClass', niceClass);
+  if (filters.markText) params.set('markText', filters.markText.trim());
+  if (filters.applicationNumber) params.set('applicationNumber', filters.applicationNumber.trim());
+  if (filters.owner) params.set('owner', filters.owner.trim());
+  if (filters.jurisdiction) params.set('jurisdiction', filters.jurisdiction.trim());
+  if (filters.documentType) params.set('documentType', filters.documentType.trim());
+  if (filters.filedFrom) params.set('filedFrom', filters.filedFrom.trim());
+  if (filters.filedTo) params.set('filedTo', filters.filedTo.trim());
   return getApiClient().requestJson<OfficeActionSearchResponse>(`/office-actions/search?${params}`);
 };
 
 export const createOfficeActionRef = (portfolioMarkId: string, item: OfficeActionSearchResult) => {
-  const referenceText = item.sourceReferenceId || `${item.sourceRegistry} ${item.applicationNumber || ''}: ${item.markText}`;
   return getApiClient().requestJson<OfficeActionRef>(`/portfolio-marks/${encodeURIComponent(portfolioMarkId)}/office-action-refs`, {
     method: 'POST',
     body: {
-      referenceText,
-      examinerReasoningSummary: item.examinerReasoningSummary,
-      linkedPrecedentRef: item.sourceReferenceId || null,
+      sourceRegistry: item.sourceRegistry,
+      sourceReferenceId: item.sourceReferenceId,
+      applicationNumber: item.applicationNumber || null,
+      documentType: item.documentType,
+      officeActionDate: item.officeActionDate || null,
+      examinerName: item.examinerName || null,
+      examinerReasoningSummary: item.examinerReasoningSummary || null,
+      summaryMethod: item.summaryMethod,
+      sourceDocumentUrl: item.sourceDocumentUrl || null,
+      sourceMetadata: item.sourceMetadata || {},
     },
   });
 };
 
-export const linkOfficeAction = (officeActionId: string, portfolioMarkId: string) =>
-  createOfficeActionRef(portfolioMarkId, {
-    sourceRegistry: 'USPTO',
-    sourceReferenceId: officeActionId,
-    applicationNumber: officeActionId,
-    markText: '',
-    owner: '',
-    jurisdiction: 'US',
-    documentType: 'Office Action',
-    officeActionDate: new Date().toISOString().slice(0, 10),
-    examinerName: '',
-    examinerReasoningSummary: 'Linked precedent reference',
-    summaryMethod: 'manual',
+export const linkOfficeActionToMatter = (matterId: string, officeActionRefId: string) => {
+  return getApiClient().requestJson<{ id: string; matterId: string; officeActionRefId: string }>(`/matters/${encodeURIComponent(matterId)}/office-action-refs`, {
+    method: 'POST',
+    body: { officeActionRefId },
   });
+};

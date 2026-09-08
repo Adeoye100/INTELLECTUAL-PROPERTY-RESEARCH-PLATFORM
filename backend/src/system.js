@@ -37,6 +37,7 @@ import { AuditService } from './audit/audit-service.js';
 import { ExportAuditService } from './audit/export-audit-service.js';
 import { UserRoleService } from './users/user-role-service.js';
 import { createOfficeActionSearchRuntime } from './office-actions/office-action-search-runtime.js';
+import { PostgresOfficeActionSource } from './office-actions/postgres-office-action-source.js';
 import { OfficeActionRefRepository } from './office-actions/office-action-ref-repository.js';
 import { OfficeActionRefService } from './office-actions/office-action-ref-service.js';
 import { createPdfExportRuntime } from './exports/pdf-export-runtime.js';
@@ -47,7 +48,7 @@ import { BillingService } from './billing/billing-service.js';
 import { MatterRepository } from './matters/matter-repository.js';
 import { MatterService } from './matters/matter-service.js';
 
-export async function createSystem(config, { officeActionSources = [], exportStorage = null } = {}) {
+export async function createSystem(config, { officeActionSources = null, exportStorage = null } = {}) {
   const pool = createPool(config.databaseUrl, config);
   const registryRefreshRepository = new RegistryRefreshRepository(pool);
   const searchFreshnessService = new SearchFreshnessService({
@@ -59,11 +60,18 @@ export async function createSystem(config, { officeActionSources = [], exportSto
   const { searchSources, federatedSearchService, searchService } = createSearchRuntime(config, {
     freshnessService: searchFreshnessService,
   });
+
+  const resolvedOfficeActionSources = officeActionSources ?? (
+    config.officeActionSearchEnabled
+      ? [new PostgresOfficeActionSource({ database: pool, maximumResults: config.officeActionSearchMaxResults })]
+      : []
+  );
+
   const {
     officeActionSources: configuredOfficeActionSources,
     federatedOfficeActionSearchService,
     officeActionSearchService,
-  } = createOfficeActionSearchRuntime(config, { sources: officeActionSources });
+  } = createOfficeActionSearchRuntime(config, { sources: resolvedOfficeActionSources });
   const supabaseVerifier = new SupabaseVerifier({
     supabaseUrl: config.supabaseUrl,
     publishableKey: config.supabasePublishableKey,

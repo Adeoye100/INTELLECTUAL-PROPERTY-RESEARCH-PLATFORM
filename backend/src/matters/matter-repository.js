@@ -112,4 +112,60 @@ export class MatterRepository {
     );
     return result.rows.map(matterRiskResultFromRow);
   }
+
+  async addOfficeActionRef({ firmId, matterId, officeActionRefId, createdByUserId }) {
+    const result = await this.database.query(
+      `INSERT INTO matter_office_action_refs (firm_id, matter_id, office_action_ref_id, created_by_user_id)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (firm_id, matter_id, office_action_ref_id) DO UPDATE SET created_at = matter_office_action_refs.created_at
+       RETURNING id, firm_id, matter_id, office_action_ref_id, created_by_user_id, created_at`,
+      [firmId, matterId, officeActionRefId, createdByUserId || null],
+    );
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      firmId: row.firm_id,
+      matterId: row.matter_id,
+      officeActionRefId: row.office_action_ref_id,
+      createdByUserId: row.created_by_user_id,
+      createdAt: timestampValue(row.created_at),
+    };
+  }
+
+  async listOfficeActionRefs({ firmId, matterId }) {
+    const result = await this.database.query(
+      `SELECT m.id, m.firm_id, m.matter_id, m.office_action_ref_id, m.created_by_user_id, m.created_at,
+              r.portfolio_mark_id, r.source_registry, r.source_reference_id, r.application_number,
+              r.document_type, r.office_action_date, r.examiner_name, r.examiner_reasoning_summary,
+              r.summary_method, r.source_document_url, r.source_metadata
+       FROM matter_office_action_refs m
+       JOIN office_action_refs r ON r.id = m.office_action_ref_id AND r.firm_id = m.firm_id
+       WHERE m.firm_id = $1 AND m.matter_id = $2
+       ORDER BY m.created_at DESC`,
+      [firmId, matterId],
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      firmId: row.firm_id,
+      matterId: row.matter_id,
+      officeActionRefId: row.office_action_ref_id,
+      createdByUserId: row.created_by_user_id,
+      createdAt: timestampValue(row.created_at),
+      officeActionRef: {
+        id: row.office_action_ref_id,
+        firmId: row.firm_id,
+        portfolioMarkId: row.portfolio_mark_id,
+        sourceRegistry: row.source_registry,
+        sourceReferenceId: row.source_reference_id,
+        applicationNumber: row.application_number,
+        documentType: row.document_type,
+        officeActionDate: row.office_action_date ? (row.office_action_date instanceof Date ? row.office_action_date.toISOString().slice(0, 10) : String(row.office_action_date).slice(0, 10)) : null,
+        examinerName: row.examiner_name,
+        examinerReasoningSummary: row.examiner_reasoning_summary,
+        summaryMethod: row.summary_method,
+        sourceDocumentUrl: row.source_document_url,
+        sourceMetadata: typeof row.source_metadata === 'object' && row.source_metadata !== null ? row.source_metadata : {},
+      },
+    }));
+  }
 }
