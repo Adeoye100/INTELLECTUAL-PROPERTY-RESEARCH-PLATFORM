@@ -1,5 +1,5 @@
 import { http, HttpResponse, delay } from 'msw';
-import type { Alert, DashboardSummary, SearchResponse, SearchResult, OfficeActionRef, PortfolioAttachment, PortfolioMark, PortfolioMarkDetail, Matter, MatterSaveResult, WatchSummary, WatchUpsertRequest } from '../../types';
+import type { Alert, DashboardAnalytics, DashboardSummary, SearchResponse, SearchResult, OfficeActionRef, PortfolioAttachment, PortfolioMark, PortfolioMarkDetail, Matter, MatterSaveResult, WatchSummary, WatchUpsertRequest } from '../../types';
 
 const mockSearchResults: SearchResult[] = [
   {
@@ -125,6 +125,35 @@ export const mockSearchResponse: SearchResponse = {
   ],
   partial: true,
   requestId: 'mock-search-request',
+};
+
+export const mockDashboardAnalytics: DashboardAnalytics = {
+  generatedAt: '2026-08-04T12:00:00.000Z',
+  cacheStatus: 'miss',
+  range: '30d',
+  portfolio: {
+    total: 24,
+    byRisk: [
+      { risk: 'low', count: 18 },
+      { risk: 'medium', count: 4 },
+      { risk: 'high', count: 2 },
+    ],
+    byStatus: [
+      { status: 'registered', count: 20 },
+      { status: 'pending', count: 4 },
+    ],
+    renewalsDueSoon: 2,
+  },
+  watchActivity: {
+    points: [
+      { date: '2026-08-01', polls: 5, alerts: 1, partial: 0, unavailable: 0 },
+      { date: '2026-08-02', polls: 6, alerts: 0, partial: 0, unavailable: 0 },
+      { date: '2026-08-03', polls: 5, alerts: 1, partial: 0, unavailable: 0 },
+      { date: '2026-08-04', polls: 6, alerts: 1, partial: 0, unavailable: 0 },
+    ],
+    enabled: 12,
+    disabled: 2,
+  },
 };
 
 export const mockDashboardSummary: DashboardSummary = {
@@ -452,27 +481,16 @@ export const handlers = [
 
   // MOCK dashboard lifecycle scenarios. Append ?scenario=empty|partial|error
   // while exercising frontend states; replace with an authenticated aggregate API.
-  http.get('/api/v1/dashboard/summary', async ({ request }) => {
-    const scenario = new URL(request.url).searchParams.get('scenario');
-    await delay(500);
+  http.get('/api/v1/dashboard/analytics', async ({ request }) => {
+    const url = new URL(request.url);
+    const range = url.searchParams.get('range') || '30d';
+    const scenario = url.searchParams.get('scenario');
+    await delay(300);
     if (scenario === 'error') return HttpResponse.json({ message: 'Mock dashboard failure' }, { status: 503 });
-    if (scenario === 'empty') return HttpResponse.json<DashboardSummary>({
-      activeWatches: 0,
-      portfolioHealthPercent: 0,
-      portfolioMarkCount: 0,
-      recentAlerts: [],
-      recentSearches: [],
-      searchActivity: [],
-      riskDistribution: [],
-      partial: false,
-      unavailableSections: [],
+    return HttpResponse.json<DashboardAnalytics>({
+      ...mockDashboardAnalytics,
+      range,
     });
-    if (scenario === 'partial') return HttpResponse.json<DashboardSummary>({
-      ...mockDashboardSummary,
-      partial: true,
-      unavailableSections: ['EUIPO alerts', 'portfolio renewal aggregate'],
-    });
-    return HttpResponse.json(mockDashboardSummary);
   }),
 
   http.get('/api/v1/portfolio', async () => {
@@ -714,24 +732,69 @@ export const handlers = [
     return HttpResponse.json(result, { status: 200 });
   }),
 
-  // TEMPORARY FE-17 FALLBACK: remove once authenticated server-generated PDF endpoint is available.
-  http.post('/api/v1/reports/pdf', async ({ request }) => {
-    const body = await request.json() as {
-      reportType?: 'search-results' | 'risk-detail' | 'portfolio-summary';
-      context?: { screen?: string };
+  http.post('/api/v1/exports', async ({ request }) => {
+    const body = (await request.json()) as {
+      type: string;
+      sourceEntityId: string;
+      idempotencyKey: string;
+      parameters?: Record<string, unknown>;
     };
-    const expectedScreens = {
-      'search-results': 'search-results',
-      'risk-detail': 'risk-detail',
-      'portfolio-summary': 'portfolio',
-    } as const;
+    await delay(300);
+    const id = '44444444-4444-4444-8444-444444444444';
+    return HttpResponse.json({
+      id,
+      firmId: '11111111-1111-4111-8111-111111111111',
+      requestedByUserId: '33333333-3333-4333-8333-333333333333',
+      type: body.type,
+      status: 'completed',
+      sourceEntityId: body.sourceEntityId,
+      requestId: 'mock-export-req',
+      idempotencyKey: body.idempotencyKey,
+      parameters: body.parameters ?? {},
+      storageKey: `exports/11111111-1111-4111-8111-111111111111/${id}.pdf`,
+      mimeType: 'application/pdf',
+      byteSize: 32,
+      checksumSha256: 'a'.repeat(64),
+      failureCode: null,
+      queuedAt: new Date().toISOString(),
+      processingStartedAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      failedAt: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  }),
 
-    if (!body.reportType || !body.context || expectedScreens[body.reportType] !== body.context.screen) {
-      return HttpResponse.json({ message: 'Invalid report type or screen context' }, { status: 400 });
-    }
+  http.get('/api/v1/exports/:id', async ({ params }) => {
+    await delay(200);
+    const id = String(params.id);
+    return HttpResponse.json({
+      id,
+      firmId: '11111111-1111-4111-8111-111111111111',
+      requestedByUserId: '33333333-3333-4333-8333-333333333333',
+      type: 'search_results',
+      status: 'completed',
+      sourceEntityId: '11111111-1111-4111-8111-111111111111',
+      requestId: 'mock-export-req',
+      idempotencyKey: `export-${id}`,
+      parameters: {},
+      storageKey: `exports/11111111-1111-4111-8111-111111111111/${id}.pdf`,
+      mimeType: 'application/pdf',
+      byteSize: 32,
+      checksumSha256: 'a'.repeat(64),
+      failureCode: null,
+      queuedAt: new Date().toISOString(),
+      processingStartedAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      failedAt: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  }),
 
-    await delay(600);
-    const fileName = `forge-${body.reportType}-${new Date().toISOString().slice(0, 10)}.pdf`;
+  http.get('/api/v1/exports/:id/download', async ({ params }) => {
+    await delay(300);
+    const fileName = `export-${params.id}.pdf`;
     return new HttpResponse('%PDF-1.4\n% mock PDF fixture\n%%EOF', {
       headers: {
         'Content-Disposition': `attachment; filename="${fileName}"`,

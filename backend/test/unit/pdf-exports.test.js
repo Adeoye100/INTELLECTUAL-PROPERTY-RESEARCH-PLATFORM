@@ -10,7 +10,7 @@ import { ExportService } from '../../src/exports/export-service.js';
 import { ExportSourceLoader } from '../../src/exports/export-source-loader.js';
 import { createExportDocumentModel } from '../../src/exports/export-document-model.js';
 import { PdfRenderer } from '../../src/exports/pdf-renderer.js';
-import { InMemoryPdfStorage, exportStorageKey, validateExportStorageKey, sha256 } from '../../src/exports/export-storage.js';
+import { DatabasePdfStorage, InMemoryPdfStorage, exportStorageKey, validateExportStorageKey, sha256 } from '../../src/exports/export-storage.js';
 import { deterministicPdfExportJobId, RedisPdfExportQueue, validatePdfExportJob } from '../../src/exports/pdf-export-queue.js';
 import { PdfExportProcessor } from '../../src/exports/pdf-export-processor.js';
 import { createExportRouter } from '../../src/routes/export-routes.js';
@@ -219,6 +219,52 @@ describe('Renderer, private storage, queue job, and worker boundaries', () => {
     await assert.rejects(() => storage.put({ key, contentType: 'application/pdf', body: Buffer.from('%PDF-replacement') }), /immutable/);
     assert.throws(() => validateExportStorageKey('../secrets.pdf'));
     await assert.rejects(() => storage.put({ key, contentType: 'application/pdf', body: Buffer.from('not-a-pdf') }));
+  });
+
+  it('stores and retrieves PDF documents via DatabasePdfStorage with byte size and checksum validation', async () => {
+    const rows = new Map();
+    const mockDb = {
+      async query(sql, values = []) {
+        if (sql.includes('INSERT INTO export_artifacts')) {
+          const [firmIdVal, exportIdVal, key, byteSize, checksumSha256, body] = values;
+          if (rows.has(key)) {
+            const err = new Error('duplicate key');
+            err.code = '23505';
+            throw err;
+          }
+          rows.set(key, { firm_id: firmIdVal, export_id: exportIdVal, storage_key: key, byte_size: byteSize, checksum_sha256: checksumSha256, body });
+          return { rowCount: 1 };
+        }
+        if (sql.includes('SELECT body FROM export_artifacts')) {
+          const [key] = values;
+          const found = rows.get(key);
+          return { rowCount: found ? 1 : 0, rows: found ? [{ body: found.body }] : [] };
+        }
+        if (sql.includes('DELETE FROM export_artifacts')) {
+          const [key] = values;
+          const existed = rows.has(key);
+          rows.delete(key);
+          return { rowCount: existed ? 1 : 0 };
+        }
+        throw new Error(`Unexpected SQL: ${sql}`);
+      },
+    };
+
+    const storage = new DatabasePdfStorage({ database: mockDb, maxBytes: 1024 * 1024 });
+    const key = exportStorageKey({ firmId, exportId });
+    const pdfBytes = Buffer.from('%PDF-database-test');
+    const saved = await storage.put({ key, contentType: 'application/pdf', body: pdfBytes });
+    assert.equal(saved.byteSize, pdfBytes.length);
+    assert.match(saved.checksumSha256, /^[a-f0-9]{64}$/);
+
+    const retrieved = await storage.get({ key });
+    assert.deepEqual(retrieved, pdfBytes);
+
+    await assert.rejects(() => storage.put({ key, contentType: 'application/pdf', body: pdfBytes }), /immutable/);
+
+    const deleted = await storage.delete({ key });
+    assert.equal(deleted, true);
+    assert.equal(await storage.get({ key }), null);
   });
 
   it('rejects tampered stored bytes and oversized Redis queue records before export download/JSON parsing', async () => {

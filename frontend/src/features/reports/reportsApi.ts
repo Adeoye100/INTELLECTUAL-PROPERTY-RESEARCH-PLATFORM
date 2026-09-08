@@ -1,5 +1,37 @@
 import { ApiError, getApiClient } from '../../lib/api/client';
-import type { PdfReportRequest } from '../../components/PdfExport';
+
+export type ExportType = 'search_results' | 'risk_report' | 'portfolio_summary';
+export type ExportStatus = 'queued' | 'processing' | 'completed' | 'failed';
+
+export interface CreateExportInput {
+  type: ExportType;
+  sourceEntityId: string;
+  idempotencyKey: string;
+  parameters?: Record<string, unknown>;
+}
+
+export interface ExportDto {
+  id: string;
+  firmId: string;
+  requestedByUserId: string;
+  type: ExportType;
+  status: ExportStatus;
+  sourceEntityId: string;
+  requestId: string;
+  idempotencyKey: string;
+  parameters: Record<string, unknown>;
+  storageKey: string | null;
+  mimeType: string | null;
+  byteSize: number | null;
+  checksumSha256: string | null;
+  failureCode: string | null;
+  queuedAt: string;
+  processingStartedAt: string | null;
+  completedAt: string | null;
+  failedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface PdfDownload {
   blob: Blob;
@@ -32,12 +64,18 @@ export const fileNameFromContentDisposition = (disposition: string | null, fallb
   return fileName ? sanitizePdfFileName(fileName, fallback) : fallback;
 };
 
-export async function generatePdfReport(request: PdfReportRequest): Promise<PdfDownload> {
-  const response = await getApiClient().requestBlob('/reports/pdf', {
-    method: 'POST',
-    body: request,
+export async function createExport(input: CreateExportInput): Promise<ExportDto> {
+  return getApiClient().requestJson<ExportDto>('/exports', { method: 'POST', body: input });
+}
+
+export async function getExportStatus(exportId: string): Promise<ExportDto> {
+  return getApiClient().requestJson<ExportDto>(`/exports/${exportId}`);
+}
+
+export async function downloadExportPdf(exportId: string, fallbackFileName = `export-${exportId}.pdf`): Promise<PdfDownload> {
+  const response = await getApiClient().requestBlob(`/exports/${exportId}/download`, {
     headers: { Accept: 'application/pdf' },
-    timeoutMs: 30_000,
+    timeoutMs: 60_000,
   });
   const contentType = response.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase();
   if (contentType !== 'application/pdf') {
@@ -59,8 +97,45 @@ export async function generatePdfReport(request: PdfReportRequest): Promise<PdfD
     blob: response.blob,
     fileName: fileNameFromContentDisposition(
       response.headers.get('content-disposition'),
-      `${request.reportType}.pdf`,
+      fallbackFileName,
     ),
     mocked: response.headers.get('x-mock-response') === 'true',
   };
+}
+
+export async function pollExportAndDownload(
+  input: CreateExportInput,
+  onProgress?: (status: ExportStatus) => void,
+): Promise<PdfDownload> {
+  const created = await createExport(input);
+  let record = created;
+  onProgress?.(record.status);
+
+  const maxAttempts = 30;
+  let attempt = 0;
+
+  while (record.status === 'queued' || record.status === 'processing') {
+    if (attempt >= maxAttempts) {
+      throw new ApiError({
+        code: 'TIMEOUT',
+        message: 'PDF export generation timed out. Please retry later.',
+        status: 408,
+      });
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    attempt += 1;
+    record = await getExportStatus(created.id);
+    onProgress?.(record.status);
+  }
+
+  if (record.status === 'failed') {
+    throw new ApiError({
+      code: 'SERVER_ERROR',
+      serverCode: record.failureCode || 'EXPORT_FAILED',
+      message: `PDF export failed (${record.failureCode || 'UNKNOWN_ERROR'}).`,
+      status: 500,
+    });
+  }
+
+  return downloadExportPdf(record.id, `${record.type}-${record.id}.pdf`);
 }

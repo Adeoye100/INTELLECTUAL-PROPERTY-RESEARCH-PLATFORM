@@ -189,3 +189,35 @@ services:
       - key: PUBLIC_APP_URL
         value: "https://intellectual-property-research-plat.vercel.app"
 
+  - type: worker
+    name: iprp-pdf-export-worker
+    runtime: node
+    rootDir: backend
+    buildCommand: corepack enable && pnpm install --frozen-lockfile
+    startCommand: pnpm pdf-export:worker
+    autoDeploy: false
+    envVars:
+      - key: NODE_VERSION
+        value: 22.14.0
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_SSL
+        value: "true"
+      - key: DATABASE_POOL_MAX
+        value: "5"
+      - key: DATABASE_IDLE_TIMEOUT_MS
+        value: "30000"
+      - key: DATABASE_CONNECTION_TIMEOUT_MS
+        value: "5000"
+      - key: DATABASE_STATEMENT_TIMEOUT_MS
+        value: "15000"
+      - key: REDIS_URL
+        sync: false
+      - key: PDF_EXPORT_ENABLED
+        value: "true"
+      - key: PDF_EXPORT_STORAGE_PROVIDER
+        value: database
+      - key: WORKER_HEARTBEAT_TTL_SECONDS
+        value: "60"

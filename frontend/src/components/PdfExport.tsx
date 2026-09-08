@@ -2,39 +2,32 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { CheckCircle, Download, FileDown, LoaderCircle, RotateCcw } from 'lucide-react';
 import { Button } from './Button';
 import { cn } from '../lib/utils';
-import { generatePdfReport } from '../features/reports/reportsApi';
+import {
+  type CreateExportInput,
+  type ExportStatus,
+  pollExportAndDownload,
+} from '../features/reports/reportsApi';
 
 export type PdfReportRequest =
   | {
       reportType: 'search-results';
       context: {
-        screen: 'search-results';
-        query: string;
-        jurisdictions: string[];
-        niceClasses: string;
-        status?: string;
-        owner?: string;
-        filedFrom?: string;
-        filedTo?: string;
-        resultIds: string[];
+        searchId: string;
       };
     }
   | {
       reportType: 'risk-detail';
       context: {
-        screen: 'risk-detail';
-        resultId: string;
         searchId: string;
-        candidateMarkText: string;
-        candidateRef: string;
+        resultId: string;
       };
     }
   | {
       reportType: 'portfolio-summary';
       context: {
-        screen: 'portfolio';
-        markIds: string[];
-        firmId?: string;
+        portfolioMarkId: string;
+        includeWatches?: boolean;
+        includeAlerts?: boolean;
       };
     };
 
@@ -47,9 +40,37 @@ interface PdfExportProps {
 
 type ExportState =
   | { status: 'idle' }
-  | { status: 'loading' }
+  | { status: 'loading'; jobStatus?: ExportStatus }
   | { status: 'success'; downloadUrl: string; fileName: string; objectUrl: boolean; mocked: boolean }
   | { status: 'error'; message: string };
+
+function buildCreateExportInput(request: PdfReportRequest): CreateExportInput {
+  if (request.reportType === 'search-results') {
+    return {
+      type: 'search_results',
+      sourceEntityId: request.context.searchId,
+      idempotencyKey: `search-${request.context.searchId}`,
+      parameters: {},
+    };
+  }
+  if (request.reportType === 'risk-detail') {
+    return {
+      type: 'risk_report',
+      sourceEntityId: request.context.searchId,
+      idempotencyKey: `risk-${request.context.searchId}-${request.context.resultId}`,
+      parameters: { resultId: request.context.resultId },
+    };
+  }
+  return {
+    type: 'portfolio_summary',
+    sourceEntityId: request.context.portfolioMarkId,
+    idempotencyKey: `portfolio-${request.context.portfolioMarkId}`,
+    parameters: {
+      ...(request.context.includeWatches !== undefined ? { includeWatches: request.context.includeWatches } : {}),
+      ...(request.context.includeAlerts !== undefined ? { includeAlerts: request.context.includeAlerts } : {}),
+    },
+  };
+}
 
 export const PdfExport: React.FC<PdfExportProps> = ({
   request,
@@ -69,12 +90,18 @@ export const PdfExport: React.FC<PdfExportProps> = ({
 
   const generate = async () => {
     if (disabled || state.status === 'loading') return;
+    if (request.reportType === 'search-results' && !request.context.searchId) return;
+    if (request.reportType === 'risk-detail' && (!request.context.searchId || !request.context.resultId)) return;
+    if (request.reportType === 'portfolio-summary' && !request.context.portfolioMarkId) return;
     if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     objectUrlRef.current = null;
-    setState({ status: 'loading' });
+    setState({ status: 'loading', jobStatus: 'queued' });
 
     try {
-      const result = await generatePdfReport(request);
+      const exportInput = buildCreateExportInput(request);
+      const result = await pollExportAndDownload(exportInput, (jobStatus) => {
+        setState((current) => current.status === 'loading' ? { ...current, jobStatus } : current);
+      });
       const downloadUrl = URL.createObjectURL(result.blob);
       objectUrlRef.current = downloadUrl;
       setState({
@@ -130,7 +157,9 @@ export const PdfExport: React.FC<PdfExportProps> = ({
 
       <div id={statusId} className="text-xs text-text-secondary" aria-live="polite">
         {disabled && state.status === 'idle' && 'PDF export becomes available when this screen has report data.'}
-        {state.status === 'loading' && 'Preparing your report for download.'}
+        {state.status === 'loading' && (
+          state.jobStatus === 'processing' ? 'Generating report pages…' : 'Queued PDF export job…'
+        )}
         {state.status === 'success' && !state.mocked && (
           <span className="inline-flex items-center gap-1 text-forge-teal-700">
             <CheckCircle className="h-3 w-3" aria-hidden="true" />

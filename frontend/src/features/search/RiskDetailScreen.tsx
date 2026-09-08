@@ -470,11 +470,8 @@ export const RiskDetailScreen: React.FC = () => {
                 request={{
                   reportType: 'risk-detail',
                   context: {
-                    screen: 'risk-detail',
-                    resultId: result.id,
                     searchId: result.searchId,
-                    candidateMarkText: result.candidateMarkText,
-                    candidateRef: result.candidateRef,
+                    resultId: result.id,
                   },
                 }}
                 label="Export risk report"

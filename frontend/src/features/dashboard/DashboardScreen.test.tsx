@@ -3,11 +3,38 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mockDashboardSummary } from '../../lib/mocks/handlers';
+import type { DashboardAnalytics } from '../../types';
 import { useAuthStore } from '../auth/authStore';
 import { DashboardScreen } from './DashboardScreen';
 
-const renderDashboard = (response = mockDashboardSummary, ok = true) => {
+const mockAnalytics: DashboardAnalytics = {
+  generatedAt: '2026-08-04T12:00:00.000Z',
+  cacheStatus: 'miss',
+  range: '30d',
+  portfolio: {
+    total: 24,
+    byRisk: [
+      { risk: 'low', count: 18 },
+      { risk: 'medium', count: 4 },
+      { risk: 'high', count: 2 },
+    ],
+    byStatus: [
+      { status: 'registered', count: 20 },
+      { status: 'pending', count: 4 },
+    ],
+    renewalsDueSoon: 2,
+  },
+  watchActivity: {
+    points: [
+      { date: '2026-08-01', polls: 5, alerts: 1, partial: 0, unavailable: 0 },
+      { date: '2026-08-02', polls: 6, alerts: 0, partial: 0, unavailable: 0 },
+    ],
+    enabled: 12,
+    disabled: 2,
+  },
+};
+
+const renderDashboard = (response = mockAnalytics, ok = true) => {
   const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(response), {
     status: ok ? 200 : 503,
     headers: { 'Content-Type': 'application/json' },
@@ -37,30 +64,25 @@ describe('DashboardScreen data states', () => {
     vi.unstubAllGlobals();
   });
 
-  it('places unresolved High-risk legal alerts before aggregate dashboard metrics', async () => {
-    renderDashboard();
-    const urgent = await screen.findByRole('heading', { name: 'Unresolved High-risk alerts' }, { timeout: 5_000 });
-    const metrics = screen.getByRole('region', { name: 'Firm summary metrics' });
-    expect(urgent.compareDocumentPosition(metrics) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByRole('table', { name: 'Unresolved High-risk trademark alerts' })).toHaveTextContent('US99887766');
-    expect(screen.getByRole('table', { name: 'Recent trademark searches' })).toHaveTextContent('FORGE');
-  }, 15_000);
+  it('renders portfolio analytics and allows switching range filters', async () => {
+    const fetchMock = renderDashboard();
+    expect(await screen.findByRole('heading', { name: 'Console Overview' })).toBeVisible();
+    expect(await screen.findByText('Total marks')).toBeVisible();
+    expect(screen.getByText('Renewals due soon')).toBeVisible();
 
-  it('announces partial data and retries without hiding available sections', async () => {
-    const fetchMock = renderDashboard({
-      ...mockDashboardSummary,
-      partial: true,
-      unavailableSections: ['EUIPO alerts'],
+    const range7d = screen.getByRole('button', { name: '7d' });
+    fireEvent.click(range7d);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/dashboard/analytics?range=7d'),
+        expect.anything(),
+      );
     });
-    expect(await screen.findByText('Dashboard data is partial')).toBeVisible();
-    expect(screen.getByText(/EUIPO alerts/)).toBeVisible();
-    expect(screen.getByText('Active watches')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Retry missing data' }));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
   });
 
   it('offers retry when the dashboard request fails', async () => {
-    const fetchMock = renderDashboard(mockDashboardSummary, false);
+    const fetchMock = renderDashboard(mockAnalytics, false);
     expect(await screen.findByRole('alert')).toHaveTextContent('Dashboard unavailable');
     fireEvent.click(screen.getByRole('button', { name: 'Retry dashboard' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));

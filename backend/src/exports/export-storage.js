@@ -74,3 +74,56 @@ export class FilePdfStorage {
     try { await rm(this.filePath(key), { force: true }); return true; } catch { return false; }
   }
 }
+
+export class DatabasePdfStorage {
+  constructor({ database, maxBytes }) {
+    if (!database || typeof database.query !== 'function') throw new TypeError('DatabasePdfStorage needs a PostgreSQL pool-like database.');
+    if (!Number.isSafeInteger(maxBytes) || maxBytes < 1024) throw new TypeError('DatabasePdfStorage needs a valid byte limit.');
+    this.database = database;
+    this.maxBytes = maxBytes;
+  }
+
+  async put({ key, contentType: type, body }) {
+    const bytes = validBody(body, this.maxBytes);
+    contentType(type);
+    const safeKey = validateExportStorageKey(key);
+    const parts = safeKey.split('/');
+    const firmId = parts[1];
+    const exportId = parts[2].slice(0, -4);
+    const checksumSha256 = sha256(bytes);
+    const byteSize = bytes.length;
+
+    try {
+      await this.database.query(
+        `INSERT INTO export_artifacts (firm_id, export_id, storage_key, mime_type, byte_size, checksum_sha256, body)
+         VALUES ($1, $2, $3, 'application/pdf', $4, $5, $6)`,
+        [firmId, exportId, safeKey, byteSize, checksumSha256, bytes],
+      );
+    } catch (error) {
+      if (error?.code === '23505') {
+        throw new Error('Export storage objects are immutable.');
+      }
+      throw error;
+    }
+    return { byteSize, checksumSha256 };
+  }
+
+  async get({ key }) {
+    const safeKey = validateExportStorageKey(key);
+    const result = await this.database.query(
+      `SELECT body FROM export_artifacts WHERE storage_key = $1`,
+      [safeKey],
+    );
+    return result.rowCount && result.rows[0].body ? Buffer.from(result.rows[0].body) : null;
+  }
+
+  async delete({ key }) {
+    const safeKey = validateExportStorageKey(key);
+    const result = await this.database.query(
+      `DELETE FROM export_artifacts WHERE storage_key = $1`,
+      [safeKey],
+    );
+    return result.rowCount > 0;
+  }
+}
+

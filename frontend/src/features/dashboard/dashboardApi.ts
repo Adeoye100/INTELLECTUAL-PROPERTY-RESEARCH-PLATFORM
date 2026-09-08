@@ -1,8 +1,7 @@
 import type { DashboardAnalytics } from '../../types';
 import { getApiClient } from '../../lib/api/client';
 
-export const getDashboardAnalytics = () =>
-  getApiClient().requestJson<DashboardAnalytics>('/dashboard/analytics?range=30d');
+export type DashboardRange = '7d' | '30d' | '90d';
 
-/** Kept as a compatibility alias for consumers that only need the aggregate request. */
-export const getDashboardSummary = getDashboardAnalytics;
+export const getDashboardAnalytics = (range: DashboardRange = '30d') =>
+  getApiClient().requestJson<DashboardAnalytics>(`/dashboard/analytics?range=${range}`);

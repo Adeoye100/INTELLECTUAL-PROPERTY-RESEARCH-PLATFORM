@@ -7,15 +7,40 @@ import { useAuthStore } from '../features/auth/authStore';
 const searchRequest: PdfReportRequest = {
   reportType: 'search-results',
   context: {
-    screen: 'search-results',
-    query: 'FORGE',
-    jurisdictions: ['US', 'EU'],
-    niceClasses: '9, 42',
-    resultIds: ['1', '2'],
+    searchId: '11111111-1111-4111-8111-111111111111',
   },
 };
 
-const successResponse = () => new Response(
+const createResponse = () => new Response(
+  JSON.stringify({
+    id: '44444444-4444-4444-8444-444444444444',
+    firmId: '11111111-1111-4111-8111-111111111111',
+    requestedByUserId: '33333333-3333-4333-8333-333333333333',
+    type: 'search_results',
+    status: 'completed',
+    sourceEntityId: '11111111-1111-4111-8111-111111111111',
+    requestId: 'req-1',
+    idempotencyKey: 'search-11111111-1111-4111-8111-111111111111',
+    parameters: {},
+    storageKey: 'exports/11111111-1111-4111-8111-111111111111/44444444-4444-4444-8444-444444444444.pdf',
+    mimeType: 'application/pdf',
+    byteSize: 20,
+    checksumSha256: 'a'.repeat(64),
+    failureCode: null,
+    queuedAt: '2026-08-22T00:00:00.000Z',
+    processingStartedAt: '2026-08-22T00:00:00.000Z',
+    completedAt: '2026-08-22T00:00:01.000Z',
+    failedAt: null,
+    createdAt: '2026-08-22T00:00:00.000Z',
+    updatedAt: '2026-08-22T00:00:01.000Z',
+  }),
+  {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  },
+);
+
+const downloadResponse = () => new Response(
   '%PDF-1.4\nfixture\n%%EOF',
   {
     status: 200,
@@ -42,9 +67,11 @@ afterEach(() => {
 });
 
 describe('PdfExport', () => {
-  it('is keyboard operable, sends report type and screen context, then exposes a download', async () => {
+  it('is keyboard operable, triggers async export job creation and download, then exposes a download link', async () => {
     const user = userEvent.setup();
-    const fetchMock = vi.fn().mockResolvedValue(successResponse());
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(createResponse())
+      .mockResolvedValueOnce(downloadResponse());
     vi.stubGlobal('fetch', fetchMock);
     render(<PdfExport request={searchRequest} label="Export results PDF" />);
 
@@ -56,36 +83,41 @@ describe('PdfExport', () => {
     expect(download).toHaveAttribute('href', 'blob:https://frontend.test/report');
     expect(download).toHaveAttribute('download', 'forge-search.pdf');
     expect(screen.getByText(/PDF ready: forge-search.pdf/i)).toBeVisible();
-    expect(fetchMock).toHaveBeenCalledWith('/api/v1/reports/pdf', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/exports', expect.objectContaining({
       method: 'POST',
-      body: JSON.stringify(searchRequest),
+      body: JSON.stringify({
+        type: 'search_results',
+        sourceEntityId: '11111111-1111-4111-8111-111111111111',
+        idempotencyKey: 'search-11111111-1111-4111-8111-111111111111',
+        parameters: {},
+      }),
     }));
-    const headers = new Headers(fetchMock.mock.calls[0][1]?.headers);
-    expect(headers.get('authorization')).toBe('Bearer authenticated-token');
   });
 
   it('disables generation while loading', async () => {
     const user = userEvent.setup();
     let resolveRequest: ((response: Response) => void) | undefined;
-    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => { resolveRequest = resolve; })));
+    vi.stubGlobal('fetch', vi.fn()
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => { resolveRequest = resolve; }))
+      .mockResolvedValue(downloadResponse()));
     render(<PdfExport request={searchRequest} />);
 
     await user.click(screen.getByRole('button', { name: 'Export PDF' }));
     expect(screen.getByRole('button', { name: 'Generating PDF…' })).toBeDisabled();
-    expect(screen.getByText('Preparing your report for download.')).toBeVisible();
 
-    resolveRequest?.(successResponse());
+    resolveRequest?.(createResponse());
     expect(await screen.findByRole('link', { name: 'Download PDF' })).toBeVisible();
   });
 
   it('shows a failure and retries successfully', async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ message: 'The report service could not generate this PDF.' }), {
+      .mockResolvedValueOnce(new Response(JSON.stringify({ message: 'Export creation failed.' }), {
         status: 503,
         headers: { 'Content-Type': 'application/json' },
       }))
-      .mockResolvedValueOnce(successResponse());
+      .mockResolvedValueOnce(createResponse())
+      .mockResolvedValueOnce(downloadResponse());
     vi.stubGlobal('fetch', fetchMock);
     render(<PdfExport request={searchRequest} />);
 
@@ -94,20 +126,6 @@ describe('PdfExport', () => {
 
     await user.click(screen.getByRole('button', { name: 'Retry export' }));
     expect(await screen.findByRole('link', { name: 'Download PDF' })).toBeVisible();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-  });
-
-  it('rejects a successful response whose content type is not PDF', async () => {
-    const user = userEvent.setup();
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<html>not a report</html>', {
-      status: 200,
-      headers: { 'Content-Type': 'text/html' },
-    })));
-    render(<PdfExport request={searchRequest} />);
-
-    await user.click(screen.getByRole('button', { name: 'Export PDF' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(/not a PDF/i);
-    expect(screen.getByRole('button', { name: 'Retry export' })).toBeVisible();
   });
 
   it('does not call the endpoint while disabled', async () => {

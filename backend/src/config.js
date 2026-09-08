@@ -415,11 +415,18 @@ function loadPdfExportConfig(env, environment) {
   const pdfExportQueueKey = env.PDF_EXPORT_QUEUE_KEY?.trim() || 'queue:pdf_export';
   if (!/^queue:[a-z0-9:_-]{1,100}$/.test(pdfExportQueueKey)) throw new Error('PDF_EXPORT_QUEUE_KEY is invalid.');
   const pdfExportStorageProvider = env.PDF_EXPORT_STORAGE_PROVIDER?.trim();
-  if (pdfExportStorageProvider !== 'filesystem') throw new Error('PDF_EXPORT_STORAGE_PROVIDER must be filesystem when PDF export is enabled.');
-  const pdfExportStorageRoot = env.PDF_EXPORT_STORAGE_ROOT?.trim();
-  if (!pdfExportStorageRoot || !pdfExportStorageRoot.startsWith('/')) throw new Error('PDF_EXPORT_STORAGE_ROOT must be an absolute private storage path.');
-  if (environment === 'production') {
-    throw new Error('PDF_EXPORT_ENABLED cannot be enabled in production until a verified shared private-storage adapter is configured.');
+  if (!['filesystem', 'database'].includes(pdfExportStorageProvider)) {
+    throw new Error('PDF_EXPORT_STORAGE_PROVIDER must be filesystem or database when PDF export is enabled.');
+  }
+  let pdfExportStorageRoot;
+  if (pdfExportStorageProvider === 'filesystem') {
+    pdfExportStorageRoot = env.PDF_EXPORT_STORAGE_ROOT?.trim();
+    if (!pdfExportStorageRoot || !pdfExportStorageRoot.startsWith('/')) {
+      throw new Error('PDF_EXPORT_STORAGE_ROOT must be an absolute private storage path.');
+    }
+    if (environment === 'production') {
+      throw new Error('PDF_EXPORT_ENABLED cannot use filesystem storage in production. Configure database shared private storage instead.');
+    }
   }
   return {
     pdfExportEnabled: true, pdfExportQueueKey, pdfExportMaxBytes, pdfExportMaxPages, pdfExportMaxResults,

@@ -1,7 +1,7 @@
 import { ExportRepository } from './export-repository.js';
 import { ExportService } from './export-service.js';
 import { ExportSourceLoader } from './export-source-loader.js';
-import { FilePdfStorage } from './export-storage.js';
+import { DatabasePdfStorage, FilePdfStorage } from './export-storage.js';
 import { PdfRenderer } from './pdf-renderer.js';
 import { RedisPdfExportQueue } from './pdf-export-queue.js';
 import { PdfExportProcessor } from './pdf-export-processor.js';
@@ -16,7 +16,11 @@ export function createPdfExportRuntime({
   const queue = new RedisPdfExportQueue({
     redisClient, queueKey: config.pdfExportQueueKey, maxAttempts: config.pdfExportMaxAttempts,
   });
-  const privateStorage = storage ?? new FilePdfStorage({ root: config.pdfExportStorageRoot, maxBytes: config.pdfExportMaxBytes });
+  const privateStorage = storage ?? (
+    config.pdfExportStorageProvider === 'database'
+      ? new DatabasePdfStorage({ database, maxBytes: config.pdfExportMaxBytes })
+      : new FilePdfStorage({ root: config.pdfExportStorageRoot, maxBytes: config.pdfExportMaxBytes })
+  );
   const sourceLoader = new ExportSourceLoader({ searchResultService, portfolioMarkService, officeActionRefService, watchService, alertService });
   const renderer = new PdfRenderer({ maxPages: config.pdfExportMaxPages, maxResults: config.pdfExportMaxResults });
   const exportService = new ExportService({
