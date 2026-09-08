@@ -179,4 +179,20 @@ export class BillingRepository {
       throw error;
     } finally { client.release(); }
   }
+
+  async listPendingForReconciliation({ olderThanMinutes = 5, newerThanHours = 24, limit = 50 } = {}) {
+    const result = await this.database.query(
+      `SELECT bt.*, app_user.supabase_user_id AS initiated_by_supabase_user_id,
+              app_user.email AS initiated_by_email
+       FROM billing_transactions bt
+       LEFT JOIN users app_user ON app_user.id = bt.initiated_by_user_id
+       WHERE bt.status = 'pending'
+         AND bt.created_at <= now() - ($1 || ' minutes')::interval
+         AND bt.created_at >= now() - ($2 || ' hours')::interval
+       ORDER BY bt.created_at ASC
+       LIMIT $3`,
+      [olderThanMinutes, newerThanHours, limit],
+    );
+    return result.rows.map(transactionFromRow);
+  }
 }

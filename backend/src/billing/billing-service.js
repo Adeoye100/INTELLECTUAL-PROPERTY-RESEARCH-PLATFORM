@@ -196,4 +196,66 @@ export class BillingService {
       metadata: { source: 'verified_webhook' },
     });
   }
+
+  async reconcilePendingTransactions({ olderThanMinutes = 5, limit = 50 } = {}) {
+    const candidates = await this.repository.listPendingForReconciliation({ olderThanMinutes, limit });
+    let reconciled = 0;
+    let failed = 0;
+    let pending = 0;
+    let errors = 0;
+
+    for (const candidate of candidates) {
+      try {
+        let verified;
+        try {
+          verified = await this.paystackClient.verifyTransaction(candidate.reference);
+        } catch {
+          errors++;
+          continue;
+        }
+
+        if (verified.status === 'success') {
+          try {
+            this.validateVerified(candidate, verified);
+          } catch {
+            await this.repository.markFailed(candidate.reference);
+            failed++;
+            continue;
+          }
+
+          const result = await this.repository.confirmVerifiedPayment({
+            reference: candidate.reference,
+            providerTransactionId: String(verified.id),
+            paidAt: verified.paid_at ?? new Date().toISOString(),
+            customerCode: providerCode(verified.customer?.customer_code, 'CUS'),
+            subscriptionCode: providerCode(verified.subscription?.subscription_code, 'SUB'),
+            renewsAt: verified.subscription?.next_payment_date ?? null,
+          });
+
+          if (!result.duplicate) {
+            await this.auditService.record({
+              firmId: candidate.firmId,
+              actorUserId: candidate.initiatedByUserId,
+              action: AUDIT_ACTIONS.BILLING_PAYMENT_CONFIRMED,
+              entityType: AUDIT_ENTITY_TYPES.BILLING_TRANSACTION,
+              entityId: candidate.id,
+              beforeState: { status: 'pending' },
+              afterState: { status: 'paid', tier: candidate.tier },
+              metadata: { source: 'reconciliation' },
+            });
+          }
+          reconciled++;
+        } else if (['failed', 'abandoned'].includes(verified.status)) {
+          await this.repository.markFailed(candidate.reference);
+          failed++;
+        } else {
+          pending++;
+        }
+      } catch {
+        errors++;
+      }
+    }
+
+    return { processed: candidates.length, reconciled, failed, pending, errors };
+  }
 }

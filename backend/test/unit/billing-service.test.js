@@ -103,4 +103,32 @@ describe('Paystack billing security boundary', () => {
     assert.equal(calls.subscriptionEvent.subscriptionCode, 'SUB_subscription1');
     assert.equal(calls.subscriptionEvent.customerCode, 'CUS_customer1');
   });
+
+  it('reconciles pending transactions using canonical provider verification and records audit log', async () => {
+    const pendingTx = {
+      id: transactionId,
+      firmId,
+      reference: 'iprp_reconcile_ref_111111111111',
+      tier: plan.tier,
+      planCode: plan.planCode,
+      amountSubunit: plan.amountSubunit,
+      currency: plan.currency,
+      status: 'pending',
+      initiatedByUserId: applicationUserId,
+      initiatedByEmail: 'admin@example.test',
+    };
+
+    const { service, calls } = runtime({
+      repository: {
+        async listPendingForReconciliation() { return [pendingTx]; },
+      },
+    });
+
+    const stats = await service.reconcilePendingTransactions();
+    assert.equal(stats.processed, 1);
+    assert.equal(stats.reconciled, 1);
+    assert.equal(stats.failed, 0);
+    assert.equal(calls.confirmed.reference, pendingTx.reference);
+    assert.equal(calls.audit[0].metadata.source, 'reconciliation');
+  });
 });
