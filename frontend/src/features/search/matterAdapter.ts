@@ -48,16 +48,14 @@ export const matterAdapter: MatterAdapter = {
     const saved = await getApiClient().requestJson<SaveRiskResultResponse>(`/matters/${encodeURIComponent(matterId)}/risk-results`, {
       method: 'POST',
       body: {
-        resultId: request.resultId,
-        candidateMarkText: request.candidateMarkText,
-        riskScoreSnapshot: request.riskScoreSnapshot,
+        searchId: request.searchId,
+        candidateResultId: request.candidateResultId,
       },
     });
 
     return {
       matter: saved.matter,
       created,
-      mocked: true,
     };
   },
 };

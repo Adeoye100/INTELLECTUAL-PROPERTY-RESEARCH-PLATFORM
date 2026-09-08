@@ -22,7 +22,8 @@ import { Modal } from '../../components/Modal';
 import { MatterSelectionModal } from './MatterSelectionModal';
 import { useAuthStore } from '../auth/authStore';
 import type {
-  SearchResponse,
+  PersistedSearchResult,
+  ProposedMark,
   RiskDetailRouteState,
   RiskLevel,
   Matter,
@@ -133,7 +134,7 @@ type ActionStatus =
 // ---------------------------------------------------------------------------
 
 export const RiskDetailScreen: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { searchId, resultId, id } = useParams<{ searchId?: string; resultId?: string; id?: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const user = useAuthStore((state) => state.user);
@@ -144,17 +145,24 @@ export const RiskDetailScreen: React.FC = () => {
   // Will be null on a direct page refresh or bookmark navigation.
   const routeState = location.state as RiskDetailRouteState | null;
 
+  const effectiveSearchId = searchId || (routeState?.result?.searchId ?? id);
+  const effectiveResultId = resultId || id || routeState?.result?.id;
+
   // API fallback: only fires when route state is absent (direct refresh, bookmark).
-  const { data: searchResponse, isLoading: isFetching } = useQuery<SearchResponse>({
-    queryKey: ['search-result', id],
-    queryFn: () => getSearchResult(id ?? ''),
+  const { data: searchResponse, isLoading: isFetching } = useQuery<PersistedSearchResult>({
+    queryKey: ['search-result', effectiveSearchId],
+    queryFn: () => getSearchResult(effectiveSearchId ?? ''),
     // Only hit the API if route state is absent
-    enabled: routeState === null,
+    enabled: routeState === null && !!effectiveSearchId,
   });
 
   // Prefer route state; fall back to API cache
-  const result = routeState?.result ?? searchResponse?.results.find((r) => r.id === id);
-  const proposedMark = routeState?.proposedMark;
+  const result = routeState?.result ?? searchResponse?.results.find((r) => r.id === effectiveResultId);
+  const proposedMark: ProposedMark | undefined = routeState?.proposedMark ?? (searchResponse?.query ? {
+    markText: searchResponse.query.mark,
+    jurisdiction: searchResponse.query.jurisdictions.join(', ') || 'US',
+    niceClasses: searchResponse.query.niceClasses ?? [],
+  } : undefined);
   const isLoading = routeState === null && isFetching;
 
   // UI state
@@ -164,9 +172,8 @@ export const RiskDetailScreen: React.FC = () => {
   const [discarded, setDiscarded] = useState(false);
 
   // ---- Derived ----
-  const score = result?.riskAnalysis ?? result?.riskScore;
+  const score = result?.riskAnalysis;
   const rp = score ? riskPresentation[score.compositeRating] : null;
-
 
   // ---- Handlers ----
   const handleMatterSaved = (matter: Matter, created: boolean) => {
@@ -183,15 +190,8 @@ export const RiskDetailScreen: React.FC = () => {
   const matterSaveRequest: Omit<MatterSaveRequest, 'matterId' | 'newMatterName' | 'newMatterClientRef'> | null =
     result && score
       ? {
-          resultId: result.id,
-          candidateMarkText: result.candidateMarkText,
-          riskScoreSnapshot: {
-            compositeRating: score.compositeRating,
-            phoneticScore: score.phoneticScore,
-            visualScore: score.visualScore,
-            conceptualScore: score.conceptualScore,
-            classOverlap: score.classOverlap,
-          },
+          searchId: result.searchId || effectiveSearchId || '',
+          candidateResultId: result.id,
         }
       : null;
 
@@ -274,7 +274,7 @@ export const RiskDetailScreen: React.FC = () => {
         {routeState === null && (
           <div className="flex items-center gap-1.5 rounded border border-forge-silver-300 bg-surface-base px-3 py-1.5 text-xs text-text-secondary">
             <Info className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
-            Loaded via API fallback (direct navigation). Data reflects last registry query.
+            Loaded via API fallback (direct navigation). {searchResponse?.dataFreshness?.dataThrough ? `USPTO data through ${searchResponse.dataFreshness.dataThrough}.` : 'Data reflects last registry query.'}
           </div>
         )}
       </header>
@@ -292,7 +292,6 @@ export const RiskDetailScreen: React.FC = () => {
             {actionStatus.matter.clientRef && (
               <> &mdash; Ref: <span className="font-mono">{actionStatus.matter.clientRef}</span></>
             )}
-            <span className="ml-2 text-risk-medium">(mock-only: browser storage, not server)</span>
           </span>
         </div>
       )}
@@ -494,7 +493,6 @@ export const RiskDetailScreen: React.FC = () => {
                   >
                     <FolderOpen className="mr-2 h-4 w-4" aria-hidden="true" />
                     Save to matter
-                    <span className="ml-auto text-xs opacity-60">(mock)</span>
                   </Button>
 
                   <Button

@@ -11,6 +11,7 @@ const expected = {
   '/api/v1/provisioning/organization-intents': ['post'], '/api/v1/provisioning/firm': ['post'], '/api/v1/me': ['get'], '/api/v1/admin/users': ['get'], '/api/v1/admin/invitations': ['get', 'post'], '/api/v1/admin/invitations/{invitationId}/resend': ['post'], '/api/v1/admin/invitations/{invitationId}': ['delete'], '/api/v1/admin/users/{userId}/role': ['patch'],
   '/api/v1/dashboard/analytics': ['get'],
   '/api/v1/billing/webhook': ['post'], '/api/v1/billing': ['get'], '/api/v1/billing/checkout': ['post'], '/api/v1/billing/verify': ['post'],
+  '/api/v1/matters': ['get', 'post'], '/api/v1/matters/{id}': ['get'], '/api/v1/matters/{id}/risk-results': ['post'],
   '/api/v1/search': ['get'], '/api/v1/search-results': ['get'], '/api/v1/search-results/{id}': ['get'], '/api/v1/office-actions/search': ['get'],
   '/api/v1/portfolio-marks': ['get', 'post'], '/api/v1/portfolio-marks/{id}': ['get', 'patch', 'delete'],
   '/api/v1/watches': ['get', 'post'], '/api/v1/watches/{id}': ['get', 'patch', 'delete'],

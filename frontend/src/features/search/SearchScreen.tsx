@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ApiError } from '../../lib/api/client';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { AlertTriangle, FilterX, MoveHorizontal, Search as SearchIcon } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -10,7 +10,7 @@ import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
 import { PdfExport } from '../../components/PdfExport';
 import { SourceStatusIndicator } from '../../components/SourceStatusIndicator';
-import type { PortfolioMark, SearchResponse, RiskDetailRouteState, SearchResult, MatchedMarkRef } from '../../types';
+import type { SearchResponse, RiskDetailRouteState, MatchedMarkRef } from '../../types';
 import { useAuthStore } from '../auth/authStore';
 import { useOnboardingStore } from '../onboarding/onboardingStore';
 import {
@@ -24,7 +24,7 @@ import {
   searchFiltersToParams,
   type SearchFilters,
 } from './searchFilters';
-import { importSearchResultToPortfolio, searchTrademarks } from './searchApi';
+import { searchTrademarks } from './searchApi';
 
 const jurisdictions = [
   ['US', 'United States (USPTO)'],
@@ -55,17 +55,16 @@ const loadInitialFilters = (params: URLSearchParams, userId: string | undefined)
 };
 
 export const SearchScreen: React.FC = () => {
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const user = useAuthStore((state) => state.user);
   const completePath = useOnboardingStore((state) => state.completePath);
-  const queryClient = useQueryClient();
   const [initialState] = useState(() => loadInitialFilters(searchParams, user?.id));
   const [submittedFilters, setSubmittedFilters] = useState<SearchFilters | null>(
     initialState.submitted ? normalizeSearchFilters(initialState.filters) : null,
   );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [onboardingComplete, setOnboardingComplete] = useState(false);
-  const [portfolioMessage, setPortfolioMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const {
     register,
     handleSubmit,
@@ -91,14 +90,6 @@ export const SearchScreen: React.FC = () => {
   const sourceStatuses = searchQuery.data?.sourceStatuses ?? [];
   const hasIncompleteSources = sourceStatuses.some(({ status }) => status !== 'complete');
   const allSourcesUnavailable = sourceStatuses.length > 0 && sourceStatuses.every(({ status }) => status === 'unavailable');
-  const importToPortfolio = useMutation({
-    mutationFn: (result: SearchResult) => importSearchResultToPortfolio(result),
-    onSuccess: (created) => {
-      queryClient.setQueryData<PortfolioMark[]>(['portfolio'], (current = []) => current.some((mark) => mark.id === created.id) ? current : [...current, created]);
-      setPortfolioMessage({ type: 'success', text: `${created.markText} was imported to the portfolio.` });
-    },
-    onError: (error) => setPortfolioMessage({ type: 'error', text: error instanceof Error ? error.message : 'Portfolio import failed.' }),
-  });
 
   const onSubmit = async (values: SearchFilters) => {
     const normalized = normalizeSearchFilters(values);
@@ -156,7 +147,6 @@ export const SearchScreen: React.FC = () => {
           <Link to="/dashboard" className="font-bold text-forge-teal-700 underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">Continue to dashboard</Link>
         </div>
       )}
-      {portfolioMessage && <div className={`rounded border p-4 ${portfolioMessage.type === 'success' ? 'border-risk-low bg-risk-low/10' : 'border-risk-high bg-risk-high/10'}`} role={portfolioMessage.type === 'error' ? 'alert' : 'status'}>{portfolioMessage.text}</div>}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
         <aside className="space-y-4 lg:col-span-1" aria-label="Trademark search filters">
@@ -263,7 +253,7 @@ export const SearchScreen: React.FC = () => {
                               <td className="px-3 py-3 text-sm text-text-primary"><span className="block">{result.candidateSource}</span><span className="font-mono text-xs text-text-secondary">{result.candidateRef}</span></td>
                               <td className="px-3 py-3">
                                 {(() => {
-                                  const riskObj = result.riskAnalysis ?? result.riskScore;
+                                  const riskObj = result.riskAnalysis;
                                   return (
                                     <>
                                       <Badge risk={riskObj?.compositeRating}>{riskObj ? `${riskObj.compositeRating} risk` : 'Not scored'}</Badge>
@@ -277,7 +267,7 @@ export const SearchScreen: React.FC = () => {
                                   );
                                 })()}
                               </td>
-                              <td className="px-3 py-3"><div className="flex flex-col items-start gap-2"><Link to={`/search/risk/${result.id}`} state={routeState} className="inline-flex rounded border border-forge-silver-500 px-3 py-1.5 text-sm font-medium text-text-primary hover:bg-forge-silver-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2" aria-label={`Review risk for ${result.candidateMarkText}`}>Review risk</Link>{user?.role !== 'viewer' && <Button variant="ghost" size="sm" disabled={importToPortfolio.isPending && importToPortfolio.variables?.id === result.id} onClick={() => importToPortfolio.mutate(result)}>{importToPortfolio.isPending && importToPortfolio.variables?.id === result.id ? 'Importing…' : 'Import to portfolio'}</Button>}</div></td>
+                              <td className="px-3 py-3"><div className="flex flex-col items-start gap-2"><Link to={`/search/risk/${searchQuery.data?.searchId || result.searchId || result.id}/${result.id}`} state={routeState} className="inline-flex rounded border border-forge-silver-500 px-3 py-1.5 text-sm font-medium text-text-primary hover:bg-forge-silver-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2" aria-label={`Review risk for ${result.candidateMarkText}`}>Review risk</Link></div></td>
                             </tr>
                           );
                         })}

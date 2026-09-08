@@ -1291,6 +1291,71 @@
           }
         }
       }
+    },
+    "/api/v1/matters": {
+      "get": {
+        "operationId": "listMatters",
+        "x-roles": ["admin", "attorney", "viewer"],
+        "responses": {
+          "200": { "description": "List matters." },
+          "401": { "$ref": "#/components/responses/Error" }
+        }
+      },
+      "post": {
+        "operationId": "createMatter",
+        "x-roles": ["admin", "attorney"],
+        "responses": {
+          "201": { "description": "Matter created." },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/v1/matters/{id}": {
+      "get": {
+        "operationId": "getMatter",
+        "x-roles": ["admin", "attorney", "viewer"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": { "description": "Matter details." },
+          "401": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/v1/matters/{id}/risk-results": {
+      "post": {
+        "operationId": "saveMatterRiskResult",
+        "x-roles": ["admin", "attorney"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["searchId", "candidateResultId"],
+                "properties": {
+                  "searchId": { "type": "string", "format": "uuid" },
+                  "candidateResultId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Risk result saved to matter." },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
     }
   },
   "components": {

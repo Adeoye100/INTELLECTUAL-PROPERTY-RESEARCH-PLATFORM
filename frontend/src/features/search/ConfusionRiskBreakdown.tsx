@@ -1,10 +1,10 @@
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import type { RiskScore } from '../../types';
+import type { RiskAnalysis, RiskScore } from '../../types';
+import { ResponsiveContainer, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Bar } from 'recharts';
 import { AccessibleDataTable, ChartCard } from '../../components/visualization/ChartPrimitives';
 
 const finite = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
 
-export function ConfusionRiskBreakdown({ score }: { score: RiskScore }) {
+export function ConfusionRiskBreakdown({ score }: { score: RiskAnalysis | RiskScore }) {
   const data = [
     { name: 'Phonetic similarity', value: finite(score.phoneticScore) },
     { name: 'Visual similarity', value: finite(score.visualScore) },
@@ -17,7 +17,7 @@ export function ConfusionRiskBreakdown({ score }: { score: RiskScore }) {
       <div>
         <div className="h-56 min-h-56" role="img" aria-label={`Confusion-risk components. ${data.map((entry) => `${entry.name}: ${entry.value} out of 100`).join('. ')}`}>
           <ResponsiveContainer width="100%" height="100%"><BarChart data={data} layout="vertical" margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
-            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E7EAEE" /><XAxis type="number" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} unit=" / 100" /><YAxis type="category" dataKey="name" width={142} tick={{ fontSize: 12 }} /><Tooltip formatter={(value) => [`${value} / 100`, 'Score']} /><Bar dataKey="value" fill="#146575" isAnimationActive={false} radius={[0, 3, 3, 0]} />
+            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E7EAEE" /><XAxis type="number" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} unit=" / 100" /><YAxis type="category" dataKey="name" width={142} tick={{ fontSize: 12 }} /><Tooltip formatter={(value: unknown) => [`${value} / 100`, 'Score']} /><Bar dataKey="value" fill="#146575" isAnimationActive={false} radius={[0, 3, 3, 0]} />
           </BarChart></ResponsiveContainer>
         </div>
         <AccessibleDataTable caption="Confusion-risk component scores" rows={data.map((entry) => ({ label: `${entry.name.replace(' similarity', '')} score`, value: `${entry.value} / 100` }))} />

@@ -80,8 +80,8 @@ export const buildSearchRequestUrl = (filters: SearchFilters) =>
 const riskWeight: Record<RiskLevel, number> = { high: 3, medium: 2, low: 1 };
 
 export const rankSearchResults = (results: SearchResult[]) => [...results].sort((left, right) => {
-  const leftRiskObj = left.riskAnalysis ?? left.riskScore;
-  const rightRiskObj = right.riskAnalysis ?? right.riskScore;
+  const leftRiskObj = left.riskAnalysis;
+  const rightRiskObj = right.riskAnalysis;
   const leftRisk = leftRiskObj?.compositeRating;
   const rightRisk = rightRiskObj?.compositeRating;
   const riskDifference = (rightRisk ? riskWeight[rightRisk] : 0) - (leftRisk ? riskWeight[leftRisk] : 0);

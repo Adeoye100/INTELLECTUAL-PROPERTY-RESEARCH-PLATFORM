@@ -1,9 +1,12 @@
 import { AppError } from '../errors.js';
 
 export class MatterService {
-  constructor(repository) {
+  constructor(repository, options = {}) {
     if (!repository) throw new TypeError('MatterService requires a repository.');
     this.repository = repository;
+    this.searchResultService = typeof options?.getSearchResult === 'function'
+      ? options
+      : (options?.searchResultService ?? null);
   }
 
   async createMatter({ firmId, createdByUserId, input }) {
@@ -27,13 +30,24 @@ export class MatterService {
 
   async saveRiskResult({ firmId, matterId, createdByUserId, input }) {
     const matter = await this.getMatter({ firmId, id: matterId });
+    if (!this.searchResultService || typeof this.searchResultService.getSearchResult !== 'function') {
+      throw new AppError(500, 'MATTER_SERVICE_UNCONFIGURED', 'SearchResultService is required for matter risk result persistence.');
+    }
+    const searchSnapshot = await this.searchResultService.getSearchResult({
+      firmId,
+      searchResultId: input.searchId,
+    });
+    const candidate = searchSnapshot.results.find((c) => c.id === input.candidateResultId);
+    if (!candidate) {
+      throw new AppError(404, 'CANDIDATE_RESULT_NOT_FOUND', 'Candidate result not found in search snapshot.');
+    }
     const saved = await this.repository.addRiskResult({
       firmId,
       matterId: matter.id,
       createdByUserId,
-      searchResultId: input.searchResultId,
-      candidateMarkText: input.candidateMarkText,
-      riskScoreSnapshot: input.riskScoreSnapshot,
+      searchResultId: input.searchId,
+      candidateMarkText: candidate.candidateMarkText,
+      riskScoreSnapshot: candidate.riskAnalysis,
     });
     const updatedMatter = await this.getMatter({ firmId, id: matterId });
     return {

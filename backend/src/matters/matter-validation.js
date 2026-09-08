@@ -19,15 +19,17 @@ export function parseMatterRiskResultCreate(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     throw badRequest('VALIDATION_ERROR', 'Risk result input must be an object.');
   }
-  const candidateMarkText = typeof body.candidateMarkText === 'string' ? body.candidateMarkText.trim() : '';
-  if (!candidateMarkText) {
-    throw badRequest('VALIDATION_ERROR', 'candidateMarkText is required.', { field: 'candidateMarkText' });
+  if (body.riskScoreSnapshot !== undefined || body.candidateMarkText !== undefined) {
+    throw badRequest('VALIDATION_ERROR', 'Client-supplied risk scores and candidate mark text are not permitted.');
   }
-  const riskScoreSnapshot = body.riskScoreSnapshot && typeof body.riskScoreSnapshot === 'object' ? body.riskScoreSnapshot : null;
-  if (!riskScoreSnapshot) {
-    throw badRequest('VALIDATION_ERROR', 'riskScoreSnapshot is required.', { field: 'riskScoreSnapshot' });
+  const searchId = typeof body.searchId === 'string' ? body.searchId.trim() : '';
+  if (!searchId) {
+    throw badRequest('VALIDATION_ERROR', 'searchId is required.', { field: 'searchId' });
   }
-  const searchResultId = typeof body.resultId === 'string' ? body.resultId.trim() : (typeof body.searchResultId === 'string' ? body.searchResultId.trim() : null);
+  const candidateResultId = typeof body.candidateResultId === 'string' ? body.candidateResultId.trim() : (typeof body.resultId === 'string' ? body.resultId.trim() : '');
+  if (!candidateResultId) {
+    throw badRequest('VALIDATION_ERROR', 'candidateResultId is required.', { field: 'candidateResultId' });
+  }
 
-  return { candidateMarkText, riskScoreSnapshot, searchResultId };
+  return { searchId, candidateResultId };
 }

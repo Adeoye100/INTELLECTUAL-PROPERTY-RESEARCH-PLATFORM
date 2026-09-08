@@ -79,7 +79,7 @@ const mockResult: SearchResult = {
   niceClasses: [9, 42],
   filingDate: '2025-03-14',
   status: 'Pending',
-  riskScore: mockScore,
+  riskAnalysis: mockScore as any,
 };
 
 const mockResultNoConceptual: SearchResult = {
@@ -88,7 +88,7 @@ const mockResultNoConceptual: SearchResult = {
   candidateMarkText: 'FORTRESS GLOBAL',
   candidateSource: 'EUIPO',
   candidateRef: 'EU12345678',
-  riskScore: mockScoreNoConceptual,
+  riskAnalysis: mockScoreNoConceptual as any,
 };
 
 const routeState: RiskDetailRouteState = {
@@ -309,7 +309,6 @@ describe('RiskDetailScreen — Save to matter', () => {
     await user.click(screen.getByRole('button', { name: /save to matter/i }));
 
     expect(await screen.findByRole('dialog', { name: /save to matter/i })).toBeInTheDocument();
-    expect(screen.getByText(/development mode/i)).toBeInTheDocument();
   });
 
   it('shows existing matters in the modal', async () => {

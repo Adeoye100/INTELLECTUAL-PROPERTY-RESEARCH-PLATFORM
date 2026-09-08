@@ -2,10 +2,6 @@
  * MatterSelectionModal.tsx
  *
  * Modal for saving a risk result to an existing matter or creating a new one.
- *
- * ⚠️  MOCK-ONLY: All persistence is handled by the matterAdapter which writes
- * to localStorage only. No server state is modified. A disclaimer is shown to
- * the user whenever a save completes successfully.
  */
 import React, { useEffect, useState } from 'react';
 import { CheckCircle, FolderOpen, FolderPlus, Loader2, AlertCircle } from 'lucide-react';
@@ -129,15 +125,6 @@ export const MatterSelectionModal: React.FC<MatterSelectionModalProps> = ({
       }
     >
       <div className="space-y-4">
-        {/* Mock disclaimer — always visible */}
-        <div className="flex items-start gap-2 rounded border border-risk-medium/40 bg-risk-medium/10 p-3 text-sm text-risk-medium">
-          <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden="true" />
-          <p>
-            <strong>Development mode:</strong> Matter state is stored in this browser only.
-            No server persistence exists yet — saves will be lost on clearing browser storage.
-          </p>
-        </div>
-
         {/* Success state */}
         {saveState.status === 'success' && (
           <div className="flex items-start gap-3 rounded border border-forge-teal-700/40 bg-forge-teal-700/10 p-4">

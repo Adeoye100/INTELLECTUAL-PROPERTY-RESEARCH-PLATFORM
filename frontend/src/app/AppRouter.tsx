@@ -64,6 +64,14 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: 'search/risk/:searchId/:resultId',
+        element: features.searchEnabled ? (
+          <Suspense fallback={<RouteLoading />}><RiskDetailScreen /></Suspense>
+        ) : (
+          <FeatureUnavailable title="Risk analysis is not available" detail="Search-backed risk analysis is disabled with the federated search integration." />
+        ),
+      },
+      {
         path: 'search/risk/:id',
         element: features.searchEnabled ? (
           <Suspense fallback={<RouteLoading />}><RiskDetailScreen /></Suspense>

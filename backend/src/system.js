@@ -42,6 +42,8 @@ import { DashboardAnalyticsRepository, DashboardAnalyticsService } from './dashb
 import { PaystackClient } from './billing/paystack-client.js';
 import { BillingRepository } from './billing/billing-repository.js';
 import { BillingService } from './billing/billing-service.js';
+import { MatterRepository } from './matters/matter-repository.js';
+import { MatterService } from './matters/matter-service.js';
 
 export async function createSystem(config, { officeActionSources = [], exportStorage = null } = {}) {
   const pool = createPool(config.databaseUrl, config);
@@ -141,6 +143,8 @@ export async function createSystem(config, { officeActionSources = [], exportSto
   const userRoleService = new UserRoleService({ userRepository, auditService, roleFirmResolver });
   const officeActionRefRepository = new OfficeActionRefRepository(pool);
   const officeActionRefService = new OfficeActionRefService({ repository: officeActionRefRepository, auditService });
+  const matterRepository = new MatterRepository(pool);
+  const matterService = new MatterService(matterRepository, { searchResultService });
   const alertGenerationService = config.watchEnabled
     ? new AlertGenerationService({ repository: alertRepository }) : null;
   const watchRuntime = createWatchRuntime({
@@ -175,11 +179,14 @@ export async function createSystem(config, { officeActionSources = [], exportSto
       corsAllowedOrigins: config.corsAllowedOrigins,
       dashboardAnalyticsService,
       billingService,
+      matterService,
       readinessChecks: [
         async () => { await pool.query('SELECT 1'); },
         async () => { await redisClient.ping(); },
       ],
     }),
+    matterRepository,
+    matterService,
     pool,
     redisClient,
     authRateLimiter,

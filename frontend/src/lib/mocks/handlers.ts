@@ -1,5 +1,5 @@
 import { http, HttpResponse, delay } from 'msw';
-import type { Alert, DashboardSummary, SearchResponse, SearchResult, OfficeActionRef, PortfolioAttachment, PortfolioMark, PortfolioMarkDetail, Matter, MatterSaveRequest, MatterSaveResult, WatchSummary, WatchUpsertRequest } from '../../types';
+import type { Alert, DashboardSummary, SearchResponse, SearchResult, OfficeActionRef, PortfolioAttachment, PortfolioMark, PortfolioMarkDetail, Matter, MatterSaveResult, WatchSummary, WatchUpsertRequest } from '../../types';
 
 const mockSearchResults: SearchResult[] = [
   {
@@ -13,7 +13,7 @@ const mockSearchResults: SearchResult[] = [
     jurisdiction: 'US',
     filingDate: '2025-02-14',
     status: 'pending',
-    riskScore: {
+    riskAnalysis: {
       id: 'r1',
       phoneticScore: 85,
       visualScore: 40,
@@ -60,7 +60,7 @@ const mockSearchResults: SearchResult[] = [
     jurisdiction: 'EU',
     filingDate: '2024-09-03',
     status: 'registered',
-    riskScore: {
+    riskAnalysis: {
       id: 'r2',
       phoneticScore: 30,
       visualScore: 60,
@@ -98,7 +98,7 @@ const mockSearchResults: SearchResult[] = [
     jurisdiction: 'GB',
     filingDate: '2023-05-18',
     status: 'Abandoned',
-    riskScore: {
+    riskAnalysis: {
       id: 'r3',
       phoneticScore: 25,
       visualScore: 35,
@@ -277,19 +277,19 @@ const mockAlerts: Alert[] = [
     id: 'a-newest', watchId: 'w1', matchedFilingRef: 'US99887766', riskScoreId: 'r1', riskResultId: '1', read: false,
     createdAt: '2026-08-04T14:35:00.000Z', matchedMarkText: 'FORGE LABS', protectedMarkText: 'FORGE GLOBAL',
     severity: 'high', source: 'USPTO', supportingEvidence: ['92% phonetic similarity', 'Nice Class 42 overlap'], mocked: true,
-    riskScore: mockSearchResults[0].riskScore,
+    riskScore: mockSearchResults[0].riskAnalysis as any,
   },
   {
     id: 'a-older', watchId: 'w1', matchedFilingRef: 'EU12345678', riskScoreId: 'r2', riskResultId: '2', read: true,
     createdAt: '2026-08-02T09:15:00.000Z', matchedMarkText: 'FORTRESS GLOBAL', protectedMarkText: 'FORGE GLOBAL',
     severity: 'medium', source: 'EUIPO', supportingEvidence: ['60% visual similarity', 'Shared GLOBAL element'], mocked: true,
-    riskScore: mockSearchResults[1].riskScore,
+    riskScore: mockSearchResults[1].riskAnalysis as any,
   },
   {
     id: 'a-middle', watchId: 'w1', matchedFilingRef: 'GB00998877', riskScoreId: 'r3', riskResultId: '3', read: false,
     createdAt: '2026-08-03T18:05:00.000Z', matchedMarkText: 'THE FORGE HOUSE', protectedMarkText: 'FORGE GLOBAL',
     severity: 'low', source: 'UKIPO', supportingEvidence: ['35% visual similarity', 'No class overlap'], mocked: true,
-    riskScore: mockSearchResults[2].riskScore,
+    riskScore: mockSearchResults[2].riskAnalysis as any,
   },
 ];
 
@@ -419,9 +419,9 @@ export const handlers = [
       if (requestedJurisdictions.length && !requestedJurisdictions.includes(result.jurisdiction)) return false;
       if (requestedClasses.length && !requestedClasses.some((niceClass) => result.niceClasses.includes(niceClass))) return false;
       if (status && result.status.toLowerCase() !== status) return false;
-      if (owner && !result.owner.toLowerCase().includes(owner)) return false;
-      if (filedFrom && result.filingDate < filedFrom) return false;
-      if (filedTo && result.filingDate > filedTo) return false;
+      if (owner && (!result.owner || !result.owner.toLowerCase().includes(owner))) return false;
+      if (filedFrom && (!result.filingDate || result.filingDate < filedFrom)) return false;
+      if (filedTo && (!result.filingDate || result.filingDate > filedTo)) return false;
       return true;
     });
 
@@ -537,7 +537,7 @@ export const handlers = [
       id: `portfolio-import-${result.id}`,
       firmId: 'f1', ownerUserId: 'u1', markText: result.candidateMarkText, jurisdiction: result.jurisdiction,
       niceClasses: result.niceClasses, status: 'pending', filingDate: result.filingDate,
-      renewalDate: result.filingDate.replace(/^\d{4}/, String(Number(result.filingDate.slice(0, 4)) + 10)),
+      renewalDate: result.filingDate ? result.filingDate.replace(/^\d{4}/, String(Number(result.filingDate.slice(0, 4)) + 10)) : new Date().toISOString().slice(0, 10),
       sourceRegistry: 'MOCK SEARCH IMPORT', registryReference: 'MOCK-IMPORT', registrationDate: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
     };
     if (!mockPortfolioMarks.some(({ id }) => id === created.id)) mockPortfolioMarks.push(created);
@@ -681,7 +681,11 @@ export const handlers = [
 
   http.post('/api/v1/matters/:matterId/risk-results', async ({ params, request }) => {
     const matterId = String(params.matterId);
-    const body = await request.json() as MatterSaveRequest;
+    const body = await request.json() as Record<string, unknown>;
+    if (body.riskScoreSnapshot !== undefined || body.candidateMarkText !== undefined) {
+      return HttpResponse.json({ message: 'Client-supplied risk scores are not permitted.' }, { status: 400 });
+    }
+    const candidateResultId = String(body.candidateResultId || body.resultId || '');
 
     await delay(500);
 
@@ -689,8 +693,8 @@ export const handlers = [
     if (!matter) {
       return HttpResponse.json({ message: `Matter ${matterId} not found` }, { status: 404 });
     }
-    if (!matter.savedResultIds.includes(body.resultId)) {
-      matter.savedResultIds = [...matter.savedResultIds, body.resultId];
+    if (candidateResultId && !matter.savedResultIds.includes(candidateResultId)) {
+      matter.savedResultIds = [...matter.savedResultIds, candidateResultId];
     }
 
     const result: MatterSaveResult = { matter, created: false, mocked: true };

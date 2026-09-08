@@ -28,9 +28,9 @@ describe('search filter contract', () => {
 
   it('ranks explicit risk before similarity without mutating arrival order', () => {
     const arrivalOrder = [...mockSearchResponse.results].reverse();
-    expect(rankSearchResults(arrivalOrder).map(({ riskScore }) => riskScore?.compositeRating)).toEqual([
+    expect(rankSearchResults(arrivalOrder).map(({ riskAnalysis }) => riskAnalysis?.compositeRating)).toEqual([
       'high', 'medium', 'low',
     ]);
-    expect(arrivalOrder[0].riskScore?.compositeRating).toBe('low');
+    expect(arrivalOrder[0].riskAnalysis?.compositeRating).toBe('low');
   });
 });

@@ -116,6 +116,22 @@ export interface Search {
   createdAt: string;
 }
 
+export interface RiskAnalysis {
+  id?: string;
+  candidateRecordId?: string;
+  candidateSource?: string;
+  candidateRef?: string;
+  phoneticScore: number;
+  visualScore: number;
+  conceptualScore: number | null;
+  classOverlap: boolean;
+  classOverlapScore?: number;
+  compositeScore?: number;
+  compositeRating: RiskLevel;
+  methodology?: ScoringMethodology;
+  matchedMarkRefs: MatchedMarkRef[];
+}
+
 export interface SearchResult {
   id: string;
   searchId: string;
@@ -123,17 +139,16 @@ export interface SearchResult {
   candidateSource: string;
   candidateRef: string;
   /** Mark owner name as returned by the source registry. */
-  owner: string;
+  owner: string | null;
   /** Jurisdiction code, e.g. "US", "EU". */
   jurisdiction: string;
   /** Nice Classification class numbers for this filing. */
   niceClasses: number[];
   /** Filing date in YYYY-MM-DD format. */
-  filingDate: string;
+  filingDate: string | null;
   /** Current filing status as returned by the source registry. */
   status: string;
-  riskScore?: RiskScore; // Joined data
-  riskAnalysis?: RiskScore; // Joined data alias
+  riskAnalysis: RiskAnalysis;
 }
 
 export interface SearchDataFreshness {
@@ -144,6 +159,7 @@ export interface SearchDataFreshness {
 }
 
 export interface SearchResponse {
+  searchId?: string;
   results: SearchResult[];
   sourceStatuses: SourceStatusEntry[];
   /** True while one or more registry sources are incomplete. */
@@ -318,12 +334,32 @@ export interface RiskDetailRouteState {
 // FE-12: Matter types (mock-only until backend /api/v1/matters is implemented)
 // ---------------------------------------------------------------------------
 
+export interface SearchQuerySnapshot {
+  mark: string;
+  jurisdictions: string[];
+  niceClasses: number[];
+  status: string | null;
+  owner: string | null;
+  filedFrom: string | null;
+  filedTo: string | null;
+}
+
+export interface PersistedSearchResult {
+  id: string;
+  requestedByUserId: string;
+  requestId: string;
+  query: SearchQuerySnapshot;
+  results: SearchResult[];
+  sourceStatuses: SourceStatusEntry[];
+  partial: boolean;
+  resultCount: number;
+  methodologyVersions: string[];
+  createdAt: IsoTimestamp;
+  dataFreshness?: SearchDataFreshness | null;
+}
+
 /**
  * A matter (case file) that one or more risk results can be saved into.
- *
- * IMPORTANT: This type is used exclusively through the mock-only MatterAdapter.
- * No server persistence exists yet. Saving a result to a matter stores it only
- * in the adapter's in-memory + localStorage mock state.
  */
 export interface Matter {
   id: string;
@@ -344,18 +380,15 @@ export interface MatterSaveRequest {
   /** Required when matterId is omitted — name for the new matter. */
   newMatterName?: string;
   newMatterClientRef?: string;
-  resultId: string;
-  /** Snapshot of the risk score saved for the matter record. */
-  riskScoreSnapshot: Pick<RiskScore, 'compositeRating' | 'phoneticScore' | 'visualScore' | 'conceptualScore' | 'classOverlap'>;
-  candidateMarkText: string;
+  searchId: string;
+  candidateResultId: string;
 }
 
 export interface MatterSaveResult {
   matter: Matter;
   /** True when a new matter was created as part of this save. */
   created: boolean;
-  /** Always true for mock adapter responses. */
-  mocked: true;
+  mocked?: boolean;
 }
 
 /**

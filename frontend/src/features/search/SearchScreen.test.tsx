@@ -26,6 +26,7 @@ const renderSearch = (initialEntry = '/search', response = mockSearchResponse) =
       <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
           <Route path="/search" element={<SearchScreen />} />
+          <Route path="/search/risk/:searchId/:resultId" element={<div>Risk detail destination</div>} />
           <Route path="/search/risk/:id" element={<div>Risk detail destination</div>} />
         </Routes>
       </MemoryRouter>
@@ -144,17 +145,6 @@ describe('SearchScreen', () => {
     expect(review).toHaveFocus();
     await user.keyboard('{Enter}');
     expect(await screen.findByText('Risk detail destination')).toBeVisible();
-  }, 20_000);
-
-  it('imports a search result into the portfolio with its result id', async () => {
-    const { fetchMock } = renderSearch();
-    fireEvent.change(screen.getByRole('textbox', { name: 'Mark' }), { target: { value: 'FORGE' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Search trademarks' }));
-    await screen.findByRole('table', { name: /ranked by explicit risk/i });
-    fireEvent.click(screen.getAllByRole('button', { name: 'Import to portfolio' })[0]);
-    expect(await screen.findByText(/FORGE TEK was imported to the portfolio/i)).toBeVisible();
-    const request = fetchMock.mock.calls.find(([input]) => String(input).includes('/portfolio'));
-    expect(JSON.parse(String(request?.[1]?.body))).toMatchObject({ markText: 'FORGE TEK' });
   }, 20_000);
 
   it('has no automated accessibility violations before or after results load', async () => {
