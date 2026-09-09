@@ -1,137 +1,141 @@
 # IPRP — USPTO TSDR Source Acquisition & Normalization Decision
 
-**Ticket:** `OA-SOURCE-01`  
+**Ticket:** `OA-SOURCE-01A`  
 **Date:** September 9, 2026  
 **Repository:** `Adeoye100/INTELLECTUAL-PROPERTY-RESEARCH-PLATFORM`  
-**Starting Commit:** `1fdf95b121f1d691c11b8d56478c20514089cf53`  
-**Status:** `OA SOURCE ACQUISITION DEFINED — SOURCE ADAPTER APPROVAL REQUIRED`  
+**Starting Commit:** `efd9d915de4ce18afce0b886bb4c3d6b77e393d1`  
+**Status:** `OA SOURCE DISCOVERY BLOCKED — AUTHORIZED CASE SEED SET REQUIRED`  
 
 ---
 
 ## 1. Executive Summary & Decision Matrix
 
-This document defines the technical design, source contract, security boundary, and acquisition model for populating a production trademark Office Action corpus from the official **USPTO TSDR (Trademark Status & Document Retrieval) API**.
+This document defines the corrected technical design, source contract, API host contract, rate limits, capacity recalculations, and case-discovery prerequisites for producing a production trademark Office Action corpus from the official **USPTO TSDR API**.
 
-### Key Architectural Findings:
-1. **Adapter Claim Correction:** The repository's CLI script (`pnpm ingest:office-actions`) is a **downstream database loader**, NOT an upstream TSDR acquisition/normalization adapter. No TSDR client code exists in the repository.
-2. **Source Access Gate:** Programmatic access to USPTO TSDR requires a registered **USPTO API key** (`USPTO-API-KEY` header). Operator credential acquisition is required prior to live dataset polling.
-3. **Adapter Approval Requirement:** Fetching, paginating, filtering, and normalizing TSDR document metadata into the required NDJSON contract requires an upstream TSDR acquisition adapter. Building this new adapter requires explicit technical approval before implementation.
-4. **Reasoning Policy:** Examiner reasoning must be extracted directly from genuine source text or stored as `null`. AI-generated summaries, OCR guessing, or fabricated text are strictly forbidden.
+### Key Architectural Findings & Corrections:
+1. **API Host Contract:** Corrected production origin to `https://tsdrapi.uspto.gov` with resource routes under `/ts/cd/...`.
+2. **Current Rate Limits:** Corrected limits from outdated guide values to live USPTO documentation:
+   - General API Requests (XML status & document listings): **60 requests per minute**.
+   - PDF / ZIP Document Downloads: **4 requests per minute**.
+3. **Case Discovery Prerequisite (Critical Gap):** TSDR API does NOT provide a global endpoint to enumerate recent trademark cases or Office Actions. Endpoints require explicit serial numbers (`sn{serialNumber}`).
+4. **No Brute-Force Probing:** Guessing sequential serial numbers or brute-force range scanning is strictly forbidden.
+5. **No Dependent Search Seeding:** Unattended Search activation is currently blocked (`SEARCH_ENABLED=false`); Office Actions cannot depend on an unavailable Search engine.
+6. **Verdict:** `OA SOURCE DISCOVERY BLOCKED — AUTHORIZED CASE SEED SET REQUIRED`.
 
 ---
 
-## 2. Official USPTO TSDR Capabilities & Rates
+## 2. Official USPTO TSDR API Contract
 
-| Metric / Parameter | Official Specification |
+| Parameter / Feature | Official USPTO Specification |
 | :--- | :--- |
-| **Official Provider** | USPTO TSDR (Trademark Status & Document Retrieval) API |
-| **Endpoint Base URL** | `https://tsdr.uspto.gov/api/v1/` (or documented REST endpoints) |
-| **Authentication** | Request header: `USPTO-API-KEY: <secret>` |
-| **Document Retrieval** | Metadata endpoint: `/status/{appNum}` and document endpoint `/documents/{appNum}` |
-| **Published Rate Limits** | Bounded requests per minute (e.g. 120 req/min per API key) |
-| **Prohibited Methods** | Scraping TSDR web UI, WAF bypass, proxy rotation, headless browser automation |
+| **Official Host Origin** | `https://tsdrapi.uspto.gov` |
+| **Authentication** | Header: `USPTO-API-KEY: <secret>` |
+| **General Request Rate Limit** | **60 requests per API key per minute** |
+| **PDF / ZIP Download Rate Limit** | **4 requests per API key per minute** |
+| **Multi-case PDF Rate Limit** | **4 requests per API key per minute** |
+| **Documentation Source** | Official USPTO TSDR API Developer Portal & Live FAQ |
 
 ---
 
-## 3. Existing Repository Assessment
+## 3. Official Endpoints Contract
 
-- **Ingestion CLI (`backend/scripts/ingest-office-actions.js`):** Receives local JSON/NDJSON files, validates schema, and writes records to PostgreSQL via `ingestOfficeActionRecords`.
-- **Database Engine (`backend/src/office-actions/office-action-ingestion.js`):** Implements atomic PostgreSQL transactions (`BEGIN`/`COMMIT`/`ROLLBACK`) and fail-closed ledger tracking (`office_action_corpus_runs`).
-- **TSDR Acquisition Pipeline:** **NOT PRESENT.** No code currently authenticates to TSDR, polls trademark applications, filters Office Action PDFs/XMLs, or formats NDJSON.
+TSDR programmatic operations require specific, documented routes:
 
----
+### A. Case Status Endpoint (General Rate: 60 req/min)
+- **HTTP Method:** `GET`
+- **URL Structure:** `https://tsdrapi.uspto.gov/ts/cd/casestatus/sn{serialNumber}/info.xml`
+- **Response Format:** XML
+- **Returned Data:** Serial Number, Mark Text, Applicant/Owner Name, Examining Attorney, Status Code, Status Date.
 
-## 4. Source-to-Normalized Field Mapping Contract
+### B. Case Document Metadata Endpoint (General Rate: 60 req/min)
+- **HTTP Method:** `GET`
+- **URL Structure:** `https://tsdrapi.uspto.gov/ts/cd/casedocs/sn{serialNumber}/info.xml`
+- **Response Format:** XML
+- **Returned Data:** Document List, Document Type/Title, Issue Date, Document ID (`documentId`), Sequence Number.
 
-Every production record ingested into `office_action_documents` must conform strictly to the following mapping rules:
-
-| Normalized Field | TSDR Source Field / Construction Rule | Nullable? | Verification Requirement |
-| :--- | :--- | :---: | :--- |
-| `sourceRegistry` | Static string `'USPTO'` | `NO` | Must be `'USPTO'` |
-| `sourceReferenceId` | `oa-uspto-{applicationNumber}-{documentId}` | `NO` | Deterministic, stable across replays |
-| `applicationNumber` | `applicationNumber` / Serial Number (8 digits) | `YES` | Must match official USPTO serial |
-| `markText` | `markText` / Mark Literal Description | `YES` | Plain text |
-| `owner` | `applicantName` / Current Owner Name | `YES` | Normalized string |
-| `jurisdiction` | Static string `'US'` | `NO` | Standard 2-letter ISO code |
-| `documentType` | Mapped from TSDR document code/title | `NO` | Must match allowed enum |
-| `officeActionDate` | `documentDate` / Action Issue Date (`YYYY-MM-DD`) | `YES` | ISO-8601 calendar date |
-| `examinerName` | `examinerName` / Examining Attorney | `YES` | Plain text name |
-| `examinerReasoningText` | Extracted plain text refusal grounds | `YES` | Plain text only; `null` if unextracted |
-| `summaryMethod` | Static string `'registry'` | `NO` | `'registry'` |
-| `sourceDocumentUrl` | `documentDownloadUrl` / Stable TSDR URL | `YES` | Credential-free HTTP(S) URL |
-| `sourceMetadata` | JSON object (`{ documentTitle, sequenceNumber }`) | `NO` | Safe JSON metadata |
-| `sourcePublishedAt` | ISO-8601 timestamp of publication | `YES` | Strict ISO-8601 string |
-| `sourceUpdatedAt` | ISO-8601 timestamp of source record update | `YES` | Strict ISO-8601 string |
-
-### Document Type Mapping Table:
-
-| TSDR Document Category / Description | Internal `documentType` Enum |
-| :--- | :--- |
-| Non-Final Action / Examining Attorney Office Action | `non_final_office_action` |
-| Final Refusal / Final Action | `final_office_action` |
-| Restriction Requirement / Election | `restriction_requirement` |
-| Suspension Letter / Notice of Suspension | `suspension` |
-| Other Official Office Action Notice | `office_action` |
-| Unrelated Filing (e.g. Specimen, Power of Attorney) | **EXCLUDED** (Do not ingest) |
+### C. Individual Document PDF Endpoint (PDF Rate: 4 req/min)
+- **HTTP Method:** `GET`
+- **URL Structure:** `https://tsdrapi.uspto.gov/ts/cd/casedocs/sn{serialNumber}/{documentId}.pdf`
+- **Response Format:** Binary PDF
+- **Policy:** Restricted to strictly necessary downloads due to the 4 downloads/minute rate cap.
 
 ---
 
-## 5. Deterministic `sourceReferenceId` Design
+## 4. Case Discovery & Seed Set Prerequisite
 
-Production records MUST use a deterministic, reproducible reference identity:
-```
-sourceReferenceId = "oa-uspto-" + applicationNumber + "-" + documentId
-```
-- **Stability:** Ensures exact same ID is derived on replay.
-- **Uniqueness:** Prevents duplicate document rows across multiple ingestion runs.
-- **Prohibited:** Random UUIDs, ingestion timestamps, or array indices are strictly forbidden for production `sourceReferenceId`.
+### The Discovery Problem
+TSDR APIs require a known trademark serial number (`sn{serialNumber}`) for all request routes. There is no global TSDR endpoint providing a list of recently issued Office Actions across all trademark cases.
 
----
-
-## 6. Reasoning Text Extraction Policy
-
-1. **Source Text Only:** `examinerReasoningText` must contain only genuine plain text extracted directly from official USPTO documents.
-2. **Default to `null`:** If TSDR provides only a binary PDF without structured text, `examinerReasoningText` must be set to `null`.
-3. **Strict Prohibitions:**
-   - NO LLM/AI legal summarization or text generation.
-   - NO AI inference of refusal grounds.
-   - NO OCR guessing or untrusted third-party enrichment.
+### Seed Set Rules:
+- **No Brute-Force Probing:** Guessing sequential numbers (e.g., `88000001` through `88999999`) is strictly prohibited.
+- **No Unofficial UI Scraping:** Scraping TSDR web search UI is prohibited.
+- **No Search Dependency:** Cannot rely on `SEARCH_ENABLED` search data, as Search activation is currently blocked.
+- **Required Seed Set:** An authorized, project-approved list of target trademark serial numbers must be provided as an input manifest to any future acquisition adapter.
 
 ---
 
-## 7. Acquisition Capacity & Rate-Limit Estimates
+## 5. Field Evidence & Mapping Matrix
 
-Assuming an initial baseline corpus of **10,000 recent USPTO trademark Office Actions**:
+Every field in the normalized schema is mapped against verified source capabilities:
 
-- **Target Record Count:** ~10,000 Office Actions
-- **Estimated Metadata Requests:** ~10,000 API calls
-- **USPTO Published Rate Limit:** 120 requests/minute per key
-- **Theoretical Minimum Acquisition Time:** ~83.3 minutes (~1.4 hours)
-- **Safe Acquisition Time (with 20% backoff margin):** ~1.75 hours
+| Normalized Field | Source Nature | Verification / Derivation Rule |
+| :--- | :--- | :--- |
+| `sourceRegistry` | **STATIC PROJECT VALUE** | Static string `'USPTO'` |
+| `sourceReferenceId` | **DERIVED FIELD** | `oa-uspto-{applicationNumber}-{documentId}` (using document ID from `casedocs/.../info.xml`) |
+| `applicationNumber` | **VERIFIED SOURCE FIELD** | Serial Number from `casestatus/.../info.xml` |
+| `markText` | **VERIFIED SOURCE FIELD** | `MarkText` from `casestatus/.../info.xml` |
+| `owner` | **VERIFIED SOURCE FIELD** | `ApplicantName` from `casestatus/.../info.xml` |
+| `jurisdiction` | **STATIC PROJECT VALUE** | Static string `'US'` |
+| `documentType` | **DERIVED FIELD** | Mapped from document title/code in `casedocs/.../info.xml` |
+| `officeActionDate` | **VERIFIED SOURCE FIELD** | Document issue date (`YYYY-MM-DD`) from `casedocs/.../info.xml` |
+| `examinerName` | **VERIFIED SOURCE FIELD** | Examining Attorney from `casestatus/.../info.xml` |
+| `examinerReasoningText` | **UNAVAILABLE / NULL** | Default `null`; plain text only if structured metadata provides it |
+| `summaryMethod` | **STATIC PROJECT VALUE** | Static string `'registry'` |
+| `sourceDocumentUrl` | **UNAVAILABLE / NULL** | Stored as `null` (immutable identity retained in `sourceMetadata`) |
+| `sourceMetadata` | **DERIVED FIELD** | Safe JSON (`{ documentTitle, documentId, sequenceNumber }`) |
+| `sourcePublishedAt` | **VERIFIED SOURCE FIELD** | Document issue timestamp |
+| `sourceUpdatedAt` | **VERIFIED SOURCE FIELD** | Case update timestamp |
 
 ---
 
-## 8. Security & Data Safety Rules
+## 6. Recalculated Acquisition Capacity & Budget
 
-1. **Credential Handling:** `USPTO_TSDR_API_KEY` must remain strictly server-side (environment variable or secret manager). Never committed, logged, or sent to frontend.
-2. **Hostname Allowlist:** Acquisition requests must target only `https://tsdr.uspto.gov`.
-3. **No Scraping:** Browser automation (Selenium, Playwright, Puppeteer) is prohibited.
-4. **Parameterized Ingestion:** CLI ingestion writes parameterized SQL via dedicated PostgreSQL client.
+### Per-Case Request Budget
+- 1 General Status Request (`casestatus/.../info.xml`)
+- 1 General Document List Request (`casedocs/.../info.xml`)
+- **Total per case:** 2 General Requests
+
+### Baseline Estimate (10,000 Cases):
+- **General Requests:** `20,000 requests`
+- **Rate Limit:** 60 general requests/minute
+- **Theoretical Minimum Acquisition Time:** `20,000 / 60 = 333.3 minutes` (**~5.55 hours**)
+- **Safe Operational Time (with 20% margin for 429/backoff):** **~6.6 hours**
+
+### PDF Download Impact:
+- If 10,000 PDF document bodies were fetched at the 4 downloads/minute rate limit:
+  - `10,000 / 4 = 2,500 minutes` (**~41.67 hours**)
+  - This 41.7-hour requirement validates the **metadata-first acquisition** policy and storing `examinerReasoningText = null` by default.
 
 ---
 
-## 9. Feature Gate Status
+## 7. HTTP 429 & Security Handling
+
+- **Secret Handling:** `USPTO_TSDR_API_KEY` managed server-side only. Never logged, committed, or exposed to frontend.
+- **Host Restriction:** Requests strictly restricted to origin `https://tsdrapi.uspto.gov`.
+- **Rate Limit Policy:** Honor `HTTP 429 Too Many Requests` and `Retry-After` headers using exponential backoff with full jitter. Never increase concurrency on rate errors.
+
+---
+
+## 8. Feature Gate Status
 
 - `OFFICE_ACTION_SEARCH_ENABLED`: `false` (fail-closed)
 - `VITE_OFFICE_ACTION_SEARCH_ENABLED`: `false` (fail-closed)
 
-Feature gates remain set to `false` until an approved TSDR acquisition adapter is implemented, credentials provided, and the full production corpus ingested and verified.
-
 ---
 
-## 10. Verdict & Required Action
+## 9. Verdict & Required Action
 
-### Verdict: `OA SOURCE ACQUISITION DEFINED — SOURCE ADAPTER APPROVAL REQUIRED`
+### Verdict: `OA SOURCE DISCOVERY BLOCKED — AUTHORIZED CASE SEED SET REQUIRED`
 
 **Required Next Step:**  
-Approve construction of an upstream `uspto-tsdr-acquisition-adapter` script that connects to official USPTO TSDR API using operator-provided `USPTO_TSDR_API_KEY`, normalizes responses to NDJSON, and feeds the existing `pnpm ingest:office-actions` CLI loader.
+Define an authorized seed set of trademark serial numbers (or an approved global serial discovery manifest) before an upstream TSDR acquisition adapter can be approved for implementation.
