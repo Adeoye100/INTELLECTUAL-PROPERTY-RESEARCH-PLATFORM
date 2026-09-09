@@ -11,6 +11,16 @@ class MockDatabase {
     this.failCorpusRunCreate = failCorpusRunCreate;
     this.noIdCorpusRunCreate = noIdCorpusRunCreate;
     this.failCorpusRunUpdate = failCorpusRunUpdate;
+    this.released = false;
+  }
+
+  async connect() {
+    return {
+      query: (sql, parameters) => this.query(sql, parameters),
+      release: () => {
+        this.released = true;
+      },
+    };
   }
 
   async query(sql, parameters = []) {

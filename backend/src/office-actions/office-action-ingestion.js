@@ -227,6 +227,33 @@ export async function ingestOfficeActionRecords(database, records, options = {})
     throw createErr;
   }
 
+  let client = null;
+  let shouldRelease = false;
+  try {
+    if (typeof database.connect === 'function') {
+      client = await database.connect();
+      shouldRelease = true;
+    } else {
+      client = database;
+    }
+  } catch (err) {
+    if (runId) {
+      try {
+        await database.query(
+          `UPDATE office_action_corpus_runs
+           SET status = 'failed', completed_at = NOW(), error_code = $2
+           WHERE id = $1`,
+          [runId, 'OFFICE_ACTION_CORPUS_INGESTION_FAILED'],
+        );
+      } catch (_subErr) {
+        // ignore secondary error updating run status
+      }
+    }
+    const clientErr = new Error(`Failed to acquire database client for ingestion: ${err.message}`);
+    clientErr.code = 'OFFICE_ACTION_CORPUS_INGESTION_FAILED';
+    throw clientErr;
+  }
+
   let processed = 0;
   let inserted = 0;
   let updated = 0;
@@ -235,6 +262,14 @@ export async function ingestOfficeActionRecords(database, records, options = {})
   const validatedRecords = [];
 
   try {
+    try {
+      await client.query('BEGIN');
+    } catch (beginErr) {
+      const err = new Error(`Failed to begin transaction: ${beginErr.message}`);
+      err.code = 'OFFICE_ACTION_CORPUS_INGESTION_FAILED';
+      throw err;
+    }
+
     for (const item of records) {
       processed++;
       let validated;
@@ -246,7 +281,7 @@ export async function ingestOfficeActionRecords(database, records, options = {})
       }
       validatedRecords.push(validated);
 
-      const existingResult = await database.query(
+      const existingResult = await client.query(
         `SELECT id, application_number, mark_text, owner, jurisdiction, document_type,
                 office_action_date, examiner_name, examiner_reasoning_text, summary_method,
                 source_document_url, source_metadata, source_published_at, source_updated_at
@@ -256,7 +291,7 @@ export async function ingestOfficeActionRecords(database, records, options = {})
       );
 
       if (existingResult.rows.length === 0) {
-        await database.query(
+        await client.query(
           `INSERT INTO office_action_documents (
             source_registry, source_reference_id, application_number, mark_text, owner,
             jurisdiction, document_type, office_action_date, examiner_name,
@@ -303,7 +338,7 @@ export async function ingestOfficeActionRecords(database, records, options = {})
         if (isSame) {
           unchanged++;
         } else {
-          await database.query(
+          await client.query(
             `UPDATE office_action_documents
              SET application_number = $3, mark_text = $4, owner = $5, jurisdiction = $6,
                  document_type = $7, office_action_date = $8, examiner_name = $9,
@@ -332,7 +367,7 @@ export async function ingestOfficeActionRecords(database, records, options = {})
 
     const dataThrough = deriveDataThrough(validatedRecords);
     try {
-      await database.query(
+      await client.query(
         `UPDATE office_action_corpus_runs
          SET status = 'complete', completed_at = NOW(),
              processed_count = $2, inserted_count = $3, updated_count = $4,
@@ -346,10 +381,33 @@ export async function ingestOfficeActionRecords(database, records, options = {})
       throw updateErr;
     }
 
+    try {
+      await client.query('COMMIT');
+    } catch (commitErr) {
+      const err = new Error(`Failed to commit transaction: ${commitErr.message}`);
+      err.code = 'OFFICE_ACTION_CORPUS_INGESTION_FAILED';
+      throw err;
+    }
+
     return { processed, inserted, updated, unchanged, rejected, dataThrough, runId };
   } catch (err) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (_rollbackErr) {
+      // ignore rollback failure
+    }
+
+    if (shouldRelease && client && typeof client.release === 'function') {
+      try {
+        client.release();
+      } catch (_relErr) {
+        // ignore release error
+      }
+      client = null;
+    }
+
     if (runId) {
-      const errorCode = typeof err?.code === 'string' ? err.code : 'INGESTION_FAILED';
+      const errorCode = typeof err?.code === 'string' ? err.code : 'OFFICE_ACTION_CORPUS_INGESTION_FAILED';
       try {
         await database.query(
           `UPDATE office_action_corpus_runs
@@ -360,10 +418,25 @@ export async function ingestOfficeActionRecords(database, records, options = {})
           [runId, errorCode, processed, inserted, updated, unchanged, rejected],
         );
       } catch (_subErr) {
-        // ignore secondary error writing failure ledger
+        // ignore secondary failure writing run status
       }
     }
-    throw err;
+
+    if (err.code === 'ALL_RECORDS_REJECTED' || err.code === 'OFFICE_ACTION_CORPUS_RUN_UPDATE_FAILED') {
+      throw err;
+    }
+    const safeErr = new Error('Office Action ingestion failed.');
+    safeErr.code = err.code || 'OFFICE_ACTION_CORPUS_INGESTION_FAILED';
+    throw safeErr;
+  } finally {
+    if (shouldRelease && client && typeof client.release === 'function') {
+      try {
+        client.release();
+      } catch (_relErr) {
+        // ignore release error
+      }
+      client = null;
+    }
   }
 }
 
