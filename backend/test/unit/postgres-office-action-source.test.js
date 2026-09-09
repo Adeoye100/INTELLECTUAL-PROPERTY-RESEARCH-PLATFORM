@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { PostgresOfficeActionSource } from '../../src/office-actions/postgres-office-action-source.js';
+import { createOfficeActionSearchRuntime } from '../../src/office-actions/office-action-search-runtime.js';
 import { ingestOfficeActionRecords, validateIngestionRecord } from '../../src/office-actions/office-action-ingestion.js';
 
 class MockDatabase {
@@ -68,6 +69,19 @@ describe('PostgresOfficeActionSource', () => {
   it('rejects invalid construction arguments', () => {
     assert.throws(() => new PostgresOfficeActionSource({ database: null }), { name: 'TypeError' });
     assert.throws(() => new PostgresOfficeActionSource({ database: new MockDatabase(), sourceName: '' }), { name: 'TypeError' });
+  });
+
+  it('is selected by createOfficeActionSearchRuntime when OFFICE_ACTION_SOURCE_REGISTRIES includes USPTO', () => {
+    const postgresSource = new PostgresOfficeActionSource({ database: new MockDatabase(), sourceName: 'USPTO' });
+    const runtime = createOfficeActionSearchRuntime({
+      officeActionSearchEnabled: true,
+      officeActionSourceRegistries: ['USPTO'],
+      officeActionSourceTimeoutMs: 3000,
+      officeActionSearchMaxResults: 50,
+    }, { sources: [postgresSource] });
+
+    assert.equal(runtime.officeActionSources.length, 1);
+    assert.equal(runtime.officeActionSources[0], postgresSource);
   });
 });
 

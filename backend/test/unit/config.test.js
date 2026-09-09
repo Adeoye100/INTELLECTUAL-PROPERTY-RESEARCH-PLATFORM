@@ -145,10 +145,18 @@ describe('search configuration', () => {
       { SEARCH_SOURCE_TIMEOUT_MS: '0' }, { SEARCH_SOURCE_TIMEOUT_MS: '99' }, { SEARCH_SOURCE_TIMEOUT_MS: '60001' },
       { SEARCH_MAX_RESULTS: '0' }, { SEARCH_MAX_RESULTS: '101' },
     ]) {
-      assert.throws(() => loadConfig(applicationEnvironment({ ...base, ...overrides }), /must be/));
+      assert.throws(() => loadConfig(applicationEnvironment({ ...base, ...overrides })), /must be/);
     }
   });
+
+  it('rejects WATCH_ENABLED=true when SEARCH_ENABLED is false', () => {
+    assert.throws(
+      () => loadConfig(applicationEnvironment({ WATCH_ENABLED: 'true', SEARCH_ENABLED: 'false' })),
+      /WATCH_ENABLED requires SEARCH_ENABLED=true/,
+    );
+  });
 });
+
 
 describe('Office Action search configuration', () => {
   it('defaults Office Action search to disabled without source configuration', () => {
