@@ -12,6 +12,12 @@ class MockDatabase {
 
   async query(sql, parameters = []) {
     this.queries.push({ sql, parameters });
+    if (sql.includes('INSERT INTO office_action_corpus_runs')) {
+      return { rows: [{ id: '11111111-1111-4111-8111-111111111111' }] };
+    }
+    if (sql.includes('UPDATE office_action_corpus_runs')) {
+      return { rows: [] };
+    }
     if (sql.includes('SELECT') && sql.includes('office_action_documents')) {
       return { rows: this.rows };
     }
@@ -86,16 +92,20 @@ describe('PostgresOfficeActionSource', () => {
 });
 
 describe('Office Action Ingestion Validator & Process', () => {
-  it('validates correct ingestion records and rejects HTML reasoning / credential URLs', () => {
+  it('validates correct ingestion records and rejects HTML reasoning / credential URLs / invalid timestamps', () => {
     const valid = validateIngestionRecord({
       sourceRegistry: 'USPTO',
       sourceReferenceId: 'ref-1',
       documentType: 'final_office_action',
       examinerReasoningText: 'Plain text examiner reasoning without HTML.',
       sourceDocumentUrl: 'https://tsdr.uspto.gov/doc.pdf',
+      sourcePublishedAt: '2026-05-15T10:00:00Z',
+      sourceUpdatedAt: '2026-05-15T12:00:00Z',
     });
     assert.equal(valid.sourceRegistry, 'USPTO');
     assert.equal(valid.examinerReasoningText, 'Plain text examiner reasoning without HTML.');
+    assert.equal(valid.sourcePublishedAt, '2026-05-15T10:00:00.000Z');
+    assert.equal(valid.sourceUpdatedAt, '2026-05-15T12:00:00.000Z');
 
     assert.throws(() => validateIngestionRecord({
       sourceRegistry: 'USPTO',
@@ -110,9 +120,16 @@ describe('Office Action Ingestion Validator & Process', () => {
       documentType: 'final_office_action',
       sourceDocumentUrl: 'https://user:pass@tsdr.uspto.gov/doc.pdf?secret=1',
     }));
+
+    assert.throws(() => validateIngestionRecord({
+      sourceRegistry: 'USPTO',
+      sourceReferenceId: 'ref-4',
+      documentType: 'final_office_action',
+      sourcePublishedAt: 'invalid-date',
+    }));
   });
 
-  it('ingests valid records idempotently and handles updates', async () => {
+  it('ingests valid records idempotently, tracks corpus run ledger, and derives dataThrough', async () => {
     const db = new MockDatabase();
     const records = [
       {
@@ -123,6 +140,8 @@ describe('Office Action Ingestion Validator & Process', () => {
         documentType: 'non_final_office_action',
         examinerReasoningText: 'Section 2(d) refusal text.',
         summaryMethod: 'registry',
+        sourcePublishedAt: '2026-05-15T10:00:00Z',
+        sourceUpdatedAt: '2026-05-15T12:00:00Z',
       },
     ];
 
@@ -130,5 +149,26 @@ describe('Office Action Ingestion Validator & Process', () => {
     assert.equal(stats.processed, 1);
     assert.equal(stats.inserted, 1);
     assert.equal(stats.rejected, 0);
+    assert.equal(stats.dataThrough, '2026-05-15');
+    assert.equal(stats.runId, '11111111-1111-4111-8111-111111111111');
+
+    const runInserts = db.queries.filter((q) => q.sql.includes('INSERT INTO office_action_corpus_runs'));
+    const runUpdates = db.queries.filter((q) => q.sql.includes('UPDATE office_action_corpus_runs'));
+    assert.equal(runInserts.length, 1);
+    assert.equal(runUpdates.length, 1);
+    assert.ok(runUpdates[0].sql.includes("status = 'complete'"));
+  });
+
+  it('fails corpus run ledger when all records are rejected', async () => {
+    const db = new MockDatabase();
+    const invalidRecords = [{ sourceRegistry: 'INVALID' }];
+    await assert.rejects(
+      async () => ingestOfficeActionRecords(db, invalidRecords),
+      /All ingestion records were rejected/,
+    );
+    const runUpdates = db.queries.filter((q) => q.sql.includes('UPDATE office_action_corpus_runs'));
+    assert.equal(runUpdates.length, 1);
+    assert.equal(runUpdates[0].parameters[1], 'ALL_RECORDS_REJECTED');
   });
 });
+

@@ -75,6 +75,44 @@ function plainTextReasoning(value, field = 'examinerReasoningText') {
   return normalized;
 }
 
+function parseTimestamp(value, field) {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value !== 'string') invalid(field, `${field} must be a valid ISO timestamp string.`);
+  const trimmed = value.trim();
+  const date = new Date(trimmed);
+  if (Number.isNaN(date.getTime())) {
+    invalid(field, `${field} must be a valid ISO timestamp string.`);
+  }
+  return date.toISOString();
+}
+
+function deriveDataThrough(validatedRecords) {
+  let maxUpdatedAt = null;
+  let maxPublishedAt = null;
+  let maxOfficeActionDate = null;
+
+  for (const rec of validatedRecords) {
+    if (rec.sourceUpdatedAt && (!maxUpdatedAt || rec.sourceUpdatedAt > maxUpdatedAt)) {
+      maxUpdatedAt = rec.sourceUpdatedAt;
+    }
+    if (rec.sourcePublishedAt && (!maxPublishedAt || rec.sourcePublishedAt > maxPublishedAt)) {
+      maxPublishedAt = rec.sourcePublishedAt;
+    }
+    if (rec.officeActionDate && (!maxOfficeActionDate || rec.officeActionDate > maxOfficeActionDate)) {
+      maxOfficeActionDate = rec.officeActionDate;
+    }
+  }
+
+  const bestIso = maxUpdatedAt || maxPublishedAt;
+  if (bestIso) {
+    return bestIso.slice(0, 10);
+  }
+  if (maxOfficeActionDate) {
+    return maxOfficeActionDate;
+  }
+  return null;
+}
+
 export function validateIngestionRecord(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     invalid('record', 'Record must be a plain object.');
@@ -107,6 +145,9 @@ export function validateIngestionRecord(input) {
     ? null
     : parseCalendarDate(input.officeActionDate, 'officeActionDate');
 
+  const sourcePublishedAt = parseTimestamp(input.sourcePublishedAt, 'sourcePublishedAt');
+  const sourceUpdatedAt = parseTimestamp(input.sourceUpdatedAt, 'sourceUpdatedAt');
+
   return {
     sourceRegistry,
     sourceReferenceId,
@@ -121,10 +162,12 @@ export function validateIngestionRecord(input) {
     summaryMethod: summaryMeth,
     sourceDocumentUrl: sourceDocumentUrl(input.sourceDocumentUrl),
     sourceMetadata: parseOfficeActionSourceMetadata(input.sourceMetadata, { strict: false }),
+    sourcePublishedAt,
+    sourceUpdatedAt,
   };
 }
 
-export async function ingestOfficeActionRecords(database, records) {
+export async function ingestOfficeActionRecords(database, records, { defaultRegistry = 'USPTO' } = {}) {
   if (!database || typeof database.query !== 'function') {
     throw new TypeError('ingestOfficeActionRecords requires a database connection.');
   }
@@ -132,87 +175,153 @@ export async function ingestOfficeActionRecords(database, records) {
     throw new TypeError('ingestOfficeActionRecords requires an array of records.');
   }
 
+  const runRegistry = (records.length > 0 && typeof records[0]?.sourceRegistry === 'string' && records[0].sourceRegistry.trim())
+    ? records[0].sourceRegistry.trim().toUpperCase()
+    : defaultRegistry.toUpperCase();
+
+  let runId = null;
+  try {
+    const runRes = await database.query(
+      `INSERT INTO office_action_corpus_runs (source_registry, status, started_at)
+       VALUES ($1, 'running', NOW())
+       RETURNING id`,
+      [runRegistry],
+    );
+    runId = runRes.rows?.[0]?.id || null;
+  } catch (_err) {
+    runId = null;
+  }
+
   let processed = 0;
   let inserted = 0;
   let updated = 0;
   let unchanged = 0;
   let rejected = 0;
+  const validatedRecords = [];
 
-  for (const item of records) {
-    processed++;
-    let validated;
-    try {
-      validated = validateIngestionRecord(item);
-    } catch (err) {
-      rejected++;
-      continue;
-    }
+  try {
+    for (const item of records) {
+      processed++;
+      let validated;
+      try {
+        validated = validateIngestionRecord(item);
+      } catch (_err) {
+        rejected++;
+        continue;
+      }
+      validatedRecords.push(validated);
 
-    const existingResult = await database.query(
-      `SELECT id, application_number, mark_text, owner, jurisdiction, document_type,
-              office_action_date, examiner_name, examiner_reasoning_text, summary_method,
-              source_document_url, source_metadata
-       FROM office_action_documents
-       WHERE source_registry = $1 AND source_reference_id = $2`,
-      [validated.sourceRegistry, validated.sourceReferenceId],
-    );
-
-    if (existingResult.rows.length === 0) {
-      await database.query(
-        `INSERT INTO office_action_documents (
-          source_registry, source_reference_id, application_number, mark_text, owner,
-          jurisdiction, document_type, office_action_date, examiner_name,
-          examiner_reasoning_text, summary_method, source_document_url, source_metadata
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-        [
-          validated.sourceRegistry, validated.sourceReferenceId, validated.applicationNumber,
-          validated.markText, validated.owner, validated.jurisdiction, validated.documentType,
-          validated.officeActionDate, validated.examinerName, validated.examinerReasoningText,
-          validated.summaryMethod, validated.sourceDocumentUrl, JSON.stringify(validated.sourceMetadata),
-        ],
-      );
-      inserted++;
-    } else {
-      const row = existingResult.rows[0];
-      const existingDate = row.office_action_date
-        ? (row.office_action_date instanceof Date ? row.office_action_date.toISOString().slice(0, 10) : String(row.office_action_date).slice(0, 10))
-        : null;
-
-      const isSame = (
-        (row.application_number ?? null) === validated.applicationNumber
-        && (row.mark_text ?? null) === validated.markText
-        && (row.owner ?? null) === validated.owner
-        && (row.jurisdiction ?? null) === validated.jurisdiction
-        && row.document_type === validated.documentType
-        && existingDate === validated.officeActionDate
-        && (row.examiner_name ?? null) === validated.examinerName
-        && (row.examiner_reasoning_text ?? null) === validated.examinerReasoningText
-        && row.summary_method === validated.summaryMethod
-        && (row.source_document_url ?? null) === validated.sourceDocumentUrl
-        && JSON.stringify(row.source_metadata ?? {}) === JSON.stringify(validated.sourceMetadata)
+      const existingResult = await database.query(
+        `SELECT id, application_number, mark_text, owner, jurisdiction, document_type,
+                office_action_date, examiner_name, examiner_reasoning_text, summary_method,
+                source_document_url, source_metadata, source_published_at, source_updated_at
+         FROM office_action_documents
+         WHERE source_registry = $1 AND source_reference_id = $2`,
+        [validated.sourceRegistry, validated.sourceReferenceId],
       );
 
-      if (isSame) {
-        unchanged++;
-      } else {
+      if (existingResult.rows.length === 0) {
         await database.query(
-          `UPDATE office_action_documents
-           SET application_number = $3, mark_text = $4, owner = $5, jurisdiction = $6,
-               document_type = $7, office_action_date = $8, examiner_name = $9,
-               examiner_reasoning_text = $10, summary_method = $11, source_document_url = $12,
-               source_metadata = $13, updated_at = NOW()
-           WHERE source_registry = $1 AND source_reference_id = $2`,
+          `INSERT INTO office_action_documents (
+            source_registry, source_reference_id, application_number, mark_text, owner,
+            jurisdiction, document_type, office_action_date, examiner_name,
+            examiner_reasoning_text, summary_method, source_document_url, source_metadata,
+            source_published_at, source_updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
           [
             validated.sourceRegistry, validated.sourceReferenceId, validated.applicationNumber,
             validated.markText, validated.owner, validated.jurisdiction, validated.documentType,
             validated.officeActionDate, validated.examinerName, validated.examinerReasoningText,
             validated.summaryMethod, validated.sourceDocumentUrl, JSON.stringify(validated.sourceMetadata),
+            validated.sourcePublishedAt, validated.sourceUpdatedAt,
           ],
         );
-        updated++;
+        inserted++;
+      } else {
+        const row = existingResult.rows[0];
+        const existingDate = row.office_action_date
+          ? (row.office_action_date instanceof Date ? row.office_action_date.toISOString().slice(0, 10) : String(row.office_action_date).slice(0, 10))
+          : null;
+        const existingPub = row.source_published_at
+          ? (row.source_published_at instanceof Date ? row.source_published_at.toISOString() : new Date(row.source_published_at).toISOString())
+          : null;
+        const existingUpd = row.source_updated_at
+          ? (row.source_updated_at instanceof Date ? row.source_updated_at.toISOString() : new Date(row.source_updated_at).toISOString())
+          : null;
+
+        const isSame = (
+          (row.application_number ?? null) === validated.applicationNumber
+          && (row.mark_text ?? null) === validated.markText
+          && (row.owner ?? null) === validated.owner
+          && (row.jurisdiction ?? null) === validated.jurisdiction
+          && row.document_type === validated.documentType
+          && existingDate === validated.officeActionDate
+          && (row.examiner_name ?? null) === validated.examinerName
+          && (row.examiner_reasoning_text ?? null) === validated.examinerReasoningText
+          && row.summary_method === validated.summaryMethod
+          && (row.source_document_url ?? null) === validated.sourceDocumentUrl
+          && JSON.stringify(row.source_metadata ?? {}) === JSON.stringify(validated.sourceMetadata)
+          && existingPub === validated.sourcePublishedAt
+          && existingUpd === validated.sourceUpdatedAt
+        );
+
+        if (isSame) {
+          unchanged++;
+        } else {
+          await database.query(
+            `UPDATE office_action_documents
+             SET application_number = $3, mark_text = $4, owner = $5, jurisdiction = $6,
+                 document_type = $7, office_action_date = $8, examiner_name = $9,
+                 examiner_reasoning_text = $10, summary_method = $11, source_document_url = $12,
+                 source_metadata = $13, source_published_at = $14, source_updated_at = $15,
+                 updated_at = NOW()
+             WHERE source_registry = $1 AND source_reference_id = $2`,
+            [
+              validated.sourceRegistry, validated.sourceReferenceId, validated.applicationNumber,
+              validated.markText, validated.owner, validated.jurisdiction, validated.documentType,
+              validated.officeActionDate, validated.examinerName, validated.examinerReasoningText,
+              validated.summaryMethod, validated.sourceDocumentUrl, JSON.stringify(validated.sourceMetadata),
+              validated.sourcePublishedAt, validated.sourceUpdatedAt,
+            ],
+          );
+          updated++;
+        }
       }
     }
-  }
 
-  return { processed, inserted, updated, unchanged, rejected };
+    if (processed > 0 && (inserted + updated + unchanged) === 0) {
+      const err = new Error('All ingestion records were rejected.');
+      err.code = 'ALL_RECORDS_REJECTED';
+      throw err;
+    }
+
+    const dataThrough = deriveDataThrough(validatedRecords);
+    if (runId) {
+      await database.query(
+        `UPDATE office_action_corpus_runs
+         SET status = 'complete', completed_at = NOW(), processed_count = $2,
+             inserted_count = $3, updated_count = $4, data_through = $5
+         WHERE id = $1`,
+        [runId, processed, inserted, updated, dataThrough],
+      );
+    }
+
+    return { processed, inserted, updated, unchanged, rejected, dataThrough, runId };
+  } catch (err) {
+    if (runId) {
+      const errorCode = typeof err?.code === 'string' ? err.code : 'INGESTION_FAILED';
+      try {
+        await database.query(
+          `UPDATE office_action_corpus_runs
+           SET status = 'failed', completed_at = NOW(), error_code = $2
+           WHERE id = $1`,
+          [runId, errorCode],
+        );
+      } catch (_subErr) {
+        // ignore secondary error writing run ledger
+      }
+    }
+    throw err;
+  }
 }
+

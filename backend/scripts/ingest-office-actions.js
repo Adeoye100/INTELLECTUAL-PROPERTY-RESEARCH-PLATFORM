@@ -20,19 +20,29 @@ function parseFileContent(filePath) {
   if (!fs.existsSync(absolutePath)) {
     throw new Error(`Input file not found: ${filePath}`);
   }
+  const stats = fs.statSync(absolutePath);
+  if (stats.size > 50 * 1024 * 1024) {
+    throw new Error('Input file exceeds 50MB size limit.');
+  }
   const raw = fs.readFileSync(absolutePath, 'utf8').trim();
   if (!raw) return [];
 
+  let records = [];
   if (filePath.endsWith('.ndjson') || raw.includes('\n')) {
     const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-    const records = [];
     for (const line of lines) {
       records.push(JSON.parse(line));
     }
-    return records;
+  } else {
+    const parsed = JSON.parse(raw);
+    records = Array.isArray(parsed) ? parsed : [parsed];
   }
 
-  return JSON.parse(raw);
+  if (records.length > 50000) {
+    throw new Error('Input contains more than 50,000 records limit.');
+  }
+
+  return records;
 }
 
 async function main() {
