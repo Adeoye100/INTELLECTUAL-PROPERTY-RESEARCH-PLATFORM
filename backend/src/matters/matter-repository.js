@@ -40,7 +40,7 @@ export class MatterRepository {
   async create({ firmId, createdByUserId, name, clientRef = '' }) {
     const result = await this.database.query(
       `INSERT INTO matters (firm_id, created_by_user_id, name, client_ref)
-       VALUES ($1, $2, $3, $4)
+       VALUES ($1, (SELECT id FROM users WHERE (id = $2 OR supabase_user_id = $2) AND firm_id = $1 LIMIT 1), $3, $4)
        RETURNING id, firm_id, created_by_user_id, name, client_ref, created_at, updated_at`,
       [firmId, createdByUserId || null, name, clientRef],
     );
@@ -95,7 +95,7 @@ export class MatterRepository {
   async addRiskResult({ firmId, matterId, createdByUserId, searchResultId, candidateMarkText, riskScoreSnapshot }) {
     const result = await this.database.query(
       `INSERT INTO matter_risk_results (matter_id, firm_id, created_by_user_id, search_result_id, candidate_mark_text, risk_score_snapshot)
-       VALUES ($1, $2, $3, $4, $5, $6)
+       VALUES ($1, $2, (SELECT id FROM users WHERE (id = $3 OR supabase_user_id = $3) AND firm_id = $2 LIMIT 1), $4, $5, $6)
        RETURNING id, matter_id, firm_id, created_by_user_id, search_result_id, candidate_mark_text, risk_score_snapshot, created_at`,
       [matterId, firmId, createdByUserId || null, searchResultId || null, candidateMarkText, JSON.stringify(riskScoreSnapshot)],
     );
@@ -116,7 +116,7 @@ export class MatterRepository {
   async addOfficeActionRef({ firmId, matterId, officeActionRefId, createdByUserId }) {
     const result = await this.database.query(
       `INSERT INTO matter_office_action_refs (firm_id, matter_id, office_action_ref_id, created_by_user_id)
-       VALUES ($1, $2, $3, $4)
+       VALUES ($1, $2, $3, (SELECT id FROM users WHERE (id = $4 OR supabase_user_id = $4) AND firm_id = $1 LIMIT 1))
        ON CONFLICT (firm_id, matter_id, office_action_ref_id) DO UPDATE SET created_at = matter_office_action_refs.created_at
        RETURNING id, firm_id, matter_id, office_action_ref_id, created_by_user_id, created_at`,
       [firmId, matterId, officeActionRefId, createdByUserId || null],

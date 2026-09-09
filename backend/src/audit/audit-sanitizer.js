@@ -35,6 +35,7 @@ function plainRecord(value) {
 
 function sanitizeValue(value, { depth, limits, ancestors }) {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString();
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) throw invalid();
     return value;

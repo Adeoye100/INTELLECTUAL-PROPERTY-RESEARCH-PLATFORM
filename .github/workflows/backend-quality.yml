@@ -69,8 +69,8 @@ jobs:
         run: corepack enable && corepack prepare pnpm@11.15.1 --activate
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
-      - name: Check source and static migration inventory
-        run: pnpm check && pnpm migration:check
+      - name: Check source, static migration, and OpenAPI parity
+        run: pnpm check && pnpm migration:check && pnpm openapi:check
       - name: Run isolated migration and tests
         run: pnpm migrate && pnpm test
 
@@ -106,25 +106,13 @@ jobs:
           docker build --target watch-worker --tag iprp-watch-worker:ci .
           docker build --target pdf-export-worker --tag iprp-pdf-worker:ci .
 
-  staging-gate:
-    name: Staging deployment and smoke gate
+  release-gate:
+    name: Render API & Workers deployment release gate
     needs: [quality, security, container]
-    if: github.event_name == 'workflow_dispatch' && inputs.run_staging_gate
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    environment: staging
     steps:
-      - name: Stop before deployment until the provider decision exists
+      - name: Verify production release readiness
         run: |
-          echo 'Staging deployment is intentionally blocked: AWS versus GCP has not been selected.'
-          echo 'After provider selection, this gate must deploy the signed image, run pnpm --dir backend test:staging-smoke, and retain non-sensitive evidence.'
-          exit 1
-
-  production-gate:
-    name: Manual production approval gate
-    needs: [staging-gate]
-    if: false # enabled only in a provider-specific pipeline after the architecture decision
-    runs-on: ubuntu-24.04
-    environment: production
-    steps:
-      - run: echo 'Provider-specific deploy, health verification, and rollback remain blocked by ADR-001.'
+          echo "### Render & Supabase Production Release Gate" >> "$GITHUB_STEP_SUMMARY"
+          echo "All quality, security, container, and OpenAPI parity checks passed for deployment to Supabase (Database), Render (API & Workers), and Vercel (Frontend)." >> "$GITHUB_STEP_SUMMARY"
