@@ -21,7 +21,7 @@ The Intellectual Property Research Platform (IPRP) has completed its final **P5-
 | **P1: Search & Data** | USPTO Bulk Ingestion, Freshness-safe Search, Phonetic & Class Overlap Matching | PostgreSQL (`iprp_test` / Supabase) | Local / Background Ingestion | `SEARCH_ENABLED=true` | **READY** |
 | **P2: Risk Engine** | Candidate Risk Analysis, Visual/Phonetic Scores, Precedent Conflict Detection | PostgreSQL (`risk_scores`) | Synchronous API Service | `RISK_ENGINE_ENABLED=true` | **READY** |
 | **P3: Watches & Alerts** | Portfolio Watch Scheduler, Multi-tenant Alert Generation, Email/In-App Dispatch | Redis (`queue:watch_poll`) + PostgreSQL | Render Watch Worker | `WATCH_ENABLED=true` | **READY** |
-| **P4: Office Actions** | Authorized OA Research, Examiner Summaries, Matter Cross-References | PostgreSQL (`office_action_documents`) | Federated Search Service | `OFFICE_ACTIONS_ENABLED=true` | **READY** |
+| **P4: Office Actions** | Authorized OA Research, Examiner Summaries, Matter Cross-References | PostgreSQL (`office_action_documents`) | Federated Search Service | `OFFICE_ACTION_SEARCH_ENABLED=false` | **STAGING / SAMPLE VERIFIED (PROD CORPUS PENDING)** |
 | **P4B: Paystack Billing** | Tiered Subscriptions, HMAC SHA512 Webhooks, Idempotent Reconciliation | PostgreSQL (`billing_subscriptions`) | Webhook Listener & Cron | `PAYSTACK_ENABLED=true` | **READY** |
 | **P5: PDF Exports & Analytics** | Asynchronous PDF Generation, Dashboard Analytics, Shared PDF Storage | Redis (`queue:pdf_export`) + PostgreSQL | Render PDF Worker | `PDF_EXPORT_ENABLED=true` | **READY** |
 

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadConfigFromEnv } from '../src/config.js';
+import { loadMigrationConfig } from '../src/config.js';
 import { createPool } from '../src/db/pool.js';
 import { ingestOfficeActionRecords } from '../src/office-actions/office-action-ingestion.js';
 
@@ -61,7 +61,7 @@ async function main() {
   }
 
   const records = parseFileContent(inputPath);
-  const config = loadConfigFromEnv(process.env);
+  const config = loadMigrationConfig(process.env);
   const pool = createPool(config.databaseUrl, config);
 
   try {
