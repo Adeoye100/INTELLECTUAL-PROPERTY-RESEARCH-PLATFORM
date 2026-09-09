@@ -75,10 +75,15 @@ function plainTextReasoning(value, field = 'examinerReasoningText') {
   return normalized;
 }
 
+const ISO_TIMESTAMP_REGEX = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
+
 function parseTimestamp(value, field) {
   if (value === null || value === undefined || value === '') return null;
   if (typeof value !== 'string') invalid(field, `${field} must be a valid ISO timestamp string.`);
   const trimmed = value.trim();
+  if (!ISO_TIMESTAMP_REGEX.test(trimmed)) {
+    invalid(field, `${field} must be a valid ISO timestamp string.`);
+  }
   const date = new Date(trimmed);
   if (Number.isNaN(date.getTime())) {
     invalid(field, `${field} must be a valid ISO timestamp string.`);
@@ -167,17 +172,39 @@ export function validateIngestionRecord(input) {
   };
 }
 
-export async function ingestOfficeActionRecords(database, records, { defaultRegistry = 'USPTO' } = {}) {
+export async function ingestOfficeActionRecords(database, records, options = {}) {
+  const defaultRegistry = options.defaultRegistry || options.sourceRegistry || 'USPTO';
+  const sourceKind = options.sourceKind || 'trademark-office-actions';
+
   if (!database || typeof database.query !== 'function') {
     throw new TypeError('ingestOfficeActionRecords requires a database connection.');
   }
-  if (!Array.isArray(records)) {
-    throw new TypeError('ingestOfficeActionRecords requires an array of records.');
+  if (sourceKind !== 'trademark-office-actions') {
+    const err = new Error(`Unsupported sourceKind '${sourceKind}'. Only 'trademark-office-actions' is supported.`);
+    err.code = 'OFFICE_ACTION_CORPUS_UNSUPPORTED_KIND';
+    throw err;
+  }
+  if (!Array.isArray(records) || records.length === 0) {
+    const err = new Error('Corpus ingestion input is empty.');
+    err.code = 'OFFICE_ACTION_CORPUS_EMPTY';
+    throw err;
   }
 
-  const runRegistry = (records.length > 0 && typeof records[0]?.sourceRegistry === 'string' && records[0].sourceRegistry.trim())
-    ? records[0].sourceRegistry.trim().toUpperCase()
-    : defaultRegistry.toUpperCase();
+  const registries = new Set();
+  for (const r of records) {
+    if (r && typeof r === 'object' && !Array.isArray(r)) {
+      const reg = r.sourceRegistry ? String(r.sourceRegistry).trim().toUpperCase() : defaultRegistry.toUpperCase();
+      registries.add(reg);
+    }
+  }
+
+  if (registries.size > 1) {
+    const err = new Error('Mixed sourceRegistry values in single ingestion batch are forbidden.');
+    err.code = 'OFFICE_ACTION_CORPUS_MIXED_REGISTRY';
+    throw err;
+  }
+
+  const runRegistry = registries.size === 1 ? Array.from(registries)[0] : defaultRegistry.toUpperCase();
 
   let runId = null;
   try {
@@ -188,8 +215,16 @@ export async function ingestOfficeActionRecords(database, records, { defaultRegi
       [runRegistry],
     );
     runId = runRes.rows?.[0]?.id || null;
-  } catch (_err) {
-    runId = null;
+  } catch (err) {
+    const createErr = new Error(`Failed to create corpus run ledger entry: ${err.message}`);
+    createErr.code = 'OFFICE_ACTION_CORPUS_RUN_CREATE_FAILED';
+    throw createErr;
+  }
+
+  if (!runId) {
+    const createErr = new Error('Failed to create corpus run ledger entry: returned no ID');
+    createErr.code = 'OFFICE_ACTION_CORPUS_RUN_CREATE_FAILED';
+    throw createErr;
   }
 
   let processed = 0;
@@ -296,14 +331,19 @@ export async function ingestOfficeActionRecords(database, records, { defaultRegi
     }
 
     const dataThrough = deriveDataThrough(validatedRecords);
-    if (runId) {
+    try {
       await database.query(
         `UPDATE office_action_corpus_runs
-         SET status = 'complete', completed_at = NOW(), processed_count = $2,
-             inserted_count = $3, updated_count = $4, data_through = $5
+         SET status = 'complete', completed_at = NOW(),
+             processed_count = $2, inserted_count = $3, updated_count = $4,
+             unchanged_count = $5, rejected_count = $6, data_through = $7
          WHERE id = $1`,
-        [runId, processed, inserted, updated, dataThrough],
+        [runId, processed, inserted, updated, unchanged, rejected, dataThrough],
       );
+    } catch (err) {
+      const updateErr = new Error(`Failed to update corpus run ledger status: ${err.message}`);
+      updateErr.code = 'OFFICE_ACTION_CORPUS_RUN_UPDATE_FAILED';
+      throw updateErr;
     }
 
     return { processed, inserted, updated, unchanged, rejected, dataThrough, runId };
@@ -313,15 +353,18 @@ export async function ingestOfficeActionRecords(database, records, { defaultRegi
       try {
         await database.query(
           `UPDATE office_action_corpus_runs
-           SET status = 'failed', completed_at = NOW(), error_code = $2
+           SET status = 'failed', completed_at = NOW(), error_code = $2,
+               processed_count = $3, inserted_count = $4, updated_count = $5,
+               unchanged_count = $6, rejected_count = $7
            WHERE id = $1`,
-          [runId, errorCode],
+          [runId, errorCode, processed, inserted, updated, unchanged, rejected],
         );
       } catch (_subErr) {
-        // ignore secondary error writing run ledger
+        // ignore secondary error writing failure ledger
       }
     }
     throw err;
   }
 }
+
 

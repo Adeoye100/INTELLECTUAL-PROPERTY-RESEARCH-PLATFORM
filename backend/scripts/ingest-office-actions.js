@@ -6,13 +6,21 @@ import { ingestOfficeActionRecords } from '../src/office-actions/office-action-i
 
 function parseArgs(args) {
   let inputPath = null;
+  let sourceRegistry = 'USPTO';
+  let sourceKind = 'trademark-office-actions';
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--input' && i + 1 < args.length) {
       inputPath = args[i + 1];
       i++;
+    } else if (args[i] === '--source-registry' && i + 1 < args.length) {
+      sourceRegistry = args[i + 1];
+      i++;
+    } else if (args[i] === '--source-kind' && i + 1 < args.length) {
+      sourceKind = args[i + 1];
+      i++;
     }
   }
-  return { inputPath };
+  return { inputPath, sourceRegistry, sourceKind };
 }
 
 function parseFileContent(filePath) {
@@ -46,9 +54,9 @@ function parseFileContent(filePath) {
 }
 
 async function main() {
-  const { inputPath } = parseArgs(process.argv.slice(2));
+  const { inputPath, sourceRegistry, sourceKind } = parseArgs(process.argv.slice(2));
   if (!inputPath) {
-    console.error('Usage: pnpm ingest:office-actions -- --input <path>');
+    console.error('Usage: pnpm ingest:office-actions -- --input <path> [--source-registry USPTO] [--source-kind trademark-office-actions]');
     process.exit(1);
   }
 
@@ -57,7 +65,7 @@ async function main() {
   const pool = createPool(config.databaseUrl, config);
 
   try {
-    const stats = await ingestOfficeActionRecords(pool, records);
+    const stats = await ingestOfficeActionRecords(pool, records, { sourceRegistry, sourceKind });
     console.log(JSON.stringify(stats, null, 2));
   } finally {
     await pool.end();
