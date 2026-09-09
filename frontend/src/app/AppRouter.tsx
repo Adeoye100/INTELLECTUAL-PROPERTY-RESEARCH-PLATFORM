@@ -60,7 +60,7 @@ const router = createBrowserRouter([
         element: features.searchEnabled ? (
           <Suspense fallback={<RouteLoading />}><SearchScreen /></Suspense>
         ) : (
-          <FeatureUnavailable title="Federated trademark search is not available" detail="It remains disabled until Elasticsearch is provisioned and the attributed registry documents are fully reprojected." />
+          <FeatureUnavailable title="Trademark search is temporarily unavailable" detail="Trademark search is temporarily unavailable while registry search services are being activated or refreshed." />
         ),
       },
       {
@@ -68,7 +68,7 @@ const router = createBrowserRouter([
         element: features.searchEnabled ? (
           <Suspense fallback={<RouteLoading />}><RiskDetailScreen /></Suspense>
         ) : (
-          <FeatureUnavailable title="Risk analysis is not available" detail="Search-backed risk analysis is disabled with the federated search integration." />
+          <FeatureUnavailable title="Risk analysis is temporarily unavailable" detail="Trademark search is temporarily unavailable while registry search services are being activated or refreshed." />
         ),
       },
       {
@@ -76,7 +76,7 @@ const router = createBrowserRouter([
         element: features.searchEnabled ? (
           <Suspense fallback={<RouteLoading />}><RiskDetailScreen /></Suspense>
         ) : (
-          <FeatureUnavailable title="Risk analysis is not available" detail="Search-backed risk analysis is disabled with the federated search integration." />
+          <FeatureUnavailable title="Risk analysis is temporarily unavailable" detail="Trademark search is temporarily unavailable while registry search services are being activated or refreshed." />
         ),
       },
       {
@@ -84,7 +84,7 @@ const router = createBrowserRouter([
         element: features.searchEnabled ? (
           <Suspense fallback={<RouteLoading />}><RiskDetailScreen /></Suspense>
         ) : (
-          <FeatureUnavailable title="Risk analysis is not available" detail="Search-backed risk analysis is disabled with the federated search integration." />
+          <FeatureUnavailable title="Risk analysis is temporarily unavailable" detail="Trademark search is temporarily unavailable while registry search services are being activated or refreshed." />
         ),
       },
       {
@@ -92,7 +92,7 @@ const router = createBrowserRouter([
         element: features.officeActionSearchEnabled ? (
           <Suspense fallback={<RouteLoading />}><OfficeActionResearchScreen /></Suspense>
         ) : (
-          <FeatureUnavailable title="Office Action search is not available" detail="It remains disabled until a licensed provider and its server-side integration are configured and verified." />
+          <FeatureUnavailable title="Office Action research is temporarily unavailable" detail="Office Action research is temporarily unavailable while the verified trademark research corpus is being activated." />
         ),
       },
       { path: 'portfolio', lazy: lazyComponent(() => import('../features/portfolio/PortfolioScreen'), 'PortfolioScreen') },
@@ -102,7 +102,7 @@ const router = createBrowserRouter([
         element: features.watchEnabled ? (
           <Suspense fallback={<RouteLoading />}><WatchesScreen /></Suspense>
         ) : (
-          <FeatureUnavailable title="Watch monitoring is not available" detail="It remains disabled until Redis and the separate watch worker are configured and verified." />
+          <FeatureUnavailable title="Watch monitoring is temporarily unavailable" detail="Watch monitoring is temporarily unavailable until Search and the monitoring worker are ready." />
         ),
       },
       { path: 'permission-denied', lazy: lazyComponent(() => import('../features/auth/PermissionDeniedScreen'), 'PermissionDeniedScreen') },
