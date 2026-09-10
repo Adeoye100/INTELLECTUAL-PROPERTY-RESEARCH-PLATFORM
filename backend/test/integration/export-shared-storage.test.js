@@ -37,6 +37,7 @@ let portfolioMarkId;
 
 const config = loadConfig({
   ...process.env,
+  NODE_ENV: 'test',
   DATABASE_URL: databaseUrl,
   DATABASE_SSL: databaseSsl ? 'true' : 'false',
   DATABASE_CONNECTION_TIMEOUT_MS: '30000',

@@ -35,6 +35,7 @@ after(async () => {
 
 describe('SEARCH-DATA-01 integration test suite', () => {
   it('stale-search test: returns 503 SEARCH_DATA_STALE and does NOT call Elasticsearch when index is stale', async () => {
+    await pool.query("DELETE FROM registry_refresh_runs WHERE source_registry = 'USPTO'");
     // Seed an old completed refresh run (60 hours old > 48 hours max age)
     const oldDate = new Date(Date.now() - 60 * 3600 * 1000).toISOString();
     const runResult = await pool.query(`
@@ -78,8 +79,9 @@ describe('SEARCH-DATA-01 integration test suite', () => {
   });
 
   it('outage recovery test: calculates since date from last complete run date minus overlap after a 5-day outage', async () => {
+    await pool.query("DELETE FROM registry_refresh_runs WHERE source_registry = 'USPTO'");
     const lastCompleteDate = '2026-08-10';
-    const oldDate = new Date('2026-08-10T10:00:00.000Z').toISOString();
+    const completedAt = new Date().toISOString();
     const runResult = await pool.query(`
       INSERT INTO registry_refresh_runs (
         source_registry, status, requested_since_date, data_through_date,
@@ -87,7 +89,7 @@ describe('SEARCH-DATA-01 integration test suite', () => {
         projected_record_count, projection_backlog_count, started_at, completed_at
       ) VALUES ('USPTO', 'complete', '2026-08-10', '2026-08-10', 1, 5, 5, 5, 0, $1, $1)
       RETURNING id
-    `, [oldDate]);
+    `, [completedAt]);
     const seededRunId = runResult.rows[0].id;
 
     let discoveredSince = null;

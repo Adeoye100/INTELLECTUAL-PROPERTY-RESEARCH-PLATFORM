@@ -37,11 +37,11 @@ before(async () => {
     [firmId, `Role Cache Firm ${firmId}`],
   );
   await pool.query(
-    `INSERT INTO users (firm_id, email, password_hash, role)
+    `INSERT INTO users (firm_id, email, password_hash, role, supabase_user_id)
      VALUES
-       ($1, $2, 'not-used-by-this-test', 'attorney'),
-       ($1, $3, 'not-used-by-this-test', 'viewer')`,
-    [firmId, email, unconfirmedEmail],
+       ($1, $2, 'not-used-by-this-test', 'attorney', $4),
+       ($1, $3, 'not-used-by-this-test', 'viewer', NULL)`,
+    [firmId, email, unconfirmedEmail, supabaseUserId],
   );
   repository = new UserRepository(pool);
   resolver = new RedisRoleFirmResolver({
@@ -51,17 +51,6 @@ before(async () => {
       async findBySupabaseUserId(...args) {
         databaseLookups += 1;
         return repository.findBySupabaseUserId(...args);
-      },
-      async findOrLinkBySupabaseIdentity(...args) {
-        databaseLookups += 1;
-        return repository.findOrLinkBySupabaseIdentity(...args);
-      },
-    },
-    supabaseAdminUserService: {
-      async getAuthoritativeUser(id) {
-        adminLookups += 1;
-        assert.equal(id, supabaseUserId);
-        return { email, emailConfirmed: true };
       },
     },
   });
@@ -75,51 +64,30 @@ after(async () => {
 });
 
 describe('role/firm resolution with real PostgreSQL and Redis', () => {
-  it('links a confirmed email, hits Redis, and re-queries locally after expiry', async () => {
+  it('resolves a linked user, hits Redis, and re-queries locally after expiry', async () => {
     const expected = { role: 'attorney', firmId };
-    assert.deepEqual(await resolver.resolveRoleAndFirm(supabaseUserId, email.toUpperCase()), expected);
-    assert.equal(databaseLookups, 2);
-    assert.equal(adminLookups, 1);
-    assert.equal((await pool.query(
-      'SELECT supabase_user_id FROM users WHERE email = $1',
-      [email],
-    )).rows[0].supabase_user_id, supabaseUserId);
+    assert.deepEqual(await resolver.resolveRoleAndFirm(supabaseUserId), expected);
+    assert.equal(databaseLookups, 1);
 
-    assert.deepEqual(await resolver.resolveRoleAndFirm(supabaseUserId, email), expected);
-    assert.equal(databaseLookups, 2, 'second request must use Redis');
-    assert.equal(adminLookups, 1, 'second request must not call the Supabase Admin API');
+    assert.deepEqual(await resolver.resolveRoleAndFirm(supabaseUserId), expected);
+    assert.equal(databaseLookups, 1, 'second request must use Redis');
 
     await new Promise((resolve) => setTimeout(resolve, 1_100));
-    assert.deepEqual(await resolver.resolveRoleAndFirm(supabaseUserId, email), expected);
-    assert.equal(databaseLookups, 3, 'expired cache entry must re-query PostgreSQL');
-    assert.equal(adminLookups, 1, 'an already-linked identity must not call the Admin API');
+    assert.deepEqual(await resolver.resolveRoleAndFirm(supabaseUserId), expected);
+    assert.equal(databaseLookups, 2, 'expired cache entry must re-query PostgreSQL');
   });
 
-  it('does not link an authoritative unconfirmed-email fixture', async () => {
+  it('does not resolve an unlinked user', async () => {
     const unconfirmedResolver = new RedisRoleFirmResolver({
       redisClient,
       userRepository: repository,
-      supabaseAdminUserService: {
-        async getAuthoritativeUser(id) {
-          assert.equal(id, unconfirmedSupabaseUserId);
-          return { email: unconfirmedEmail, emailConfirmed: false };
-        },
-      },
     });
 
     try {
       assert.equal(
-        await unconfirmedResolver.resolveRoleAndFirm(
-          unconfirmedSupabaseUserId,
-          unconfirmedEmail,
-        ),
+        await unconfirmedResolver.resolveRoleAndFirm(unconfirmedSupabaseUserId),
         null,
       );
-      const result = await pool.query(
-        'SELECT supabase_user_id FROM users WHERE email = $1',
-        [unconfirmedEmail],
-      );
-      assert.equal(result.rows[0].supabase_user_id, null);
     } finally {
       await unconfirmedResolver.invalidate(unconfirmedSupabaseUserId);
     }

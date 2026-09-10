@@ -1,24 +1,23 @@
+function formatDateOnly(val) {
+  if (!val) return null;
+  if (val instanceof Date) {
+    const year = val.getFullYear();
+    const month = String(val.getMonth() + 1).padStart(2, '0');
+    const day = String(val.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  return String(val).slice(0, 10);
+}
+
 function refreshRunFromRow(row) {
   if (!row) return null;
   return {
     id: row.id,
     sourceRegistry: row.source_registry,
     status: row.status,
-    requestedSinceDate: row.requested_since_date
-      ? (row.requested_since_date instanceof Date
-        ? row.requested_since_date.toISOString().slice(0, 10)
-        : String(row.requested_since_date).slice(0, 10))
-      : null,
-    latestDiscoveredSourceDate: row.latest_discovered_source_date
-      ? (row.latest_discovered_source_date instanceof Date
-        ? row.latest_discovered_source_date.toISOString().slice(0, 10)
-        : String(row.latest_discovered_source_date).slice(0, 10))
-      : null,
-    dataThroughDate: row.data_through_date
-      ? (row.data_through_date instanceof Date
-        ? row.data_through_date.toISOString().slice(0, 10)
-        : String(row.data_through_date).slice(0, 10))
-      : null,
+    requestedSinceDate: formatDateOnly(row.requested_since_date),
+    latestDiscoveredSourceDate: formatDateOnly(row.latest_discovered_source_date),
+    dataThroughDate: formatDateOnly(row.data_through_date),
     discoveredFileCount: Number(row.discovered_file_count ?? 0),
     processedRecordCount: Number(row.processed_record_count ?? 0),
     changedRecordCount: Number(row.changed_record_count ?? 0),

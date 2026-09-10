@@ -57,6 +57,7 @@ jobs:
       SUPABASE_JWT_VERIFICATION_MODE: jwks
       SUPABASE_JWT_ALGORITHMS: ES256
       AUTH_RATE_LIMIT_KEY_SECRET: separate-ci-rate-limit-secret-at-least-32-bytes
+      NODE_ENV: test
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - uses: actions/cache@v4
