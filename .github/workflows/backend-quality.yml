@@ -2,10 +2,8 @@ name: Backend quality and release gates
 
 on:
   pull_request:
-    paths: ['backend/**', 'infra/**', '.github/workflows/backend-quality.yml']
   push:
     branches: [main]
-    paths: ['backend/**', 'infra/**', '.github/workflows/backend-quality.yml']
   workflow_dispatch:
     inputs:
       run_staging_gate:
@@ -90,7 +88,6 @@ jobs:
         run: pnpm security:secrets
       - name: Dependency advisory scan when registry data is available
         working-directory: backend
-        continue-on-error: true
         run: pnpm audit --prod --audit-level high
 
   container:

@@ -2,14 +2,8 @@ name: Frontend quality
 
 on:
   pull_request:
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/frontend-quality.yml'
   push:
     branches: [main]
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/frontend-quality.yml'
 
 permissions:
   contents: read
@@ -52,6 +46,9 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      - name: Dependency advisory scan
+        run: pnpm audit --prod --audit-level high
 
       - name: TypeScript and production build
         run: pnpm build

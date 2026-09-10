@@ -66,3 +66,39 @@ configuration and reconciliation gates in
 Current gates: provider decision, migration application, staging smoke/auth/RBAC
 checks, private storage/Redis/network validation, P95 measurements, dependency
 advisories, independent audit, and live Multi-AZ failover verification.
+
+## Release governance & CI enforcement policy (P5-01)
+
+### Branch protection boundary
+The `main` branch serves as the authoritative production release boundary for the repository.
+- **Direct Pushes**: Prohibited. All changes must be merged via pull requests.
+- **Force Pushes**: Disabled (`allow_force_pushes: false`).
+- **Branch Deletions**: Disabled (`allow_deletions: false`).
+- **Branch Parity**: Require branches to be up-to-date before merging (`strict: true`).
+
+### Required CI status checks
+Merges to `main` require 100% passing results across all five required GitHub Actions status checks:
+1. `Syntax, unit, and ephemeral-store integration tests` (Backend syntax, migration check, OpenAPI check, unit + ephemeral DB integration tests)
+2. `Local secret and advisory gates` (Tracked secret-pattern scan, frontend secret scan, dependency advisory scan: 0 HIGH / 0 CRITICAL)
+3. `Build API and worker images` (Docker build verification for API, watch worker, PDF export worker)
+4. `Render API & Workers deployment release gate` (Aggregated release readiness check)
+5. `Lint, test, and production build` (Frontend ESLint, Vitest suite, Vite production build, bundle secret scan, frontend dependency audit: 0 HIGH / 0 CRITICAL)
+
+### Vercel vs CI deployment boundary
+Vercel deployment success is a UI preview artifact only and does NOT constitute release approval. Commits must pass all GitHub Actions CI status checks before merging to `main`.
+
+### Fail-closed feature flag policy
+The following capabilities MUST remain `false` (fail-closed) until separate production prerequisites are verified:
+- `SEARCH_ENABLED=false` (USPTO bulk index ingestion)
+- `OFFICE_ACTION_SEARCH_ENABLED=false` (Office Actions pipeline)
+- `WATCH_ENABLED=false` (Trademark watch workers)
+- `PDF_EXPORT_ENABLED=false` (PDF export worker)
+- `PAYSTACK_LIVE=false` (Live Paystack billing integration)
+
+### Break-glass procedure
+In severe production outage scenarios requiring an immediate fix:
+1. Incident Commander authorizes break-glass emergency procedure.
+2. Temporary administrative override of branch protection is logged in the incident record.
+3. Fix is committed and pushed directly or merged via emergency PR.
+4. Immediately following incident resolution, branch protection rules are re-enforced, and a post-mortem pull request with full CI suite execution must be recorded.
+
