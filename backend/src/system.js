@@ -136,7 +136,7 @@ export async function createSystem(config, { officeActionSources = null, exportS
   });
   const watchRepository = new WatchRepository(pool);
   const watchService = new WatchService({
-    repository: watchRepository, defaultPollIntervalMinutes: config.watchPollIntervalMinutes, auditService,
+    repository: watchRepository, defaultPollIntervalMinutes: config.watchPollIntervalMinutes ?? 1440, auditService,
   });
   const alertRepository = new AlertRepository(pool);
   const alertService = new AlertService({ repository: alertRepository, auditService });

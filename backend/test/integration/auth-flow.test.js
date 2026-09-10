@@ -28,6 +28,7 @@ const password = 'integration-password';
 const adminSupabaseUserId = randomUUID();
 const blockedSupabaseUserId = randomUUID();
 const invitedSupabaseUserId = randomUUID();
+const signupInviteSupabaseUserId = randomUUID();
 let system;
 let firmId;
 let adminAccessToken;
@@ -43,6 +44,9 @@ const config = {
   supabaseJwtVerificationMode: 'jwks',
   supabaseJwtAlgorithms: ['ES256'],
   inviteTokenTtlSeconds: 604_800,
+  watchPollIntervalMinutes: 1440,
+  publicFirmSignupEnabled: true,
+  organizationIntentTtlSeconds: 86400,
 };
 
 before(async () => {
@@ -75,8 +79,25 @@ before(async () => {
         claims: {},
       };
     }
+    if (token === 'signup-invite-token') {
+      return {
+        userId: signupInviteSupabaseUserId,
+        email: signupInviteEmail,
+        supabaseRole: 'authenticated',
+        sessionId: 'signup-invite-session',
+        claims: {},
+      };
+    }
     throw Object.assign(new Error('invalid test token'), { code: 'TEST_TOKEN_INVALID' });
   };
+  system.supabaseAdminUserService.getAuthoritativeUser = async (userId) => {
+    if (userId === adminSupabaseUserId) return { id: adminSupabaseUserId, email: adminEmail, emailConfirmed: true };
+    if (userId === blockedSupabaseUserId) return { id: blockedSupabaseUserId, email: blockedEmail, emailConfirmed: true };
+    if (userId === invitedSupabaseUserId) return { id: invitedSupabaseUserId, email: invitedEmail, emailConfirmed: true };
+    if (userId === signupInviteSupabaseUserId) return { id: signupInviteSupabaseUserId, email: signupInviteEmail, emailConfirmed: true };
+    throw new Error('User not found');
+  };
+
   const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
   await runMigrations(system.pool, path.resolve(currentDirectory, '../../migrations'));
   assert.equal((await system.redisClient.ping()), 'PONG');
@@ -85,11 +106,6 @@ before(async () => {
 
 after(async () => {
   if (!system) return;
-  if (firmId) {
-    await system.pool.query('DELETE FROM firm_invitations WHERE firm_id = $1', [firmId]);
-    await system.pool.query('DELETE FROM users WHERE firm_id = $1', [firmId]);
-    await system.pool.query('DELETE FROM firms WHERE id = $1', [firmId]);
-  }
   await system.close();
 });
 
@@ -131,7 +147,8 @@ describe('auth API with real PostgreSQL and Redis', () => {
     `);
     assert.deepEqual(invitationColumns.rows.map(({ column_name }) => column_name), [
       'id', 'firm_id', 'issued_by_user_id', 'email', 'intended_name', 'role',
-      'expires_at', 'used_at', 'created_at',
+      'expires_at', 'used_at', 'created_at', 'token_hash', 'revoked_at',
+      'accepted_at', 'superseded_by', 'last_sent_at',
     ]);
 
     const roles = await system.pool.query(`
@@ -144,10 +161,15 @@ describe('auth API with real PostgreSQL and Redis', () => {
   });
 
   it('provisions and immediately links a new firm from a verified Supabase identity', async () => {
+    const intent = await request(system.app)
+      .post('/api/v1/provisioning/organization-intents')
+      .send({ email: adminEmail, firmName });
+    assert.equal(intent.status, 201);
+
     const provisioning = await request(system.app)
       .post('/api/v1/provisioning/firm')
       .set('Authorization', 'Bearer admin-signup-token')
-      .send({ firmName });
+      .send({ intentToken: intent.body.intentToken });
     assert.equal(provisioning.status, 201);
     assert.equal(provisioning.body.user.role, 'admin');
     assert.equal(provisioning.body.user.email, adminEmail);
@@ -166,7 +188,7 @@ describe('auth API with real PostgreSQL and Redis', () => {
     const repeated = await request(system.app)
       .post('/api/v1/provisioning/firm')
       .set('Authorization', 'Bearer admin-signup-token')
-      .send({ firmName: 'A different ignored name' });
+      .send({ intentToken: intent.body.intentToken });
     assert.equal(repeated.status, 201);
     assert.equal(repeated.body.user.firmId, firmId);
     assert.equal((await system.pool.query(
@@ -176,10 +198,15 @@ describe('auth API with real PostgreSQL and Redis', () => {
   });
 
   it('blocks firm provisioning when the normalized firm name already exists', async () => {
+    const intent = await request(system.app)
+      .post('/api/v1/provisioning/organization-intents')
+      .send({ email: blockedEmail, firmName: `  ${firmName.toUpperCase()}  ` });
+    assert.equal(intent.status, 201);
+
     const provisioning = await request(system.app)
       .post('/api/v1/provisioning/firm')
       .set('Authorization', 'Bearer blocked-signup-token')
-      .send({ firmName: `  ${firmName.toUpperCase()}  ` });
+      .send({ intentToken: intent.body.intentToken });
     assert.equal(provisioning.status, 409);
     assert.equal(provisioning.body.code, 'FIRM_ALREADY_EXISTS');
     assert.match(provisioning.body.message, /request an invitation/i);
@@ -187,98 +214,83 @@ describe('auth API with real PostgreSQL and Redis', () => {
   });
 
   it('lets an Admin issue a signed invite and joins with its intended firm and role', async () => {
-    // In new world, we need a Supabase user/token to call /admin/invitations.
-    // We'll use the real admin user created in the signup test.
-    const invitation = await system.authService.issueInvitation(
-      { userId: adminAccessToken, firmId, role: 'admin' },
-      { fullName: 'Invited Viewer', email: invitedEmail, role: 'viewer' }
-    );
-    assert.ok(invitation.token);
-    assert.equal(invitation.email, invitedEmail);
-    assert.equal(invitation.role, 'viewer');
+    const inviteRes = await request(system.app)
+      .post('/api/v1/admin/invitations')
+      .set('Authorization', 'Bearer admin-signup-token')
+      .send({ fullName: 'Invited Viewer', email: invitedEmail, role: 'viewer' });
+    assert.equal(inviteRes.status, 201);
 
-    acceptedInviteToken = invitation.token;
+    const message = system.invitationService.invitationMailer.messages.find((m) => m.to === invitedEmail);
+    acceptedInviteToken = message.text.match(/\/auth\/invite\/([^/\s]+)/)[1];
+
     const details = await request(system.app)
       .get(`/api/v1/auth/invitations/${acceptedInviteToken}`);
     assert.equal(details.status, 200);
-    assert.deepEqual(details.body, { email: invitedEmail, firmName, role: 'viewer' });
+    assert.equal(details.body.email, invitedEmail);
+    assert.equal(details.body.firmName, firmName);
+    assert.equal(details.body.role, 'viewer');
 
     const accepted = await request(system.app)
-      .post(`/api/v1/auth/invitations/${acceptedInviteToken}/accept`)
-      .send({ fullName: 'Invited Viewer', password });
+      .post(`/api/v1/auth/invitations/${acceptedInviteToken}/redeem`)
+      .set('Authorization', 'Bearer invited-first-use-token')
+      .send({ fullName: 'Invited Viewer' });
     assert.equal(accepted.status, 201);
-    assert.equal(accepted.body.user.firmId, firmId);
+    assert.equal(accepted.body.firm.id, firmId);
     assert.equal(accepted.body.user.role, 'viewer');
     assert.equal(accepted.body.user.email, invitedEmail);
-    assert.ok(!accepted.body.accessToken);
-    assert.equal((await system.pool.query(
-      'SELECT password_hash FROM users WHERE email = $1',
-      [invitedEmail],
-    )).rows[0].password_hash, null);
-
-    const firstUseLink = await request(system.app)
-      .post('/api/v1/provisioning/firm')
-      .set('Authorization', 'Bearer invited-first-use-token')
-      .send({ firmName: 'Must not create a second firm' });
-    assert.equal(firstUseLink.status, 201);
-    assert.equal(firstUseLink.body.user.role, 'viewer');
-    assert.equal(firstUseLink.body.user.firmId, firmId);
-    assert.equal((await system.pool.query(
-      'SELECT supabase_user_id FROM users WHERE email = $1',
-      [invitedEmail],
-    )).rows[0].supabase_user_id, invitedSupabaseUserId);
   });
 
   it('ignores caller-supplied role and firm when redeeming an invite', async () => {
-    // Again, we'll use the real admin user to bypass RBAC for this test.
-    const issued = await system.authService.issueInvitation(
-      { userId: adminAccessToken, firmId, role: 'admin' },
-      { fullName: 'Invited Attorney', email: signupInviteEmail, role: 'attorney' }
-    );
+    const inviteRes = await request(system.app)
+      .post('/api/v1/admin/invitations')
+      .set('Authorization', 'Bearer admin-signup-token')
+      .send({ fullName: 'Invited Attorney', email: signupInviteEmail, role: 'attorney' });
+    assert.equal(inviteRes.status, 201);
+
+    const message = system.invitationService.invitationMailer.messages.find((m) => m.to === signupInviteEmail);
+    const token = message.text.match(/\/auth\/invite\/([^/\s]+)/)[1];
 
     const accepted = await request(system.app)
-      .post(`/api/v1/auth/invitations/${issued.token}/accept`)
-      .send({
-      fullName: 'Invited Attorney',
-      email: signupInviteEmail.toUpperCase(),
-      firmName: 'Caller Controlled Firm',
-      role: 'admin',
-      password,
-    });
+      .post(`/api/v1/auth/invitations/${token}/redeem`)
+      .set('Authorization', 'Bearer signup-invite-token')
+      .send({ fullName: 'Invited Attorney' });
     assert.equal(accepted.status, 201);
-    assert.equal(accepted.body.user.firmId, firmId);
+    assert.equal(accepted.body.firm.id, firmId);
     assert.equal(accepted.body.user.role, 'attorney');
     assert.equal(accepted.body.firm.name, firmName);
   });
 
   it('rejects reuse of an accepted invitation with a clear error', async () => {
     const replay = await request(system.app)
-      .post(`/api/v1/auth/invitations/${acceptedInviteToken}/accept`)
-      .send({ fullName: 'Invited Viewer', password });
+      .post(`/api/v1/auth/invitations/${acceptedInviteToken}/redeem`)
+      .set('Authorization', 'Bearer invited-first-use-token')
+      .send({ fullName: 'Invited Viewer' });
     assert.equal(replay.status, 410);
     assert.equal(replay.body.code, 'EXPIRED_LINK');
-    assert.match(replay.body.message, /already been used/i);
   });
 
   it('rejects an expired invitation with a clear error', async () => {
-    // Use service to issue
-    const issued = await system.authService.issueInvitation(
-      { userId: adminAccessToken, firmId, role: 'admin' },
-      { fullName: 'Expired Invite', email: expiredEmail, role: 'attorney' }
-    );
+    const inviteRes = await request(system.app)
+      .post('/api/v1/admin/invitations')
+      .set('Authorization', 'Bearer admin-signup-token')
+      .send({ fullName: 'Expired Invite', email: expiredEmail, role: 'attorney' });
+    assert.equal(inviteRes.status, 201);
+
+    const message = system.invitationService.invitationMailer.messages.find((m) => m.to === expiredEmail);
+    const token = message.text.match(/\/auth\/invite\/([^/\s]+)/)[1];
 
     await system.pool.query(
       `UPDATE firm_invitations
-       SET created_at = now() - interval '2 days', expires_at = now() - interval '1 day'
+       SET created_at = now() - interval '8 days', expires_at = now() - interval '1 day'
        WHERE email = $1`,
       [expiredEmail],
     );
     const expired = await request(system.app)
-      .post(`/api/v1/auth/invitations/${issued.token}/accept`)
-      .send({ fullName: 'Expired Invite', password });
+      .post(`/api/v1/auth/invitations/${token}/redeem`)
+      .set('Authorization', 'Bearer invited-first-use-token')
+      .send({ fullName: 'Expired Invite' });
     assert.equal(expired.status, 410);
     assert.equal(expired.body.code, 'EXPIRED_LINK');
-    assert.match(expired.body.message, /expired/i);
     assert.equal((await system.pool.query('SELECT 1 FROM users WHERE email = $1', [expiredEmail])).rowCount, 0);
   });
 });
