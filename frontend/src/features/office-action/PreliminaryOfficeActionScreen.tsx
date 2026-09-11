@@ -1,4 +1,5 @@
-import { FormEvent, useState } from 'react';
+import { useState } from 'react';
+import type { FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { FilePlus2, ShieldAlert } from 'lucide-react';
 import { Button } from '../../components/Button';
