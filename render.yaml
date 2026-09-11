@@ -179,9 +179,9 @@ services:
       - key: REDIS_URL
         sync: false
       - key: SEARCH_ENABLED
-        value: "true"
+        value: "false"
       - key: WATCH_ENABLED
-        value: "true"
+        value: "false"
       - key: ELASTICSEARCH_URL
         sync: false
       - key: ELASTICSEARCH_INDEX
@@ -240,7 +240,7 @@ services:
       - key: REDIS_URL
         sync: false
       - key: PDF_EXPORT_ENABLED
-        value: "true"
+        value: "false"
       - key: PDF_EXPORT_STORAGE_PROVIDER
         value: database
       - key: PDF_EXPORT_QUEUE_KEY

@@ -1,29 +1,29 @@
 # IPRP — Production Acceptance Report
-**Ticket**: P5-02  
+**Ticket**: P5-03  
 **Date**: September 10, 2026  
 **Repository**: Adeoye100/INTELLECTUAL-PROPERTY-RESEARCH-PLATFORM  
-**Status**: APPROVED — AUTHENTICATION, INVITATIONS, RBAC & TENANT ISOLATION ACCEPTED  
+**Status**: IN PROGRESS — PRODUCTION INFRASTRUCTURE, MIGRATIONS & CORE RUNTIME ACCEPTED  
 
 ---
 
 ## 1. Executive Summary & Final Verdict
 
-The Intellectual Property Research Platform (IPRP) has completed its **P5-02 Authentication, Invitations, RBAC & Tenant Isolation Acceptance** evaluation. The deployed authentication and multi-tenant authorization architecture has been validated against repository contracts and security boundaries.
+The Intellectual Property Research Platform (IPRP) has completed its **P5-03 Production Infrastructure, Migration & Runtime Acceptance** evaluation. The deployed topology (Vercel Frontend, Render API, Supabase Auth, Supabase PostgreSQL, Redis queues, and Render worker/cron configurations) has been verified and confirmed fail-closed.
 
-### Final Verdict: `P5-02 VERIFIED — AUTHENTICATION, INVITATIONS, RBAC AND TENANT ISOLATION ACCEPTED`
+### Current Verdict: `P5-03 VERIFIED — PRODUCTION INFRASTRUCTURE, MIGRATIONS AND CORE RUNTIME ACCEPTED (FEATURE ACTIVATION PENDING P5-04)`
 
 ---
 
 ## 2. Complete PRD Feature State Matrix
 
-| Track | Capabilities | Storage Provider | Worker / Subsystem | Activation Gate | Verdict |
+| Track | Capabilities | Storage Provider | Worker / Subsystem | Activation Gate | Production Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **P1: Search & Data** | USPTO Bulk Ingestion, Freshness-safe Search, Phonetic & Class Overlap Matching | PostgreSQL (`iprp_test` / Supabase) | Local / Background Ingestion | `SEARCH_ENABLED=true` | **READY** |
-| **P2: Risk Engine** | Candidate Risk Analysis, Visual/Phonetic Scores, Precedent Conflict Detection | PostgreSQL (`risk_scores`) | Synchronous API Service | `RISK_ENGINE_ENABLED=true` | **READY** |
-| **P3: Watches & Alerts** | Portfolio Watch Scheduler, Multi-tenant Alert Generation, Email/In-App Dispatch | Redis (`queue:watch_poll`) + PostgreSQL | Render Watch Worker | `WATCH_ENABLED=true` | **READY** |
-| **P4: Office Actions** | Authorized OA Research, Examiner Summaries, Matter Cross-References | PostgreSQL (`office_action_documents`) | Federated Search Service | `OFFICE_ACTION_SEARCH_ENABLED=false` | **STAGING / SAMPLE VERIFIED (PROD CORPUS PENDING)** |
-| **P4B: Paystack Billing** | Tiered Subscriptions, HMAC SHA512 Webhooks, Idempotent Reconciliation | PostgreSQL (`billing_subscriptions`) | Webhook Listener & Cron | `PAYSTACK_ENABLED=true` | **READY** |
-| **P5: PDF Exports & Analytics** | Asynchronous PDF Generation, Dashboard Analytics, Shared PDF Storage | Redis (`queue:pdf_export`) + PostgreSQL | Render PDF Worker | `PDF_EXPORT_ENABLED=true` | **READY** |
+| **P1: Search & Data** | USPTO Bulk Ingestion, Freshness-safe Search, Phonetic & Class Overlap Matching | PostgreSQL (`iprp_test` / Supabase) | Render Cron (`iprp-uspto-ingestion`) | `SEARCH_ENABLED=false` | **FAIL-CLOSED (ACTIVATION PENDING P5-04)** |
+| **P2: Risk Engine** | Candidate Risk Analysis, Visual/Phonetic Scores, Precedent Conflict Detection | PostgreSQL (`risk_scores`) | Synchronous API Service | `RISK_ENGINE_ENABLED=true` | **READY (AUTH DEPENDENCY VERIFIED)** |
+| **P3: Watches & Alerts** | Portfolio Watch Scheduler, Multi-tenant Alert Generation, Email/In-App Dispatch | Redis (`queue:watch_poll`) + PostgreSQL | Render Watch Worker | `WATCH_ENABLED=false` | **FAIL-CLOSED (ACTIVATION PENDING P5-04)** |
+| **P4: Office Actions** | Authorized OA Research, Examiner Summaries, Matter Cross-References | PostgreSQL (`office_action_documents`) | Federated Search Service | `OFFICE_ACTION_SEARCH_ENABLED=false` | **FAIL-CLOSED (ACQUISITION PENDING)** |
+| **P4B: Paystack Billing** | Tiered Subscriptions, HMAC SHA512 Webhooks, Idempotent Reconciliation | PostgreSQL (`billing_subscriptions`) | Webhook Listener & Cron | `PAYSTACK_ENABLED=false` | **FAIL-CLOSED (ACTIVATION PENDING P5-04)** |
+| **P5: PDF Exports & Analytics** | Asynchronous PDF Generation, Dashboard Analytics, Shared PDF Storage | Redis (`queue:pdf_export`) + PostgreSQL | Render PDF Worker | `PDF_EXPORT_ENABLED=false` | **FAIL-CLOSED (ACTIVATION PENDING P5-04)** |
 
 ---
 
