@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Logo } from '../components/Logo';
-import { 
-  LayoutDashboard, 
+import {
+  LayoutDashboard,
   LogOut,
   Users,
   BriefcaseBusiness,
@@ -11,7 +11,9 @@ import {
   FileText,
   Eye,
   Menu,
-  X
+  X,
+  Activity,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from '../components/Button';
@@ -28,12 +30,16 @@ function getNavIcon(path: string) {
       return <LayoutDashboard size={20} />;
     case '/search':
       return <SearchIcon size={20} />;
+    case '/risk-analysis':
+      return <Activity size={20} />;
     case '/office-actions':
       return <FileText size={20} />;
     case '/portfolio':
       return <BriefcaseBusiness size={20} />;
     case '/watches':
       return <Eye size={20} />;
+    case '/reports':
+      return <BarChart3 size={20} />;
     case '/admin/billing':
       return <CreditCard size={20} />;
     default:
@@ -87,7 +93,6 @@ export const MainLayout: React.FC = () => {
         Skip to main content
       </a>
 
-      {/* Header */}
       <header className="h-16 bg-forge-gradient flex items-center justify-between px-4 md:px-6 sticky top-0 z-40">
         <div className="flex items-center gap-3">
           <button
@@ -118,7 +123,6 @@ export const MainLayout: React.FC = () => {
       </header>
 
       <div className="flex flex-1">
-        {/* Mobile backdrop */}
         {mobileNavOpen && (
           <button
             type="button"
@@ -128,7 +132,6 @@ export const MainLayout: React.FC = () => {
           />
         )}
 
-        {/* Sidebar */}
         <aside
           id="application-sidebar"
           className={cn(
@@ -151,7 +154,7 @@ export const MainLayout: React.FC = () => {
               />
             ))}
           </nav>
-          
+
           <div className="p-4 border-t border-white/10">
             <Button
               variant="ghost"
@@ -165,7 +168,6 @@ export const MainLayout: React.FC = () => {
           </div>
         </aside>
 
-        {/* Main Content */}
         <main id="main-content" tabIndex={-1} className="min-w-0 flex-1 bg-background text-foreground p-4 md:p-6 xl:p-8 focus:outline-none">
           <Outlet />
         </main>
@@ -189,8 +191,8 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, onClick }) => {
       className={({ isActive }) =>
         cn(
           'flex items-center gap-3 px-3 py-2 rounded transition-colors',
-          isActive 
-            ? 'bg-forge-teal-700 text-white font-semibold' 
+          isActive
+            ? 'bg-forge-teal-700 text-white font-semibold'
             : 'text-forge-subtext-onDark hover:bg-white/5 hover:text-white'
         )
       }
