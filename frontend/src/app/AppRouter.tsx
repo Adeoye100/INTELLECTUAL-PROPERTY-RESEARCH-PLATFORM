@@ -3,7 +3,7 @@ import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
 import { AuthLayout } from './AuthLayout';
 import { MainLayout } from './MainLayout';
 import { RouteErrorScreen, RouteLoading } from './RouteFeedback';
-import { RequireAdmin, RequireAuthentication, RoleHomeRedirect } from '../features/auth/RouteGuards';
+import { RequireAdmin, RequireAuthentication, RequireRole, RoleHomeRedirect } from '../features/auth/RouteGuards';
 import { FeatureUnavailable } from './FeatureUnavailable';
 import { AdminUsersScreen } from '../features/admin/AdminUsersScreen';
 
@@ -21,9 +21,11 @@ function lazyComponent(loader: () => Promise<RouteModule>, exportName: string) {
 import { features } from '../config/features';
 
 const SearchScreen = lazy(() => import('../features/search/SearchScreen').then(({ SearchScreen }) => ({ default: SearchScreen })));
+const RiskAnalysisScreen = lazy(() => import('../features/search/RiskAnalysisScreen').then(({ RiskAnalysisScreen }) => ({ default: RiskAnalysisScreen })));
 const RiskDetailScreen = lazy(() => import('../features/search/RiskDetailScreen').then(({ RiskDetailScreen }) => ({ default: RiskDetailScreen })));
 const OfficeActionResearchScreen = lazy(() => import('../features/office-action/OfficeActionResearchScreen').then(({ OfficeActionResearchScreen }) => ({ default: OfficeActionResearchScreen })));
 const WatchesScreen = lazy(() => import('../features/watches/WatchesScreen').then(({ WatchesScreen }) => ({ default: WatchesScreen })));
+const ReportsScreen = lazy(() => import('../features/reports/ReportsScreen').then(({ ReportsScreen }) => ({ default: ReportsScreen })));
 
 const router = createBrowserRouter([
   {
@@ -60,7 +62,15 @@ const router = createBrowserRouter([
         element: features.searchEnabled ? (
           <Suspense fallback={<RouteLoading />}><SearchScreen /></Suspense>
         ) : (
-          <FeatureUnavailable title="Trademark search is temporarily unavailable" detail="Trademark search is temporarily unavailable while registry search services are being activated or refreshed." />
+          <FeatureUnavailable title="Trademark search is temporarily unavailable" detail="The Search workspace is part of the product, but live registry search remains fail-closed until its production data and freshness gates are activated." />
+        ),
+      },
+      {
+        path: 'risk-analysis',
+        element: features.searchEnabled ? (
+          <Suspense fallback={<RouteLoading />}><RiskAnalysisScreen /></Suspense>
+        ) : (
+          <FeatureUnavailable title="Risk analysis is temporarily unavailable" detail="Risk analysis starts from an authoritative trademark Search result, so it remains unavailable until Search production activation is complete." />
         ),
       },
       {
@@ -92,7 +102,7 @@ const router = createBrowserRouter([
         element: features.officeActionSearchEnabled ? (
           <Suspense fallback={<RouteLoading />}><OfficeActionResearchScreen /></Suspense>
         ) : (
-          <FeatureUnavailable title="Office Action research is temporarily unavailable" detail="Office Action research is temporarily unavailable while the verified trademark research corpus is being activated." />
+          <FeatureUnavailable title="Office Action research is temporarily unavailable" detail="Office Action research remains fail-closed until an authorized trademark corpus and source-discovery prerequisite are available." />
         ),
       },
       { path: 'portfolio', lazy: lazyComponent(() => import('../features/portfolio/PortfolioScreen'), 'PortfolioScreen') },
@@ -102,7 +112,15 @@ const router = createBrowserRouter([
         element: features.watchEnabled ? (
           <Suspense fallback={<RouteLoading />}><WatchesScreen /></Suspense>
         ) : (
-          <FeatureUnavailable title="Watch monitoring is temporarily unavailable" detail="Watch monitoring is temporarily unavailable until Search and the monitoring worker are ready." />
+          <FeatureUnavailable title="Watch monitoring is temporarily unavailable" detail="The Watches workspace is part of the product, but monitoring remains fail-closed until Search freshness and the production watch worker are activated." />
+        ),
+      },
+      {
+        path: 'reports',
+        element: (
+          <RequireRole allowedRoles={['admin', 'attorney']}>
+            <Suspense fallback={<RouteLoading />}><ReportsScreen /></Suspense>
+          </RequireRole>
         ),
       },
       { path: 'permission-denied', lazy: lazyComponent(() => import('../features/auth/PermissionDeniedScreen'), 'PermissionDeniedScreen') },
@@ -112,7 +130,6 @@ const router = createBrowserRouter([
     ],
   },
 ]);
-
 
 export function AppRouter() {
   return <Suspense fallback={<RouteLoading />}><RouterProvider router={router} /></Suspense>;

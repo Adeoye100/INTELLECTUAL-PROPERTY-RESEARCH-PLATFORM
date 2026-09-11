@@ -61,10 +61,28 @@ export class ResendInvitationMailer {
         body: JSON.stringify({ from: this.from, to: [message.to], subject: message.subject, html: message.html, text: message.text }),
       });
     } catch (error) {
-      throw new AppError(503, 'INVITATION_EMAIL_UNAVAILABLE', 'Invitation email could not be delivered. Please retry.', { cause: error?.name });
+      console.error('Invitation email provider request failed.', { provider: 'resend', cause: error?.name ?? 'UNKNOWN' });
+      throw new AppError(503, 'INVITATION_EMAIL_UNAVAILABLE', 'Invitation email could not be submitted to the email provider. Please retry.', { cause: error?.name });
     }
-    if (!response?.ok) throw new AppError(503, 'INVITATION_EMAIL_UNAVAILABLE', 'Invitation email could not be delivered. Please retry.');
-    return { id: response.headers.get('x-message-id') ?? null };
+    if (!response?.ok) {
+      console.error('Invitation email provider rejected the request.', { provider: 'resend', status: response?.status ?? null });
+      throw new AppError(503, 'INVITATION_EMAIL_UNAVAILABLE', 'Invitation email could not be submitted to the email provider. Please retry.');
+    }
+
+    let providerMessageId = response.headers.get('x-message-id') ?? null;
+    try {
+      const payload = await response.json();
+      if (typeof payload?.id === 'string' && payload.id.trim()) providerMessageId = payload.id.trim();
+    } catch {
+      // Some compatible responses may not include JSON; provider acceptance is
+      // still represented by the successful HTTP status.
+    }
+
+    console.info('Invitation email accepted by provider.', {
+      provider: 'resend',
+      messageId: providerMessageId ?? 'unavailable',
+    });
+    return { id: providerMessageId };
   }
 }
 

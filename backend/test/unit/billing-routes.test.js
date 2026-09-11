@@ -32,6 +32,28 @@ describe('billing route authorization', () => {
     })); app.use(errorHandler);
     const response = await request(app).get('/api/v1/billing').set('x-test-role', 'admin');
     assert.equal(response.status, 200);
+    assert.equal(response.body.enabled, true);
     assert.equal(response.body.firmId, '11111111-1111-4111-8111-111111111111');
+  });
+
+  it('keeps the admin billing workspace discoverable when Paystack is fail-closed', async () => {
+    const app = express(); app.use(express.json());
+    app.use('/api/v1', createBillingRouter(authenticate, null)); app.use(errorHandler);
+
+    const response = await request(app).get('/api/v1/billing').set('x-test-role', 'admin');
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, {
+      enabled: false,
+      subscription: null,
+      transactions: [],
+      plans: [],
+    });
+
+    const checkout = await request(app)
+      .post('/api/v1/billing/checkout')
+      .set('x-test-role', 'admin')
+      .send({ tier: 'starter' });
+    assert.equal(checkout.status, 503);
+    assert.equal(checkout.body.code, 'BILLING_UNAVAILABLE');
   });
 });

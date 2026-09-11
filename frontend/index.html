@@ -10,20 +10,7 @@
       content="Forge Global unifies trademark search, confusion-risk analysis, monitoring, and portfolio intelligence for modern IP teams."
     />
     <title>Forge Global — Intellectual Property Research</title>
-    <script>
-      try {
-        const savedTheme = localStorage.getItem("forge-theme");
-        const prefersDark = window.matchMedia(
-          "(prefers-color-scheme: dark)",
-        ).matches;
-        document.documentElement.classList.toggle(
-          "dark",
-          savedTheme ? savedTheme === "dark" : prefersDark,
-        );
-      } catch {
-        document.documentElement.classList.add("dark");
-      }
-    </script>
+    <script src="/theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>
