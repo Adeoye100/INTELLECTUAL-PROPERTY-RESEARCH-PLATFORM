@@ -1,4 +1,5 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import type { FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Activity, ShieldAlert } from 'lucide-react';
 import { Button } from '../../components/Button';
@@ -33,21 +34,20 @@ function visualSimilarity(left: string, right: string) {
   return Math.max(0, Math.min(100, 100 - Math.round((distance(left, right) / maximum) * 100)));
 }
 
-const soundexGroups = new Map([
-  ...'BFPV'.split('').map((letter) => [letter, '1']),
-  ...'CGJKQSXZ'.split('').map((letter) => [letter, '2']),
-  ...'DT'.split('').map((letter) => [letter, '3']),
-  ['L', '4'], ...'MN'.split('').map((letter) => [letter, '5']), ['R', '6'],
-]);
+const SOUNDEX_GROUPS: Readonly<Record<string, string>> = Object.freeze({
+  B: '1', F: '1', P: '1', V: '1',
+  C: '2', G: '2', J: '2', K: '2', Q: '2', S: '2', X: '2', Z: '2',
+  D: '3', T: '3', L: '4', M: '5', N: '5', R: '6',
+});
 
 function soundex(token: string) {
   const normalized = normalize(token);
   if (!normalized) return '';
   const first = normalized[0];
   let code = '';
-  let previous = soundexGroups.get(first) ?? '';
+  let previous = SOUNDEX_GROUPS[first] ?? '';
   for (const letter of normalized.slice(1)) {
-    const digit = soundexGroups.get(letter);
+    const digit = SOUNDEX_GROUPS[letter];
     if (digit) {
       if (digit !== previous) code += digit;
       previous = digit;
