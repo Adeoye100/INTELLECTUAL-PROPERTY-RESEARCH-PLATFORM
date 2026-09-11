@@ -1,5 +1,4 @@
 import type { UserRole } from "../../types";
-import { features } from "../../config/features";
 
 export type Capability =
   | "dashboard:view"
@@ -62,24 +61,27 @@ export interface NavigationItem {
   to: string;
   label: string;
   capability: Capability;
-  featureFlag?: keyof typeof features;
 }
 
+/**
+ * Navigation represents the PRD product surface, not deployment activation.
+ * Feature flags are enforced by route content so a disabled capability is
+ * visible with an honest unavailable state instead of disappearing entirely.
+ */
 const functionalNavigation: readonly NavigationItem[] = [
   { to: "/dashboard", label: "Dashboard", capability: "dashboard:view" },
-  { to: "/search", label: "Search", capability: "search:view", featureFlag: "searchEnabled" },
-  { to: "/office-actions", label: "Office Actions", capability: "office-actions:view", featureFlag: "officeActionSearchEnabled" },
+  { to: "/search", label: "Search", capability: "search:view" },
+  { to: "/risk-analysis", label: "Risk Analysis", capability: "search:view" },
+  { to: "/office-actions", label: "Office Actions", capability: "office-actions:view" },
   { to: "/portfolio", label: "Portfolio", capability: "portfolio:view" },
-  { to: "/watches", label: "Watches", capability: "watches:view", featureFlag: "watchEnabled" },
+  { to: "/watches", label: "Watches", capability: "watches:view" },
+  { to: "/reports", label: "Reports", capability: "reports:export" },
   { to: "/admin/users", label: "Users & Invitations", capability: "members:manage" },
   { to: "/admin/billing", label: "Billing", capability: "billing:manage" },
 ];
 
 export function navigationForRole(role: UserRole | null | undefined) {
-  return functionalNavigation.filter((item) =>
-    hasCapability(role, item.capability) &&
-    (!item.featureFlag || features[item.featureFlag])
-  );
+  return functionalNavigation.filter((item) => hasCapability(role, item.capability));
 }
 
 export const roleDescriptions: Record<UserRole, string> = {
@@ -87,4 +89,3 @@ export const roleDescriptions: Record<UserRole, string> = {
   attorney: "Attorney performs firm legal and research work.",
   viewer: "Viewer has read-only access to firm information.",
 };
-
