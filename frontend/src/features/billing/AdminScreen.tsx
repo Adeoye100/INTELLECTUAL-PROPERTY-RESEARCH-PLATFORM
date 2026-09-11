@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { CreditCard, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { CreditCard, ShieldCheck, AlertTriangle, FileText } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
 import { ApiError } from '../../lib/api/client';
@@ -21,6 +21,7 @@ const currencyAmount = ({ amountSubunit, currency }: { amountSubunit: number; cu
 function mapErrorMessage(err: unknown, fallback: string): string {
   if (err instanceof ApiError) {
     const code = err.serverCode || String(err.code);
+    if (code === 'BILLING_UNAVAILABLE') return 'Billing is not activated for this deployment yet.';
     if (code === 'BILLING_PLAN_INVALID') return 'That subscription plan is unavailable.';
     if (code === 'PAYMENT_VERIFICATION_FAILED') return 'Payment verification did not match the initialized transaction.';
     if (code === 'BILLING_TRANSACTION_NOT_FOUND') return 'The payment reference could not be found.';
@@ -93,13 +94,32 @@ export function AdminScreen() {
 
   const currentTier = summary?.subscription?.tier;
   const isSubscriptionActive = summary?.subscription?.status === 'active';
+  const billingEnabled = summary?.enabled !== false;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <header>
-        <h1 className="text-3xl font-bold text-foreground">Billing</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Only firm Administrators can view or change the subscription.</p>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Billing</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Only firm Administrators can view or change the subscription.</p>
+        </div>
+        <Link
+          to="/reports"
+          className="inline-flex min-h-10 items-center rounded border border-border bg-card px-4 py-2 text-sm font-semibold text-card-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <FileText className="mr-2 h-4 w-4" aria-hidden="true" />
+          Open Reports
+        </Link>
       </header>
+
+      {!billingEnabled && (
+        <div className="rounded border border-amber-500/30 bg-amber-500/10 p-4" role="status">
+          <p className="font-semibold text-foreground">Paystack billing is currently fail-closed.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            The billing workspace remains available, but checkout is disabled until the production Paystack activation gate is completed.
+          </p>
+        </div>
+      )}
 
       {notice && (
         <p role="status" className="rounded border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-foreground">
@@ -127,7 +147,7 @@ export function AdminScreen() {
           </div>
           <div>
             <p className="text-sm opacity-80">Status</p>
-            <p className="font-bold capitalize">{summary?.subscription?.status ?? 'inactive'}</p>
+            <p className="font-bold capitalize">{summary?.subscription?.status ?? (billingEnabled ? 'inactive' : 'not activated')}</p>
           </div>
           {summary?.subscription?.renewsAt && (
             <div>
@@ -140,31 +160,37 @@ export function AdminScreen() {
 
       <section aria-labelledby="plans-title">
         <h2 id="plans-title" className="text-xl font-bold text-foreground">Available plans</h2>
-        <div className="mt-3 grid gap-4 md:grid-cols-2">
-          {summary?.plans.map((plan: BillingPlan) => {
-            const isCurrent = currentTier === plan.tier && isSubscriptionActive;
-            return (
-              <Card key={plan.tier} title={plan.tier[0].toUpperCase() + plan.tier.slice(1)}>
-                <p className="text-2xl font-black text-foreground">{currencyAmount(plan)}</p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Checkout is completed on Paystack. The server verifies payment before enabling the plan.
-                </p>
-                <Button
-                  className="mt-4 w-full"
-                  disabled={busyTier !== null || isCurrent}
-                  onClick={() => void checkout(plan.tier)}
-                >
-                  <CreditCard className="mr-2 h-4 w-4" aria-hidden="true" />
-                  {isCurrent
-                    ? 'Current plan'
-                    : busyTier === plan.tier
-                      ? 'Opening checkout…'
-                      : `Choose ${plan.tier}`}
-                </Button>
-              </Card>
-            );
-          })}
-        </div>
+        {summary?.plans.length ? (
+          <div className="mt-3 grid gap-4 md:grid-cols-2">
+            {summary.plans.map((plan: BillingPlan) => {
+              const isCurrent = currentTier === plan.tier && isSubscriptionActive;
+              return (
+                <Card key={plan.tier} title={plan.tier[0].toUpperCase() + plan.tier.slice(1)}>
+                  <p className="text-2xl font-black text-foreground">{currencyAmount(plan)}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Checkout is completed on Paystack. The server verifies payment before enabling the plan.
+                  </p>
+                  <Button
+                    className="mt-4 w-full"
+                    disabled={busyTier !== null || isCurrent || !billingEnabled}
+                    onClick={() => void checkout(plan.tier)}
+                  >
+                    <CreditCard className="mr-2 h-4 w-4" aria-hidden="true" />
+                    {isCurrent
+                      ? 'Current plan'
+                      : busyTier === plan.tier
+                        ? 'Opening checkout…'
+                        : `Choose ${plan.tier}`}
+                  </Button>
+                </Card>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="mt-2 text-sm text-muted-foreground">
+            {billingEnabled ? 'No subscription plans are configured.' : 'Plans will appear here when production Paystack billing is activated.'}
+          </p>
+        )}
       </section>
 
       <section aria-labelledby="history-title">
