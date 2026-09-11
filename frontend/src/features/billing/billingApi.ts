@@ -25,6 +25,7 @@ export interface BillingSubscription {
 }
 
 export interface BillingSummary {
+  enabled?: boolean;
   subscription: BillingSubscription | null;
   transactions: BillingTransaction[];
   plans: BillingPlan[];
