@@ -27,6 +27,7 @@ const RiskDetailScreen = lazy(() => import('../features/search/RiskDetailScreen'
 const OfficeActionResearchScreen = lazy(() => import('../features/office-action/OfficeActionResearchScreen').then(({ OfficeActionResearchScreen }) => ({ default: OfficeActionResearchScreen })));
 const PreliminaryOfficeActionScreen = lazy(() => import('../features/office-action/PreliminaryOfficeActionScreen').then(({ PreliminaryOfficeActionScreen }) => ({ default: PreliminaryOfficeActionScreen })));
 const WatchesScreen = lazy(() => import('../features/watches/WatchesScreen').then(({ WatchesScreen }) => ({ default: WatchesScreen })));
+const PreliminaryWatchesScreen = lazy(() => import('../features/watches/PreliminaryWatchesScreen').then(({ PreliminaryWatchesScreen }) => ({ default: PreliminaryWatchesScreen })));
 const ReportsScreen = lazy(() => import('../features/reports/ReportsScreen').then(({ ReportsScreen }) => ({ default: ReportsScreen })));
 const PreliminaryReportsScreen = lazy(() => import('../features/reports/PreliminaryReportsScreen').then(({ PreliminaryReportsScreen }) => ({ default: PreliminaryReportsScreen })));
 
@@ -113,7 +114,9 @@ const router = createBrowserRouter([
       {
         path: 'watches',
         element: (
-          <Suspense fallback={<RouteLoading />}><WatchesScreen /></Suspense>
+          <Suspense fallback={<RouteLoading />}>
+            {features.watchEnabled ? <WatchesScreen /> : <PreliminaryWatchesScreen />}
+          </Suspense>
         ),
       },
       {
