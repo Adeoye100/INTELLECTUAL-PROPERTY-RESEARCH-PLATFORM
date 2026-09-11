@@ -163,8 +163,6 @@ export async function createSystem(config, { officeActionSources = null, exportS
   const watchRuntime = createWatchRuntime({
     config, redisClient, watchRepository, searchService, alertGenerationService, alertDeliveryService,
   });
-  // This runtime constructs its Redis queue and private storage only when the
-  // explicitly disabled-by-default PDF flag is enabled.
   const pdfExportRuntime = createPdfExportRuntime({
     config, redisClient, database: pool, exportAuditService, searchResultService, portfolioMarkService,
     officeActionRefService, watchService, alertService, storage: exportStorage,
@@ -179,8 +177,11 @@ export async function createSystem(config, { officeActionSources = null, exportS
       searchService,
       searchResultService: config.searchEnabled ? searchResultService : null,
       portfolioMarkService,
-      watchService: config.watchEnabled ? watchService : null,
-      alertService: config.watchEnabled ? alertService : null,
+      // CRUD remains available as a preliminary workspace even while the
+      // continuous polling/delivery runtime is disabled. WATCH_ENABLED gates
+      // only automated monitoring and delivery, not saved watch configuration.
+      watchService,
+      alertService,
       auditService,
       userRoleService,
       officeActionSearchService,
