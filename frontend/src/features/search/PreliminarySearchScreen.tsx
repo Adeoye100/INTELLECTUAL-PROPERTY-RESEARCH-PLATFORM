@@ -1,4 +1,5 @@
-import { FormEvent, useState } from 'react';
+import { useState } from 'react';
+import type { FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, Search as SearchIcon, ShieldAlert } from 'lucide-react';
 import { Link } from 'react-router-dom';
