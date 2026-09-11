@@ -68,7 +68,9 @@ export function createApp({
   }));
   app.use(createHealthRouter({ readinessChecks }));
 
-  if (billingService) app.use('/api/v1', createBillingRouter(authenticate, billingService));
+  // Keep the billing management surface present even when Paystack is fail-closed.
+  // The router returns a controlled disabled state instead of a misleading 404.
+  app.use('/api/v1', createBillingRouter(authenticate, billingService));
 
   app.use('/api/v1/auth', createAuthRouter(invitationService, authenticateIdentity, { authRateLimiter }));
   app.use(
