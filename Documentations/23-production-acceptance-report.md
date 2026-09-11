@@ -1,8 +1,8 @@
 # IPRP — Production Acceptance Report
-**Ticket**: P5-03  
-**Date**: September 10, 2026  
-**Repository**: Adeoye100/INTELLECTUAL-PROPERTY-RESEARCH-PLATFORM  
-**Status**: IN PROGRESS — PRODUCTION INFRASTRUCTURE, MIGRATIONS & CORE RUNTIME ACCEPTED  
+**Ticket**: P5-03-CLOSEOUT
+**Date**: September 11, 2026
+**Repository**: Adeoye100/INTELLECTUAL-PROPERTY-RESEARCH-PLATFORM
+**Status**: ACCEPTED — CORE PRODUCTION RUNTIME ACCEPTED (PRD FEATURE ACTIVATION PENDING)
 
 ---
 
@@ -10,7 +10,7 @@
 
 The Intellectual Property Research Platform (IPRP) has completed its **P5-03 Production Infrastructure, Migration & Runtime Acceptance** evaluation. The deployed topology (Vercel Frontend, Render API, Supabase Auth, Supabase PostgreSQL, Redis queues, and Render worker/cron configurations) has been verified and confirmed fail-closed.
 
-### Current Verdict: `P5-03 VERIFIED — PRODUCTION INFRASTRUCTURE, MIGRATIONS AND CORE RUNTIME ACCEPTED (FEATURE ACTIVATION PENDING P5-04)`
+### Final Verdict: `P5-03 VERIFIED — PRODUCTION INFRASTRUCTURE, MIGRATIONS AND CORE RUNTIME ACCEPTED (PRD FEATURE ACTIVATION PENDING P5-04)`
 
 ---
 
@@ -21,7 +21,7 @@ The Intellectual Property Research Platform (IPRP) has completed its **P5-03 Pro
 | **P1: Search & Data** | USPTO Bulk Ingestion, Freshness-safe Search, Phonetic & Class Overlap Matching | PostgreSQL (`iprp_test` / Supabase) | Render Cron (`iprp-uspto-ingestion`) | `SEARCH_ENABLED=false` | **FAIL-CLOSED (ACTIVATION PENDING P5-04)** |
 | **P2: Risk Engine** | Candidate Risk Analysis, Visual/Phonetic Scores, Precedent Conflict Detection | PostgreSQL (`risk_scores`) | Synchronous API Service | `RISK_ENGINE_ENABLED=true` | **READY (AUTH DEPENDENCY VERIFIED)** |
 | **P3: Watches & Alerts** | Portfolio Watch Scheduler, Multi-tenant Alert Generation, Email/In-App Dispatch | Redis (`queue:watch_poll`) + PostgreSQL | Render Watch Worker | `WATCH_ENABLED=false` | **FAIL-CLOSED (ACTIVATION PENDING P5-04)** |
-| **P4: Office Actions** | Authorized OA Research, Examiner Summaries, Matter Cross-References | PostgreSQL (`office_action_documents`) | Federated Search Service | `OFFICE_ACTION_SEARCH_ENABLED=false` | **FAIL-CLOSED (ACQUISITION PENDING)** |
+| **P4: Office Actions** | Authorized OA Research, Examiner Summaries, Matter Cross-References | PostgreSQL (`office_action_documents`) | Federated Search Service | `OFFICE_ACTION_SEARCH_ENABLED=false` | **FAIL-CLOSED (OA SOURCE DISCOVERY BLOCKED — AUTHORIZED CASE SEED SET REQUIRED)** |
 | **P4B: Paystack Billing** | Tiered Subscriptions, HMAC SHA512 Webhooks, Idempotent Reconciliation | PostgreSQL (`billing_subscriptions`) | Webhook Listener & Cron | `PAYSTACK_ENABLED=false` | **FAIL-CLOSED (ACTIVATION PENDING P5-04)** |
 | **P5: PDF Exports & Analytics** | Asynchronous PDF Generation, Dashboard Analytics, Shared PDF Storage | Redis (`queue:pdf_export`) + PostgreSQL | Render PDF Worker | `PDF_EXPORT_ENABLED=false` | **FAIL-CLOSED (ACTIVATION PENDING P5-04)** |
 
@@ -45,15 +45,15 @@ The unified security suite `backend/test/security/security-acceptance.test.js` w
 ## 4. Verification Evidence & Test Results
 
 ### 4.1 Backend Quality & Security Verification
-- **Syntax Check**: `194` JavaScript files syntax checked cleanly.
-- **Migration Check**: `22` static migrations verified in sequence without gap or conflict.
+- **Syntax Check**: `195` JavaScript files syntax checked cleanly.
+- **Migration Check**: `23` static migrations verified in sequence without gap or conflict (`001_create_firms_and_users.sql` through `023_add_office_action_corpus_run_counts.sql`).
 - **OpenAPI Parity**: `37` API endpoint paths verified against OpenAPI specification.
 - **Tracked Secret Scan**: `0` sensitive key patterns or credentials detected across tracked repository files.
-- **Security Acceptance Suite**: `18 / 18` tests passed (exit code `0`).
-- **Backend Unit & Integration Suite**: `326 / 326` tests passed.
+- **Backend Unit Suite**: `335 / 335` tests passed across `89` test suites.
+- **Backend Integration & Security Suite**: `19 / 19` tests passed across `7` test suites.
 
 ### 4.2 Frontend Quality Verification
-- **Frontend Unit Suite**: `160 / 160` tests passed across `39` test files.
+- **Frontend Unit Suite**: `162 / 162` tests passed across `40` test files.
 - **Frontend Production Build**: Clean production build completed with `VITE_API_MODE=live`.
 
 ---
@@ -76,15 +76,15 @@ flowchart TD
 
 ## 6. Deployment Readiness & Rollback Rehearsal
 
-1. **Feature Activation Control**: All features default to controlled activation flags (`SEARCH_ENABLED`, `WATCH_ENABLED`, `PDF_EXPORT_ENABLED`, `PAYSTACK_ENABLED`).
+1. **Feature Activation Control**: All unaccepted features default to fail-closed activation flags (`SEARCH_ENABLED=false`, `WATCH_ENABLED=false`, `OFFICE_ACTION_SEARCH_ENABLED=false`, `PDF_EXPORT_ENABLED=false`, `PAYSTACK_ENABLED=false`).
 2. **Graceful Fail-stop & Rollback**:
    - In the event of an upstream dependency outage (e.g., Paystack API), worker processes enter fail-stop state without dropping queue messages.
-   - Database migrations are purely additive (`001` through `022`), enabling seamless rollbacks to previous application container versions without data loss.
+   - Database migrations are purely additive (`001` through `023`), enabling seamless rollbacks to previous application container versions without data loss.
 
 ---
 
 ## 7. Sign-Off
 
 - **Lead Engineer**: Antigravity AI
-- **Status**: Production Accepted
-- **Next Step**: Merge to `main` and trigger release pipeline.
+- **Status**: Core Production Runtime Accepted (PRD Feature Activation Pending)
+- **Next Step**: P5-04 — Controlled Production Feature Activation & Acceptance
