@@ -77,6 +77,19 @@ describe('USPTO Bulk XML adapter', () => {
     ]);
   });
 
+  it('discovers daily archive names rendered in form and script markup', () => {
+    const links = dailyFileLinks(`
+      <option value="downloads/apc260106.zip">January 6</option>
+      <script>downloadFile('apc260107.zip')</script>
+      <div data-file="archive/apc260108.zip?download=1"></div>
+    `, 'https://trademarks.reedtech.com/tmappxml.php');
+    assert.deepEqual(links.map(({ url }) => url), [
+      'https://trademarks.reedtech.com/downloads/apc260106.zip',
+      'https://trademarks.reedtech.com/apc260107.zip',
+      'https://trademarks.reedtech.com/archive/apc260108.zip?download=1',
+    ]);
+  });
+
   it('downloads only listing entries on or after since', async () => {
     const calls = [];
     const adapter = new UsptoBulkXmlAdapter({
