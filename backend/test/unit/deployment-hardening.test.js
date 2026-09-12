@@ -59,7 +59,8 @@ describe('Render blueprint configuration contracts', () => {
     assert.ok(apiBlock.includes('key: SEARCH_ENABLED\n        value: "true"'));
     assert.ok(apiBlock.includes('key: SEARCH_BACKEND\n        value: postgres'));
     assert.ok(apiBlock.includes('key: USPTO_BULK_SOURCE\n        value: listing'));
-    assert.ok(apiBlock.includes('key: USPTO_BULK_LISTING_URL\n        value: "https://bulkdata.uspto.gov/data/trademark/daily/"'));
+    assert.ok(apiBlock.includes('key: USPTO_BULK_LISTING_URL\n        value: "https://bulkdata.uspto.gov/data3/trademark/dailyxml/applications/"'));
+    assert.ok(apiBlock.includes('key: USPTO_LISTING_BASELINE_DAYS\n        value: "7"'));
     assert.ok(apiBlock.includes('key: USPTO_REFRESH_IN_PROCESS_ENABLED\n        value: "true"'));
     assert.ok(apiBlock.includes('key: WATCH_ENABLED\n        value: "true"'));
     assert.ok(apiBlock.includes('key: WATCH_IN_PROCESS_ENABLED\n        value: "true"'));
