@@ -117,7 +117,10 @@ export function dailyFileLinks(listingHtml, listingUrl) {
     pushDailyFileLink(links, match[1], match[2], listingUrl);
   }
 
-  return [...new Map(links.map((link) => [link.url, link])).values()]
+  // There is exactly one daily Applications archive per source date. Keeping
+  // the first discovered reference makes explicit href/download handlers win
+  // over a later bare filename token from the same rendered row.
+  return [...new Map(links.map((link) => [link.date.toISOString().slice(0, 10), link])).values()]
     .sort((left, right) => left.date - right.date);
 }
 
