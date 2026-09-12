@@ -77,6 +77,30 @@ describe('USPTO Bulk XML adapter', () => {
     ]);
   });
 
+  it('discovers daily archive names rendered in form and script markup', () => {
+    const links = dailyFileLinks(`
+      <option value="downloads/apc260106.zip">January 6</option>
+      <script>downloadFile('apc260107.zip')</script>
+      <div data-file="archive/apc260108.zip?download=1"></div>
+    `, 'https://trademarks.reedtech.com/tmappxml.php');
+    assert.deepEqual(links.map(({ url }) => url), [
+      'https://trademarks.reedtech.com/downloads/apc260106.zip',
+      'https://trademarks.reedtech.com/apc260107.zip',
+      'https://trademarks.reedtech.com/archive/apc260108.zip?download=1',
+    ]);
+  });
+
+  it('prefers same-origin download handlers when archive names are link labels', () => {
+    const links = dailyFileLinks(`
+      <a href="download.php?id=106">apc260106.zip</a>
+      <option value="download.php?id=107">apc260107.zip</option>
+    `, 'https://trademarks.reedtech.com/tmappxml.php');
+    assert.deepEqual(links.map(({ url }) => url), [
+      'https://trademarks.reedtech.com/download.php?id=106',
+      'https://trademarks.reedtech.com/download.php?id=107',
+    ]);
+  });
+
   it('downloads only listing entries on or after since', async () => {
     const calls = [];
     const adapter = new UsptoBulkXmlAdapter({

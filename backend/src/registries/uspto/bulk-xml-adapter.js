@@ -17,7 +17,10 @@ import {
   toNodeReadable,
 } from '../bounded-response.js';
 
-const DAILY_FILE_PATTERN = /href\s*=\s*["']([^"']*apc(\d{6})\.zip(?:\?[^"']*)?)["']/gi;
+const DAILY_HREF_PATTERN = /href\s*=\s*["']([^"']*apc(\d{6})\.zip(?:\?[^"']*)?)["']/gi;
+const DAILY_ANCHOR_LABEL_PATTERN = /<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*>[^<]*apc(\d{6})\.zip[^<]*<\/a>/gi;
+const DAILY_OPTION_LABEL_PATTERN = /<option\b[^>]*value\s*=\s*["']([^"']+)["'][^>]*>[^<]*apc(\d{6})\.zip[^<]*<\/option>/gi;
+const DAILY_TOKEN_PATTERN = /([A-Za-z0-9_./%?=&:+~-]*apc(\d{6})\.zip(?:\?[A-Za-z0-9_./%?=&:+~-]*)?)/gi;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 const MAX_SAME_ORIGIN_REDIRECTS = 3;
 const REGISTRY_TIMEOUT_MS = 120_000;
@@ -79,14 +82,50 @@ function sameOriginRedirectFetch(fetchImpl, trustedOrigin, onResolvedUrl = null)
   };
 }
 
+function pushDailyFileLink(links, reference, stamp, listingUrl) {
+  const date = dateFromFileStamp(stamp);
+  if (!date) return;
+  let url;
+  try {
+    url = new URL(reference, listingUrl).toString();
+  } catch {
+    return;
+  }
+  links.push({ date, url });
+}
+
 export function dailyFileLinks(listingHtml, listingUrl) {
   const links = [];
-  for (const match of listingHtml.matchAll(DAILY_FILE_PATTERN)) {
-    const date = dateFromFileStamp(match[2]);
-    if (date) links.push({ date, url: new URL(match[1], listingUrl).toString() });
+
+  for (const match of listingHtml.matchAll(DAILY_HREF_PATTERN)) {
+    pushDailyFileLink(links, match[1], match[2], listingUrl);
   }
-  return [...new Map(links.map((link) => [link.url, link])).values()]
-    .sort((left, right) => left.date - right.date);
+
+  // Some legacy bulk mirrors render the archive filename as visible link text
+  // while href/value points at a download handler. Prefer that real handler
+  // over guessing a sibling file path from the displayed filename.
+  for (const match of listingHtml.matchAll(DAILY_ANCHOR_LABEL_PATTERN)) {
+    pushDailyFileLink(links, match[1], match[2], listingUrl);
+  }
+  for (const match of listingHtml.matchAll(DAILY_OPTION_LABEL_PATTERN)) {
+    pushDailyFileLink(links, match[1], match[2], listingUrl);
+  }
+
+  // Also accept exact archive tokens appearing in simple form/script/data
+  // markup. The caller still rejects every cross-origin destination.
+  for (const match of listingHtml.matchAll(DAILY_TOKEN_PATTERN)) {
+    pushDailyFileLink(links, match[1], match[2], listingUrl);
+  }
+
+  // There is exactly one daily Applications archive per source date. Preserve
+  // the first discovered reference so explicit href/download handlers win over
+  // a later bare filename token from the same rendered row.
+  const firstByDate = new Map();
+  for (const link of links) {
+    const key = link.date.toISOString().slice(0, 10);
+    if (!firstByDate.has(key)) firstByDate.set(key, link);
+  }
+  return [...firstByDate.values()].sort((left, right) => left.date - right.date);
 }
 
 export class UsptoBulkXmlAdapter extends RegistryAdapter {
