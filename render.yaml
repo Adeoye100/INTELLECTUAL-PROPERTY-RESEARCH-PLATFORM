@@ -66,8 +66,8 @@ services:
       - key: AUTH_RATE_LIMIT_KEY_SECRET
         sync: false
 
-      # Search now uses the canonical Supabase/PostgreSQL corpus directly.
-      # ELASTICSEARCH_URL remains only to satisfy the legacy config validator;
+      # Search uses the canonical Supabase/PostgreSQL corpus directly.
+      # ELASTICSEARCH_URL remains only for the legacy config validator;
       # SEARCH_BACKEND=postgres means no request is sent to it.
       - key: SEARCH_ENABLED
         value: "true"
@@ -88,14 +88,16 @@ services:
       - key: SEARCH_MAX_MISSED_REFRESH_RUNS
         value: "2"
 
-      # Keyless USPTO Trademark Daily XML ingestion. The first run creates a
-      # bounded rolling baseline; later runs overlap recent days idempotently.
+      # Public keyless Trademark Applications Daily XML feed. The first live
+      # activation intentionally uses a bounded recent window for a fast,
+      # quota-safe baseline; later runs overlap incrementally and operators can
+      # expand the backfill window under controlled storage monitoring.
       - key: USPTO_BULK_SOURCE
         value: listing
       - key: USPTO_BULK_LISTING_URL
-        value: "https://bulkdata.uspto.gov/data/trademark/daily/"
+        value: "https://bulkdata.uspto.gov/data3/trademark/dailyxml/applications/"
       - key: USPTO_LISTING_BASELINE_DAYS
-        value: "30"
+        value: "7"
       - key: USPTO_INGESTION_OVERLAP_DAYS
         value: "3"
       - key: USPTO_REFRESH_IN_PROCESS_ENABLED
@@ -187,9 +189,9 @@ services:
       - key: USPTO_BULK_SOURCE
         value: listing
       - key: USPTO_BULK_LISTING_URL
-        value: "https://bulkdata.uspto.gov/data/trademark/daily/"
+        value: "https://bulkdata.uspto.gov/data3/trademark/dailyxml/applications/"
       - key: USPTO_LISTING_BASELINE_DAYS
-        value: "30"
+        value: "7"
       - key: USPTO_INGESTION_OVERLAP_DAYS
         value: "3"
       - key: SEARCH_REFRESH_EXPECTED_INTERVAL_HOURS
