@@ -32,6 +32,7 @@ export function createSearchRuntime(config, {
     searchDatabase = createPool(config.databaseUrl, {
       ...config,
       databasePoolMax: Math.min(config.databasePoolMax ?? 3, 3),
+      databaseIdleTimeoutMs: Math.min(config.databaseIdleTimeoutMs ?? 5_000, 5_000),
     });
     searchDatabase.on?.('error', (error) => {
       logger?.warn?.('PostgreSQL search pool error', { name: error.name, code: error.code ?? 'UNKNOWN' });
