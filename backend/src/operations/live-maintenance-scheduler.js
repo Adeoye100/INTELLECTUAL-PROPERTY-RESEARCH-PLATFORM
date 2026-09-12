@@ -43,32 +43,50 @@ export function startLiveMaintenance({ config, system }) {
   );
 
   let stopped = false;
+  let initialTimer = null;
   let refreshTimer = null;
   let refreshRunning = null;
+  let watchStarted = false;
+
+  const startWatch = () => {
+    if (!watchEnabled || stopped || watchStarted || !system.watchRuntime?.worker) return;
+    system.watchRuntime.worker.start();
+    watchStarted = true;
+    console.log('In-process watch worker started after Search freshness activation.');
+  };
 
   const refresh = async () => {
-    if (!refreshEnabled || stopped || refreshRunning) return;
+    if (!refreshEnabled || stopped || refreshRunning) return null;
     refreshRunning = executeUsptoSearchRefresh({
       pool: system.pool,
       config: ingestionConfig(config),
-    }).catch((error) => {
+    });
+    try {
+      const result = await refreshRunning;
+      // Do not dequeue due watches against an empty/stale initial corpus. A
+      // completed refresh makes the freshness ledger authoritative and allows
+      // the existing Watch processor to use the same live Search source.
+      if (result?.status === 'complete') startWatch();
+      return result;
+    } catch (error) {
       console.error('Scheduled USPTO refresh failed', {
         name: error?.name ?? 'Error',
         code: error?.code ?? 'USPTO_REFRESH_FAILED',
       });
-    }).finally(() => { refreshRunning = null; });
-    await refreshRunning;
+      return null;
+    } finally {
+      refreshRunning = null;
+    }
   };
 
-  if (watchEnabled && system.watchRuntime?.worker) {
-    system.watchRuntime.worker.start();
-    console.log('In-process watch worker started.');
-  }
-
-  if (refreshEnabled) {
+  if (!refreshEnabled) {
+    // Deployments using an external ingestion schedule may start Watch
+    // immediately; its processor still enforces the persisted freshness gate.
+    startWatch();
+  } else {
     // Start after the HTTP server has had time to become healthy. The database
     // advisory lock prevents overlap with a standalone/manual refresh.
-    const initialTimer = setTimeout(() => { refresh().catch(() => {}); }, 5_000);
+    initialTimer = setTimeout(() => { refresh().catch(() => {}); }, 5_000);
     initialTimer.unref?.();
     refreshTimer = setInterval(() => { refresh().catch(() => {}); }, intervalMs);
     refreshTimer.unref?.();
@@ -78,9 +96,11 @@ export function startLiveMaintenance({ config, system }) {
   return {
     async stop() {
       stopped = true;
+      if (initialTimer) clearTimeout(initialTimer);
+      initialTimer = null;
       if (refreshTimer) clearInterval(refreshTimer);
       refreshTimer = null;
-      if (watchEnabled && system.watchRuntime?.worker) await system.watchRuntime.worker.stop();
+      if (watchStarted && system.watchRuntime?.worker) await system.watchRuntime.worker.stop();
       await refreshRunning;
     },
   };
