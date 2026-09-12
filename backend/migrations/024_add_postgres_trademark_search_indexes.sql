@@ -1,3 +1,9 @@
+-- The normal API statement timeout is intentionally short. Building search
+-- indexes over an existing registry corpus is controlled deployment work and
+-- can legitimately take longer, so raise the timeout only for this migration
+-- transaction. The migration runner restores the session setting afterwards.
+SET LOCAL statement_timeout = '15min';
+
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE EXTENSION IF NOT EXISTS fuzzystrmatch;
 
