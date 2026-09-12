@@ -139,8 +139,16 @@ services:
         value: "10000"
       - key: DATABASE_STATEMENT_TIMEOUT_MS
         value: "60000"
-      - key: USPTO_BULK_LISTING_URL
+      - key: USPTO_BULK_SOURCE
+        value: odp
+      - key: USPTO_ODP_API_KEY
         sync: false
+      - key: USPTO_ODP_API_BASE_URL
+        value: "https://api.uspto.gov/api/v1/datasets/products"
+      - key: USPTO_ODP_ANNUAL_PRODUCT
+        value: TRTYRAP
+      - key: USPTO_ODP_DAILY_PRODUCT
+        value: TRTDXFAP
       - key: USPTO_INGESTION_OVERLAP_DAYS
         value: "3"
       - key: ELASTICSEARCH_URL
