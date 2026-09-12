@@ -21,12 +21,14 @@ const DAILY_HREF_PATTERN = /href\s*=\s*["']([^"']*apc(\d{6})\.zip(?:\?[^"']*)?)[
 const DAILY_ANCHOR_LABEL_PATTERN = /<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*>[^<]*apc(\d{6})\.zip[^<]*<\/a>/gi;
 const DAILY_OPTION_LABEL_PATTERN = /<option\b[^>]*value\s*=\s*["']([^"']+)["'][^>]*>[^<]*apc(\d{6})\.zip[^<]*<\/option>/gi;
 const DAILY_TOKEN_PATTERN = /([A-Za-z0-9_./%?=&:+~-]*apc(\d{6})\.zip(?:\?[A-Za-z0-9_./%?=&:+~-]*)?)/gi;
+const ATTRIBUTE_REFERENCE_PATTERN = /\b(?:href|action|value)\s*=\s*["']([^"']{1,512})["']/gi;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 const MAX_SAME_ORIGIN_REDIRECTS = 3;
 const REGISTRY_TIMEOUT_MS = 120_000;
 const MAX_LISTING_BYTES = 4 * 1024 * 1024;
 const MAX_DAILY_ARCHIVE_COMPRESSED_BYTES = 64 * 1024 * 1024;
 const MAX_DAILY_ARCHIVE_DECOMPRESSED_BYTES = 256 * 1024 * 1024;
+const MAX_DIAGNOSTIC_PATHS = 12;
 
 function dateFromFileStamp(stamp) {
   const year = 2000 + Number(stamp.slice(0, 2));
@@ -92,6 +94,59 @@ function pushDailyFileLink(links, reference, stamp, listingUrl) {
     return;
   }
   links.push({ date, url });
+}
+
+function countTag(html, name) {
+  return (html.match(new RegExp(`<${name}\\b`, 'gi')) ?? []).length;
+}
+
+function safeTitle(html) {
+  const match = html.match(/<title\b[^>]*>([^<]{0,300})<\/title>/i);
+  if (!match) return null;
+  return match[1]
+    .replace(/\s+/g, ' ')
+    .replace(/[^\x20-\x7e]/g, '?')
+    .trim()
+    .slice(0, 120) || null;
+}
+
+/**
+ * Produce bounded, non-body diagnostics for public bulk listing failures.
+ * Query strings, fragments, credentials and arbitrary response text are never
+ * emitted; same-origin path names are enough to identify a changed download UI.
+ */
+export function listingDiagnostics(listingHtml, listingUrl, response = null) {
+  const base = new URL(listingUrl);
+  const paths = [];
+  const seen = new Set();
+  for (const match of listingHtml.matchAll(ATTRIBUTE_REFERENCE_PATTERN)) {
+    let candidate;
+    try { candidate = new URL(match[1], base); } catch { continue; }
+    if (candidate.origin !== base.origin || candidate.username || candidate.password) continue;
+    const path = candidate.pathname.slice(0, 160);
+    if (!path || seen.has(path)) continue;
+    seen.add(path);
+    paths.push(path);
+    if (paths.length >= MAX_DIAGNOSTIC_PATHS) break;
+  }
+  const rawContentType = response?.headers?.get?.('content-type');
+  const contentType = typeof rawContentType === 'string'
+    ? rawContentType.replace(/[^\x20-\x7e]/g, '').slice(0, 100)
+    : null;
+  return {
+    bytes: Buffer.byteLength(listingHtml, 'utf8'),
+    contentType,
+    title: safeTitle(listingHtml),
+    anchors: countTag(listingHtml, 'a'),
+    forms: countTag(listingHtml, 'form'),
+    selects: countTag(listingHtml, 'select'),
+    options: countTag(listingHtml, 'option'),
+    scripts: countTag(listingHtml, 'script'),
+    hasZipToken: /\.zip\b/i.test(listingHtml),
+    hasXmlToken: /\bxml\b/i.test(listingHtml),
+    hasDownloadToken: /\bdownload\b/i.test(listingHtml),
+    sameOriginPaths: paths,
+  };
 }
 
 export function dailyFileLinks(listingHtml, listingUrl) {
@@ -171,11 +226,13 @@ export class UsptoBulkXmlAdapter extends RegistryAdapter {
       throw new RegistryHttpError(this.sourceName, 'daily-file discovery', request.response.status);
     }
     const resolvedListingUrl = this.resolvedRequestUrl;
-    const links = dailyFileLinks(await readBoundedText(request, {
+    const listingHtml = await readBoundedText(request, {
       maxBytes: this.maxListingBytes, sourceName: this.sourceName, operation: 'daily-file discovery',
-    }), resolvedListingUrl)
+    });
+    const links = dailyFileLinks(listingHtml, resolvedListingUrl)
       .filter((link) => new URL(link.url).origin === this.listingOrigin);
     if (!links.length) {
+      console.warn('USPTO bulk listing diagnostics', listingDiagnostics(listingHtml, resolvedListingUrl, request.response));
       throw new Error(
         `${this.sourceName} listing contained no apcYYMMDD.zip links; `
         + 'verify USPTO_BULK_LISTING_URL and upstream access.',
