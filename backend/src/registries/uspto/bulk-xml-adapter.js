@@ -18,6 +18,8 @@ import {
 } from '../bounded-response.js';
 
 const DAILY_FILE_PATTERN = /href\s*=\s*["']([^"']*apc(\d{6})\.zip(?:\?[^"']*)?)["']/gi;
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+const MAX_SAME_ORIGIN_REDIRECTS = 3;
 // Trademark application dailies average roughly 17 MiB compressed, so the
 // generic 20 MiB registry ceiling leaves too little operational headroom.
 // These remain hard, bounded limits against oversized/malicious responses.
@@ -44,6 +46,44 @@ function startOfUtcDay(date) {
     throw new TypeError('fetchUpdates(since) requires a valid Date.');
   }
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+function redirectLocation(response) {
+  const value = response?.headers?.get?.('location');
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+/**
+ * The public USPTO bulk directory may canonicalize a directory URL with a
+ * same-host redirect. The generic registry HTTP helper rejects redirects to
+ * prevent credential forwarding/SSRF, so handle only a tightly bounded
+ * same-origin redirect chain here. No credentials are attached to these
+ * requests and cross-origin redirects remain rejected.
+ */
+function sameOriginRedirectFetch(fetchImpl, trustedOrigin) {
+  return async function fetchWithSameOriginRedirects(initialUrl, options = {}) {
+    let current = new URL(initialUrl);
+    if (current.origin !== trustedOrigin) throw new TypeError('USPTO bulk request origin is not trusted.');
+
+    for (let redirectCount = 0; redirectCount <= MAX_SAME_ORIGIN_REDIRECTS; redirectCount += 1) {
+      const response = await fetchImpl(current.toString(), { ...options, redirect: 'manual' });
+      if (!REDIRECT_STATUSES.has(response.status)) return response;
+
+      const location = redirectLocation(response);
+      response.body?.cancel?.().catch?.(() => {});
+      if (!location) return response;
+      if (redirectCount === MAX_SAME_ORIGIN_REDIRECTS) {
+        throw new TypeError('USPTO bulk redirect limit exceeded.');
+      }
+
+      const next = new URL(location, current);
+      if (next.origin !== trustedOrigin || next.username || next.password || next.hash) {
+        throw new TypeError('USPTO bulk redirect left the trusted origin.');
+      }
+      current = next;
+    }
+    throw new TypeError('USPTO bulk redirect limit exceeded.');
+  };
 }
 
 export function dailyFileLinks(listingHtml, listingUrl) {
@@ -75,7 +115,7 @@ export class UsptoBulkXmlAdapter extends RegistryAdapter {
     if (typeof fetchImpl !== 'function') throw new TypeError('USPTO bulk adapter needs fetch.');
     this.listingUrl = parsed.toString();
     this.listingOrigin = parsed.origin;
-    this.fetchImpl = fetchImpl;
+    this.fetchImpl = sameOriginRedirectFetch(fetchImpl, this.listingOrigin);
     for (const [name, value] of Object.entries({ maxListingBytes, maxArchiveCompressedBytes, maxArchiveDecompressedBytes })) {
       if (!Number.isSafeInteger(value) || value < 1 || value > 512 * 1024 * 1024) throw new TypeError(`${name} must be a bounded positive byte count.`);
     }
