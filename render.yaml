@@ -65,10 +65,16 @@ services:
         value: "true"
       - key: AUTH_RATE_LIMIT_KEY_SECRET
         sync: false
+
+      # Search uses the canonical Supabase/PostgreSQL corpus directly.
+      # ELASTICSEARCH_URL remains only for the legacy config validator;
+      # SEARCH_BACKEND=postgres means no request is sent to it.
       - key: SEARCH_ENABLED
-        value: "false"
+        value: "true"
+      - key: SEARCH_BACKEND
+        value: postgres
       - key: ELASTICSEARCH_URL
-        sync: false
+        value: "https://iprp-api.onrender.com"
       - key: ELASTICSEARCH_INDEX
         value: trademarks_composite
       - key: SEARCH_SOURCE_REGISTRIES
@@ -81,6 +87,24 @@ services:
         value: "24"
       - key: SEARCH_MAX_MISSED_REFRESH_RUNS
         value: "2"
+
+      # Public keyless Trademark Applications Daily XML feed. The first live
+      # activation intentionally uses a bounded recent window for a fast,
+      # quota-safe baseline; later runs overlap incrementally and operators can
+      # expand the backfill window under controlled storage monitoring.
+      - key: USPTO_BULK_SOURCE
+        value: listing
+      - key: USPTO_BULK_LISTING_URL
+        value: "https://bulkdata.uspto.gov/data3/trademark/dailyxml/applications/"
+      - key: USPTO_LISTING_BASELINE_DAYS
+        value: "7"
+      - key: USPTO_INGESTION_OVERLAP_DAYS
+        value: "3"
+      - key: USPTO_REFRESH_IN_PROCESS_ENABLED
+        value: "true"
+      - key: USPTO_REFRESH_INTERVAL_MS
+        value: "21600000"
+
       - key: OFFICE_ACTION_SEARCH_ENABLED
         value: "false"
       - key: OFFICE_ACTION_SOURCE_REGISTRIES
@@ -89,14 +113,28 @@ services:
         value: "30000"
       - key: OFFICE_ACTION_SEARCH_MAX_RESULTS
         value: "50"
+
       - key: WATCH_ENABLED
-        value: "false"
+        value: "true"
+      - key: WATCH_IN_PROCESS_ENABLED
+        value: "true"
+      - key: WATCH_SCHEDULER_INTERVAL_MS
+        value: "60000"
+      - key: WATCH_SCHEDULER_BATCH_SIZE
+        value: "50"
+      - key: WATCH_POLL_INTERVAL_MINUTES
+        value: "1440"
+      - key: WORKER_HEARTBEAT_TTL_SECONDS
+        value: "60"
+
       - key: PDF_EXPORT_ENABLED
         value: "false"
       - key: PDF_EXPORT_STORAGE_PROVIDER
         value: database
       - key: PDF_EXPORT_QUEUE_KEY
         value: queue:pdf_export
+
+      # Billing remains intentionally unchanged for this release.
       - key: PAYSTACK_ENABLED
         value: "false"
       - key: PAYSTACK_MODE
@@ -116,6 +154,9 @@ services:
       - key: PAYSTACK_PROFESSIONAL_CURRENCY
         value: NGN
 
+  # Optional dedicated ingestion process. The API currently runs the same
+  # advisory-lock-protected refresh in-process, so provisioning this cron later
+  # is safe and does not require Elasticsearch or a USPTO API key.
   - type: cron
     name: iprp-uspto-ingestion
     runtime: node
@@ -139,27 +180,27 @@ services:
         value: "10000"
       - key: DATABASE_STATEMENT_TIMEOUT_MS
         value: "60000"
-      - key: USPTO_BULK_SOURCE
-        value: odp
-      - key: USPTO_ODP_API_KEY
-        sync: false
-      - key: USPTO_ODP_API_BASE_URL
-        value: "https://api.uspto.gov/api/v1/datasets/products"
-      - key: USPTO_ODP_ANNUAL_PRODUCT
-        value: TRTYRAP
-      - key: USPTO_ODP_DAILY_PRODUCT
-        value: TRTDXFAP
-      - key: USPTO_INGESTION_OVERLAP_DAYS
-        value: "3"
+      - key: SEARCH_BACKEND
+        value: postgres
       - key: ELASTICSEARCH_URL
-        sync: false
+        value: "https://iprp-api.onrender.com"
       - key: ELASTICSEARCH_INDEX
         value: trademarks_composite
+      - key: USPTO_BULK_SOURCE
+        value: listing
+      - key: USPTO_BULK_LISTING_URL
+        value: "https://bulkdata.uspto.gov/data3/trademark/dailyxml/applications/"
+      - key: USPTO_LISTING_BASELINE_DAYS
+        value: "7"
+      - key: USPTO_INGESTION_OVERLAP_DAYS
+        value: "3"
       - key: SEARCH_REFRESH_EXPECTED_INTERVAL_HOURS
         value: "24"
       - key: SEARCH_MAX_MISSED_REFRESH_RUNS
         value: "2"
 
+  # Optional dedicated Watch worker. Production can use this instead of the
+  # in-process worker once the service is provisioned with the same secrets.
   - type: worker
     name: iprp-watch-worker
     runtime: node
@@ -187,11 +228,11 @@ services:
       - key: REDIS_URL
         sync: false
       - key: SEARCH_ENABLED
-        value: "false"
-      - key: WATCH_ENABLED
-        value: "false"
+        value: "true"
+      - key: SEARCH_BACKEND
+        value: postgres
       - key: ELASTICSEARCH_URL
-        sync: false
+        value: "https://iprp-api.onrender.com"
       - key: ELASTICSEARCH_INDEX
         value: trademarks_composite
       - key: SEARCH_SOURCE_REGISTRIES
@@ -204,6 +245,8 @@ services:
         value: "24"
       - key: SEARCH_MAX_MISSED_REFRESH_RUNS
         value: "2"
+      - key: WATCH_ENABLED
+        value: "true"
       - key: WATCH_SCHEDULER_INTERVAL_MS
         value: "60000"
       - key: WATCH_SCHEDULER_BATCH_SIZE

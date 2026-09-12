@@ -11,8 +11,6 @@ import {
 } from './constants.js';
 import { parseUsptoBulkXml } from './bulk-xml-parser.js';
 import {
-  DEFAULT_MAX_REGISTRY_COMPRESSED_BYTES,
-  DEFAULT_MAX_REGISTRY_DECOMPRESSED_BYTES,
   limitReadableBytes,
   readBoundedText,
   requestBoundedResponse,
@@ -20,8 +18,13 @@ import {
 } from '../bounded-response.js';
 
 const DAILY_FILE_PATTERN = /href\s*=\s*["']([^"']*apc(\d{6})\.zip(?:\?[^"']*)?)["']/gi;
-const REGISTRY_TIMEOUT_MS = 30_000;
-const MAX_LISTING_BYTES = 1 * 1024 * 1024;
+// Trademark application dailies average roughly 17 MiB compressed, so the
+// generic 20 MiB registry ceiling leaves too little operational headroom.
+// These remain hard, bounded limits against oversized/malicious responses.
+const REGISTRY_TIMEOUT_MS = 120_000;
+const MAX_LISTING_BYTES = 4 * 1024 * 1024;
+const MAX_DAILY_ARCHIVE_COMPRESSED_BYTES = 64 * 1024 * 1024;
+const MAX_DAILY_ARCHIVE_DECOMPRESSED_BYTES = 256 * 1024 * 1024;
 
 function dateFromFileStamp(stamp) {
   const year = 2000 + Number(stamp.slice(0, 2));
@@ -58,8 +61,8 @@ export class UsptoBulkXmlAdapter extends RegistryAdapter {
     listingUrl = DEFAULT_USPTO_BULK_LISTING_URL,
     fetchImpl = globalThis.fetch,
     maxListingBytes = MAX_LISTING_BYTES,
-    maxArchiveCompressedBytes = DEFAULT_MAX_REGISTRY_COMPRESSED_BYTES,
-    maxArchiveDecompressedBytes = DEFAULT_MAX_REGISTRY_DECOMPRESSED_BYTES,
+    maxArchiveCompressedBytes = MAX_DAILY_ARCHIVE_COMPRESSED_BYTES,
+    maxArchiveDecompressedBytes = MAX_DAILY_ARCHIVE_DECOMPRESSED_BYTES,
   } = {}) {
     super(USPTO_BULK_SOURCE_NAME);
     let parsed;
