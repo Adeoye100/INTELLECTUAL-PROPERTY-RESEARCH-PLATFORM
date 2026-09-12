@@ -17,6 +17,16 @@ function boundedInterval(name, fallback, minimum, maximum) {
   return value;
 }
 
+function safeDiagnosticMessage(error) {
+  const value = typeof error?.message === 'string' ? error.message : '';
+  // Keep logs actionable without allowing upstream response bodies, headers,
+  // credentials, or unbounded content into production logs.
+  return value
+    .replace(/https?:\/\/[^\s]+/gi, '[url]')
+    .replace(/[\r\n\t]+/g, ' ')
+    .slice(0, 240) || 'No diagnostic message available.';
+}
+
 function ingestionConfig(config) {
   return {
     ...config,
@@ -72,6 +82,8 @@ export function startLiveMaintenance({ config, system }) {
       console.error('Scheduled USPTO refresh failed', {
         name: error?.name ?? 'Error',
         code: error?.code ?? 'USPTO_REFRESH_FAILED',
+        message: safeDiagnosticMessage(error),
+        causeCode: typeof error?.cause?.code === 'string' ? error.cause.code.slice(0, 80) : null,
       });
       return null;
     } finally {
