@@ -18,6 +18,8 @@ import {
 } from '../bounded-response.js';
 
 const DAILY_HREF_PATTERN = /href\s*=\s*["']([^"']*apc(\d{6})\.zip(?:\?[^"']*)?)["']/gi;
+const DAILY_ANCHOR_LABEL_PATTERN = /<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*>[^<]*apc(\d{6})\.zip[^<]*<\/a>/gi;
+const DAILY_OPTION_LABEL_PATTERN = /<option\b[^>]*value\s*=\s*["']([^"']+)["'][^>]*>[^<]*apc(\d{6})\.zip[^<]*<\/option>/gi;
 const DAILY_TOKEN_PATTERN = /([A-Za-z0-9_./%?=&:+~-]*apc(\d{6})\.zip(?:\?[A-Za-z0-9_./%?=&:+~-]*)?)/gi;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 const MAX_SAME_ORIGIN_REDIRECTS = 3;
@@ -95,14 +97,22 @@ function pushDailyFileLink(links, reference, stamp, listingUrl) {
 export function dailyFileLinks(listingHtml, listingUrl) {
   const links = [];
 
-  // Prefer actual anchors when the upstream page exposes normal links.
   for (const match of listingHtml.matchAll(DAILY_HREF_PATTERN)) {
     pushDailyFileLink(links, match[1], match[2], listingUrl);
   }
 
-  // ReedTech's legacy mirror has historically rendered downloadable filenames
-  // through form/script markup as well as anchors. Accept only exact
-  // apcYYMMDD.zip tokens, then apply the same same-origin enforcement later.
+  // Some legacy bulk mirrors render the archive filename as visible link text
+  // while href/value points at a download handler. Prefer that real handler
+  // over guessing a sibling file path from the displayed filename.
+  for (const match of listingHtml.matchAll(DAILY_ANCHOR_LABEL_PATTERN)) {
+    pushDailyFileLink(links, match[1], match[2], listingUrl);
+  }
+  for (const match of listingHtml.matchAll(DAILY_OPTION_LABEL_PATTERN)) {
+    pushDailyFileLink(links, match[1], match[2], listingUrl);
+  }
+
+  // Also accept exact archive tokens appearing in simple form/script/data
+  // markup. The caller still rejects every cross-origin destination.
   for (const match of listingHtml.matchAll(DAILY_TOKEN_PATTERN)) {
     pushDailyFileLink(links, match[1], match[2], listingUrl);
   }
