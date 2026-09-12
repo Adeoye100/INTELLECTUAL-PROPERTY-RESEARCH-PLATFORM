@@ -1,5 +1,6 @@
 import { loadUsptoSearchRefreshConfig } from '../config.js';
 import { createPool } from '../db/pool.js';
+import { loadUsptoBulkSourceConfig } from '../registries/uspto/odp-config.js';
 import { executeUsptoSearchRefresh } from './uspto-search-refresh-service.js';
 
 function argument(name) {
@@ -16,7 +17,10 @@ if (sinceValue && !/^\d{4}-\d{2}-\d{2}$/.test(sinceValue)) {
   throw new Error('--since must use YYYY-MM-DD format.');
 }
 
-const config = loadUsptoSearchRefreshConfig();
+const config = {
+  ...loadUsptoSearchRefreshConfig(),
+  ...loadUsptoBulkSourceConfig(),
+};
 const pool = createPool(config.databaseUrl, config);
 
 try {
@@ -25,10 +29,12 @@ try {
     config,
     sinceOverride: sinceValue || null,
   });
-  if (result.status === 'already_running') {
-    process.exit(0);
-  }
+  if (result.status === 'already_running') process.exit(0);
 } catch (error) {
+  console.error('USPTO search refresh command failed', {
+    name: error?.name ?? 'Error',
+    code: error?.code ?? 'UNKNOWN',
+  });
   process.exit(1);
 } finally {
   await pool.end();
