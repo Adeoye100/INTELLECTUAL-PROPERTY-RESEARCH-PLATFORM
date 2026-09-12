@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "node --env-file=.env --watch src/server.js",
-    "start": "node src/server.js",
+    "start": "pnpm migrate && node src/server.js",
     "watch:worker": "node src/watch/run-watch-worker.js",
     "watch:worker:dev": "node --env-file=.env src/watch/run-watch-worker.js",
     "pdf-export:worker": "node src/exports/run-pdf-export-worker.js",
