@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { loadConfig } from './config.js';
 import { configureHttpServer } from './http-server.js';
 import { createSystem } from './system.js';
+import { startLiveMaintenance } from './operations/live-maintenance-scheduler.js';
 
 const config = loadConfig();
 const system = await createSystem(config);
@@ -12,6 +13,7 @@ configureHttpServer(server, config);
 server.listen(config.port, '0.0.0.0', () => {
   console.log(`IPRP API listening on port ${config.port}.`);
 });
+const liveMaintenance = startLiveMaintenance({ config, system });
 
 let stopping = false;
 async function shutdown(signal) {
@@ -25,6 +27,7 @@ async function shutdown(signal) {
   deadline.unref();
   server.close(async () => {
     try {
+      await liveMaintenance.stop();
       await system.close();
       process.exitCode = 0;
     } finally { clearTimeout(deadline); }
