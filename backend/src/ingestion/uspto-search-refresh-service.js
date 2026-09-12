@@ -65,6 +65,24 @@ function rollingListingBaselineDate(clock = () => new Date()) {
   return date;
 }
 
+async function acquireRefreshLock(pool) {
+  // PostgreSQL advisory locks are session-scoped. Production pools can route
+  // consecutive pool.query calls to different sessions, so pin the lock to a
+  // dedicated client for the whole refresh. Lightweight unit fakes that only
+  // expose query() keep the same executable contract.
+  const client = typeof pool.connect === 'function' ? await pool.connect() : pool;
+  try {
+    const result = await client.query(
+      'SELECT pg_try_advisory_lock(hashtext($1)) AS locked',
+      [LOCK_KEY],
+    );
+    return { client, locked: Boolean(result.rows[0]?.locked), dedicated: client !== pool };
+  } catch (error) {
+    if (client !== pool) client.release();
+    throw error;
+  }
+}
+
 export async function executeUsptoSearchRefresh({
   pool,
   config,
@@ -73,12 +91,9 @@ export async function executeUsptoSearchRefresh({
   projectorOverride = null,
   clock = () => new Date(),
 }) {
-  const lockResult = await pool.query(
-    'SELECT pg_try_advisory_lock(hashtext($1)) AS locked',
-    [LOCK_KEY],
-  );
-  const locked = Boolean(lockResult.rows[0]?.locked);
-  if (!locked) {
+  const lock = await acquireRefreshLock(pool);
+  if (!lock.locked) {
+    if (lock.dedicated) lock.client.release();
     console.log('USPTO search refresh skipped; run is already in progress', { code: 'REFRESH_ALREADY_RUNNING' });
     return { status: 'already_running' };
   }
@@ -222,9 +237,10 @@ export async function executeUsptoSearchRefresh({
     console.error('USPTO search refresh failed', { runId, code: errorCode });
     throw error;
   } finally {
-    await pool.query(
+    await lock.client.query(
       'SELECT pg_advisory_unlock(hashtext($1))',
       [LOCK_KEY],
     ).catch(() => {});
+    if (lock.dedicated) lock.client.release();
   }
 }
