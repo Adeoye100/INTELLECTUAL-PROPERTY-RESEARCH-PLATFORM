@@ -20,11 +20,17 @@ async function collect(iterable) {
   return records;
 }
 
-function response(body, { status = 200, contentLength = null } = {}) {
+function response(body, { status = 200, contentLength = null, location = null } = {}) {
   return {
     ok: status >= 200 && status < 300,
     status,
-    headers: { get(name) { return name.toLowerCase() === 'content-length' ? contentLength : null; } },
+    headers: {
+      get(name) {
+        if (name.toLowerCase() === 'content-length') return contentLength;
+        if (name.toLowerCase() === 'location') return location;
+        return null;
+      },
+    },
     body: Readable.from([Buffer.from(body)]),
   };
 }
@@ -90,6 +96,39 @@ describe('USPTO Bulk XML adapter', () => {
       'https://example.test/listing',
       'https://example.test/apc260105.zip',
     ]);
+  });
+
+  it('allows bounded same-origin canonicalization redirects for the public listing', async () => {
+    const calls = [];
+    const adapter = new UsptoBulkXmlAdapter({
+      listingUrl: 'https://registry.example.test/applications',
+      fetchImpl: async (url, options) => {
+        calls.push({ url, redirect: options?.redirect });
+        if (url.endsWith('/applications')) {
+          return response('', { status: 301, location: '/applications/' });
+        }
+        return response('<a href="apc260105.zip">daily</a>');
+      },
+    });
+
+    const updates = await adapter.discoverUpdates(new Date('2026-01-05T00:00:00.000Z'));
+    assert.equal(updates.length, 1);
+    assert.equal(updates[0].url, 'https://registry.example.test/applications/apc260105.zip');
+    assert.deepEqual(calls, [
+      { url: 'https://registry.example.test/applications', redirect: 'manual' },
+      { url: 'https://registry.example.test/applications/', redirect: 'manual' },
+    ]);
+  });
+
+  it('rejects a cross-origin redirect from the public listing', async () => {
+    const adapter = new UsptoBulkXmlAdapter({
+      listingUrl: 'https://registry.example.test/applications',
+      fetchImpl: async () => response('', { status: 302, location: 'https://unexpected.example.test/listing' }),
+    });
+    await assert.rejects(
+      adapter.discoverUpdates(new Date('2026-01-05T00:00:00.000Z')),
+      /redirect left the trusted origin/,
+    );
   });
 
   it('does not follow a cross-origin archive URL discovered in an upstream listing', async () => {
