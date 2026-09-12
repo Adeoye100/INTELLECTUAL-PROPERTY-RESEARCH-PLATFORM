@@ -23,7 +23,7 @@ export function createSearchRuntime(config, {
   database = null,
 } = {}) {
   if (!config?.searchEnabled) {
-    return { searchSources: [], federatedSearchService: null, searchService: null, searchDatabase: null };
+    return { searchSources: [], federatedSearchService: null, searchService: null };
   }
 
   const backend = configuredBackend();
