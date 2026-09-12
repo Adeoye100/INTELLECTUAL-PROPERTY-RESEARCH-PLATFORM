@@ -17,7 +17,8 @@ import {
   toNodeReadable,
 } from '../bounded-response.js';
 
-const DAILY_FILE_PATTERN = /href\s*=\s*["']([^"']*apc(\d{6})\.zip(?:\?[^"']*)?)["']/gi;
+const DAILY_HREF_PATTERN = /href\s*=\s*["']([^"']*apc(\d{6})\.zip(?:\?[^"']*)?)["']/gi;
+const DAILY_TOKEN_PATTERN = /([A-Za-z0-9_./%?=&:+~-]*apc(\d{6})\.zip(?:\?[A-Za-z0-9_./%?=&:+~-]*)?)/gi;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 const MAX_SAME_ORIGIN_REDIRECTS = 3;
 const REGISTRY_TIMEOUT_MS = 120_000;
@@ -79,12 +80,33 @@ function sameOriginRedirectFetch(fetchImpl, trustedOrigin, onResolvedUrl = null)
   };
 }
 
+function pushDailyFileLink(links, reference, stamp, listingUrl) {
+  const date = dateFromFileStamp(stamp);
+  if (!date) return;
+  let url;
+  try {
+    url = new URL(reference, listingUrl).toString();
+  } catch {
+    return;
+  }
+  links.push({ date, url });
+}
+
 export function dailyFileLinks(listingHtml, listingUrl) {
   const links = [];
-  for (const match of listingHtml.matchAll(DAILY_FILE_PATTERN)) {
-    const date = dateFromFileStamp(match[2]);
-    if (date) links.push({ date, url: new URL(match[1], listingUrl).toString() });
+
+  // Prefer actual anchors when the upstream page exposes normal links.
+  for (const match of listingHtml.matchAll(DAILY_HREF_PATTERN)) {
+    pushDailyFileLink(links, match[1], match[2], listingUrl);
   }
+
+  // ReedTech's legacy mirror has historically rendered downloadable filenames
+  // through form/script markup as well as anchors. Accept only exact
+  // apcYYMMDD.zip tokens, then apply the same same-origin enforcement later.
+  for (const match of listingHtml.matchAll(DAILY_TOKEN_PATTERN)) {
+    pushDailyFileLink(links, match[1], match[2], listingUrl);
+  }
+
   return [...new Map(links.map((link) => [link.url, link])).values()]
     .sort((left, right) => left.date - right.date);
 }
