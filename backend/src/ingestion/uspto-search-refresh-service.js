@@ -10,6 +10,21 @@ import {
 
 const LOCK_KEY = 'uspto_search_refresh';
 
+function searchBackend() {
+  const value = process.env.SEARCH_BACKEND?.trim().toLowerCase() || 'elasticsearch';
+  if (!['elasticsearch', 'postgres'].includes(value)) throw new Error('SEARCH_BACKEND must be elasticsearch or postgres.');
+  return value;
+}
+
+function listingBaselineDays() {
+  const raw = process.env.USPTO_LISTING_BASELINE_DAYS?.trim() || '30';
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < 1 || value > 365) {
+    throw new Error('USPTO_LISTING_BASELINE_DAYS must be an integer from 1 through 365.');
+  }
+  return value;
+}
+
 function classifyError(error) {
   if (!error) return 'UNKNOWN_REFRESH_ERROR';
   const message = error.message ?? '';
@@ -43,12 +58,20 @@ function calendarDate(value, message) {
   return date;
 }
 
+function rollingListingBaselineDate(clock = () => new Date()) {
+  const date = clock();
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCDate(date.getUTCDate() - listingBaselineDays());
+  return date;
+}
+
 export async function executeUsptoSearchRefresh({
   pool,
   config,
   sinceOverride = null,
   adapterOverride = null,
   projectorOverride = null,
+  clock = () => new Date(),
 }) {
   const lockResult = await pool.query(
     'SELECT pg_try_advisory_lock(hashtext($1)) AS locked',
@@ -70,6 +93,7 @@ export async function executeUsptoSearchRefresh({
     let requestedSinceDate;
     let updates;
     let baseline = false;
+    let baselineMode = null;
 
     if (sinceOverride) {
       const since = calendarDate(sinceOverride, 'Explicit since date is invalid.');
@@ -90,12 +114,18 @@ export async function executeUsptoSearchRefresh({
         throw new Error('BASELINE_REQUIRED: USPTO ODP did not return a usable annual baseline.');
       }
       baseline = true;
+      baselineMode = 'annual-baseline-plus-daily';
       requestedSinceDate = discovery.coverageStart.toISOString().slice(0, 10);
       updates = discovery.updates;
     } else {
-      throw new Error(
-        'BASELINE_REQUIRED: Configure the official USPTO ODP source for automatic annual baseline loading, or provide an explicit --since date.',
-      );
+      const since = rollingListingBaselineDate(clock);
+      baseline = true;
+      baselineMode = 'rolling-daily-baseline';
+      requestedSinceDate = since.toISOString().slice(0, 10);
+      updates = await adapter.discoverUpdates(since);
+      if (!updates.length) {
+        throw new Error('BASELINE_REQUIRED: Keyless USPTO bulk listing returned no daily XML files inside the configured baseline window.');
+      }
     }
 
     const run = await refreshRepo.startRun({
@@ -142,38 +172,50 @@ export async function executeUsptoSearchRefresh({
       changedRecordCount,
     });
 
-    const projector = projectorOverride ?? new ElasticsearchProjector({
-      baseUrl: config.elasticsearchUrl,
-      indexName: config.elasticsearchIndex,
-    });
+    const backend = searchBackend();
+    let projectedRecordCount;
+    let backlogCount;
 
-    const syncResult = await syncRegistryTrademarksToElasticsearch({
-      repository: trademarkRepo,
-      projector,
-    });
-
-    const backlogCount = await trademarkRepo.projectionBacklogCount();
-    if (backlogCount > 0) throw new Error(`PROJECTION_BACKLOG_REMAINS: ${backlogCount} unprojected row(s) remain.`);
+    if (backend === 'postgres') {
+      // PostgreSQL is the canonical search store. No second projection is
+      // required; a committed upsert is immediately searchable by the indexed
+      // Postgres source.
+      projectedRecordCount = changedRecordCount;
+      backlogCount = 0;
+    } else {
+      const projector = projectorOverride ?? new ElasticsearchProjector({
+        baseUrl: config.elasticsearchUrl,
+        indexName: config.elasticsearchIndex,
+      });
+      const syncResult = await syncRegistryTrademarksToElasticsearch({
+        repository: trademarkRepo,
+        projector,
+      });
+      projectedRecordCount = syncResult.projected;
+      backlogCount = await trademarkRepo.projectionBacklogCount();
+      if (backlogCount > 0) throw new Error(`PROJECTION_BACKLOG_REMAINS: ${backlogCount} unprojected row(s) remain.`);
+    }
 
     const completedRun = await refreshRepo.markComplete({
       runId: run.id,
       dataThroughDate,
-      projectedRecordCount: syncResult.projected,
+      projectedRecordCount,
       projectionBacklogCount: backlogCount,
     });
 
     console.log('USPTO search refresh complete', {
       runId: run.id,
-      mode: baseline ? 'annual-baseline-plus-daily' : 'incremental-daily',
+      backend,
+      mode: baseline ? baselineMode : 'incremental-daily',
       since: requestedSinceDate,
       filesDiscovered: discoveredFileCount,
       processed: processedRecordCount,
       changed: changedRecordCount,
-      projected: syncResult.projected,
+      projected: projectedRecordCount,
       dataThrough: dataThroughDate,
     });
 
-    return { status: 'complete', run: completedRun, baseline };
+    return { status: 'complete', run: completedRun, baseline, baselineMode, backend };
   } catch (error) {
     const errorCode = classifyError(error);
     if (runId) await refreshRepo.markFailed({ runId, errorCode }).catch(() => {});
