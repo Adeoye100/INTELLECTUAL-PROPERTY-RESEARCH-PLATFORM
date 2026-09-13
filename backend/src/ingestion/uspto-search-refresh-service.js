@@ -1,3 +1,4 @@
+import { UsptoBdssBulkXmlAdapter } from '../registries/uspto/bdss-bulk-adapter.js';
 import { UsptoBulkXmlAdapter } from '../registries/uspto/bulk-xml-adapter.js';
 import { UsptoOdpBulkXmlAdapter } from '../registries/uspto/odp-bulk-adapter.js';
 import { ingestRegistryRecords } from './ingest-registry.js';
@@ -49,6 +50,12 @@ function createConfiguredAdapter(config) {
       dailyProduct: config.usptoOdpDailyProduct,
     });
   }
+  if (config.usptoBulkSource === 'bdss') {
+    return new UsptoBdssBulkXmlAdapter({
+      baseUrl: config.usptoBdssApiBaseUrl,
+      dailyProduct: config.usptoBdssDailyProduct,
+    });
+  }
   return new UsptoBulkXmlAdapter({ listingUrl: config.usptoBulkListingUrl });
 }
 
@@ -66,10 +73,6 @@ function rollingListingBaselineDate(clock = () => new Date()) {
 }
 
 async function acquireRefreshLock(pool) {
-  // PostgreSQL advisory locks are session-scoped. Production pools can route
-  // consecutive pool.query calls to different sessions, so pin the lock to a
-  // dedicated client for the whole refresh. Lightweight unit fakes that only
-  // expose query() keep the same executable contract.
   const client = typeof pool.connect === 'function' ? await pool.connect() : pool;
   try {
     const result = await client.query(
@@ -116,9 +119,7 @@ export async function executeUsptoSearchRefresh({
       updates = await adapter.discoverUpdates(since);
     } else if (latestComplete) {
       const baseDateStr = latestComplete.dataThroughDate || latestComplete.requestedSinceDate;
-      if (!baseDateStr) {
-        throw new Error('BASELINE_REQUIRED: Previous complete run contained no dataThroughDate or requestedSinceDate.');
-      }
+      if (!baseDateStr) throw new Error('BASELINE_REQUIRED: Previous complete run contained no dataThroughDate or requestedSinceDate.');
       const since = calendarDate(baseDateStr, 'Previous complete refresh date is invalid.');
       since.setUTCDate(since.getUTCDate() - (config.usptoIngestionOverlapDays ?? 3));
       requestedSinceDate = since.toISOString().slice(0, 10);
@@ -135,18 +136,13 @@ export async function executeUsptoSearchRefresh({
     } else {
       const since = rollingListingBaselineDate(clock);
       baseline = true;
-      baselineMode = 'rolling-daily-baseline';
+      baselineMode = config.usptoBulkSource === 'bdss' ? 'rolling-bdss-daily-baseline' : 'rolling-daily-baseline';
       requestedSinceDate = since.toISOString().slice(0, 10);
       updates = await adapter.discoverUpdates(since);
-      if (!updates.length) {
-        throw new Error('BASELINE_REQUIRED: Keyless USPTO bulk listing returned no daily XML files inside the configured baseline window.');
-      }
+      if (!updates.length) throw new Error('BASELINE_REQUIRED: Keyless USPTO bulk source returned no daily XML files inside the configured baseline window.');
     }
 
-    const run = await refreshRepo.startRun({
-      sourceRegistry: 'USPTO',
-      requestedSinceDate,
-    });
+    const run = await refreshRepo.startRun({ sourceRegistry: 'USPTO', requestedSinceDate });
     runId = run.id;
 
     const discoveredFileCount = updates.length;
@@ -192,9 +188,6 @@ export async function executeUsptoSearchRefresh({
     let backlogCount;
 
     if (backend === 'postgres') {
-      // PostgreSQL is the canonical search store. No second projection is
-      // required; a committed upsert is immediately searchable by the indexed
-      // Postgres source.
       projectedRecordCount = changedRecordCount;
       backlogCount = 0;
     } else {
@@ -202,10 +195,7 @@ export async function executeUsptoSearchRefresh({
         baseUrl: config.elasticsearchUrl,
         indexName: config.elasticsearchIndex,
       });
-      const syncResult = await syncRegistryTrademarksToElasticsearch({
-        repository: trademarkRepo,
-        projector,
-      });
+      const syncResult = await syncRegistryTrademarksToElasticsearch({ repository: trademarkRepo, projector });
       projectedRecordCount = syncResult.projected;
       backlogCount = await trademarkRepo.projectionBacklogCount();
       if (backlogCount > 0) throw new Error(`PROJECTION_BACKLOG_REMAINS: ${backlogCount} unprojected row(s) remain.`);
@@ -237,10 +227,7 @@ export async function executeUsptoSearchRefresh({
     console.error('USPTO search refresh failed', { runId, code: errorCode });
     throw error;
   } finally {
-    await lock.client.query(
-      'SELECT pg_advisory_unlock(hashtext($1))',
-      [LOCK_KEY],
-    ).catch(() => {});
+    await lock.client.query('SELECT pg_advisory_unlock(hashtext($1))', [LOCK_KEY]).catch(() => {});
     if (lock.dedicated) lock.client.release();
   }
 }
