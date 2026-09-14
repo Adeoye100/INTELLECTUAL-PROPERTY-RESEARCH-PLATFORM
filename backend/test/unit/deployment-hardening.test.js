@@ -21,13 +21,14 @@ describe('initial-deployment database boundary', () => {
 });
 
 describe('Render blueprint configuration contracts', () => {
-  it('keeps externally blocked Search and Watch activation fail-closed while preserving their implementation config', async () => {
+  it('activates database-backed research and server reports while upstream refresh, Watch, and billing stay fail-closed', async () => {
     const renderYaml = await readFile(new URL('../../../render.yaml', import.meta.url), 'utf8');
     const apiBlock = renderYaml.split('- type: web')[1]?.split('- type:')[0] || '';
 
     const requiredKeys = [
       'SEARCH_ENABLED',
       'SEARCH_BACKEND',
+      'SEARCH_FRESHNESS_MODE',
       'ELASTICSEARCH_URL',
       'ELASTICSEARCH_INDEX',
       'SEARCH_SOURCE_REGISTRIES',
@@ -47,6 +48,7 @@ describe('Render blueprint configuration contracts', () => {
       'WATCH_ENABLED',
       'WATCH_IN_PROCESS_ENABLED',
       'PDF_EXPORT_ENABLED',
+      'PDF_EXPORT_IN_PROCESS_ENABLED',
       'PAYSTACK_ENABLED',
     ];
 
@@ -57,18 +59,16 @@ describe('Render blueprint configuration contracts', () => {
       );
     }
 
-    assert.ok(apiBlock.includes('key: SEARCH_ENABLED\n        value: "false"'));
+    assert.ok(apiBlock.includes('key: SEARCH_ENABLED\n        value: "true"'));
     assert.ok(apiBlock.includes('key: SEARCH_BACKEND\n        value: postgres'));
-    assert.ok(apiBlock.includes('key: USPTO_BULK_SOURCE\n        value: bdss'));
-    assert.ok(apiBlock.includes('key: USPTO_BDSS_API_BASE_URL\n        value: "https://bulkdata.uspto.gov/BDSS-API/products"'));
-    assert.ok(apiBlock.includes('key: USPTO_BDSS_DAILY_PRODUCT\n        value: TRTDXFAP'));
-    assert.ok(apiBlock.includes('key: USPTO_LISTING_BASELINE_DAYS\n        value: "7"'));
+    assert.ok(apiBlock.includes('key: SEARCH_FRESHNESS_MODE\n        value: corpus'));
     assert.ok(apiBlock.includes('key: USPTO_REFRESH_IN_PROCESS_ENABLED\n        value: "false"'));
+    assert.ok(apiBlock.includes('key: OFFICE_ACTION_SEARCH_ENABLED\n        value: "true"'));
+    assert.ok(apiBlock.includes('key: PDF_EXPORT_ENABLED\n        value: "true"'));
+    assert.ok(apiBlock.includes('key: PDF_EXPORT_IN_PROCESS_ENABLED\n        value: "true"'));
+
     assert.ok(apiBlock.includes('key: WATCH_ENABLED\n        value: "false"'));
     assert.ok(apiBlock.includes('key: WATCH_IN_PROCESS_ENABLED\n        value: "false"'));
-
-    assert.ok(apiBlock.includes('key: OFFICE_ACTION_SEARCH_ENABLED\n        value: "false"'));
-    assert.ok(apiBlock.includes('key: PDF_EXPORT_ENABLED\n        value: "false"'));
     assert.ok(apiBlock.includes('key: PAYSTACK_ENABLED\n        value: "false"'));
   });
 });
