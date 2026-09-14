@@ -1,20 +1,23 @@
-function isFeatureEnabled(value: string | undefined): boolean {
-  return value === 'true' || value === '1';
+function parseFeatureFlag(value: string | undefined, productionDefault = false): boolean {
+  if (value === 'true' || value === '1') return true;
+  if (value === 'false' || value === '0') return false;
+  return import.meta.env.PROD ? productionDefault : false;
 }
 
 export const features = {
   get searchEnabled() {
-    return isFeatureEnabled(import.meta.env.VITE_SEARCH_ENABLED);
+    // Production Search is backed by the persisted USPTO corpus in Supabase/Postgres.
+    return parseFeatureFlag(import.meta.env.VITE_SEARCH_ENABLED, true);
   },
   get officeActionSearchEnabled() {
-    return isFeatureEnabled(
-      import.meta.env.VITE_OFFICE_ACTION_SEARCH_ENABLED
-    );
+    // Production Office Action research queries the persisted corpus only.
+    return parseFeatureFlag(import.meta.env.VITE_OFFICE_ACTION_SEARCH_ENABLED, true);
   },
   get watchEnabled() {
-    return isFeatureEnabled(import.meta.env.VITE_WATCH_ENABLED);
+    return parseFeatureFlag(import.meta.env.VITE_WATCH_ENABLED, false);
   },
   get pdfExportEnabled() {
-    return isFeatureEnabled(import.meta.env.VITE_PDF_EXPORT_ENABLED);
+    // Reports are generated server-side by the authenticated PDF export pipeline.
+    return parseFeatureFlag(import.meta.env.VITE_PDF_EXPORT_ENABLED, true);
   },
 };

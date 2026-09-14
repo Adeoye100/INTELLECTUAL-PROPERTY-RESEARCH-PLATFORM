@@ -15,6 +15,20 @@ export class PostgresOfficeActionSource {
     this.maximumResults = maximumResults;
   }
 
+  async assertCorpusAvailable() {
+    const result = await this.database.query(
+      `SELECT EXISTS (
+         SELECT 1 FROM office_action_documents WHERE source_registry = $1
+       ) AS available`,
+      [this.sourceName],
+    );
+    if (result.rows?.[0]?.available !== true) {
+      const error = new Error('Persisted USPTO Office Action corpus is empty.');
+      error.code = 'OFFICE_ACTION_CORPUS_EMPTY';
+      throw error;
+    }
+  }
+
   async searchOfficeActions(query = {}) {
     const clauses = ['source_registry = $' + 1];
     const parameters = [this.sourceName];
@@ -80,6 +94,11 @@ export class PostgresOfficeActionSource {
     `;
 
     const result = await this.database.query(sql, parameters);
+    if (result.rows.length === 0) {
+      await this.assertCorpusAvailable();
+      return [];
+    }
+
     return result.rows.map((row) => ({
       sourceRegistry: row.source_registry,
       sourceReferenceId: row.source_reference_id,

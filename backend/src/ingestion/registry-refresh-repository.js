@@ -48,6 +48,27 @@ export class RegistryRefreshRepository {
     this.pool = pool;
   }
 
+  async corpusSummary(sourceRegistry) {
+    if (typeof sourceRegistry !== 'string' || !sourceRegistry.trim()) {
+      throw new TypeError('corpusSummary requires a sourceRegistry string.');
+    }
+    const result = await this.pool.query(
+      `SELECT
+         COUNT(*)::bigint AS record_count,
+         MAX(source_updated_at) AS data_through_date,
+         MAX(updated_at) AS indexed_at
+       FROM registry_trademarks
+       WHERE source_registry = $1`,
+      [sourceRegistry.trim()],
+    );
+    const row = result.rows?.[0] ?? {};
+    return {
+      recordCount: Number(row.record_count ?? 0),
+      dataThroughDate: formatDateOnly(row.data_through_date),
+      indexedAt: row.indexed_at ? new Date(row.indexed_at).toISOString() : null,
+    };
+  }
+
   async startRun({ sourceRegistry, requestedSinceDate }) {
     if (typeof sourceRegistry !== 'string' || !sourceRegistry.trim()) {
       throw new TypeError('startRun requires a sourceRegistry string.');
