@@ -7,7 +7,7 @@ services:
     preDeployCommand: pnpm migrate
     startCommand: pnpm start
     healthCheckPath: /healthz
-    autoDeploy: false
+    autoDeploy: true
     envVars:
       - key: NODE_VERSION
         value: 22.14.0
