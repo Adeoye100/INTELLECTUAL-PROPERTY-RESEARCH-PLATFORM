@@ -7,7 +7,7 @@ services:
     preDeployCommand: pnpm migrate
     startCommand: pnpm start
     healthCheckPath: /healthz
-    autoDeploy: false
+    autoDeploy: true
     envVars:
       - key: NODE_VERSION
         value: 22.14.0
@@ -88,14 +88,15 @@ services:
       - key: SEARCH_MAX_MISSED_REFRESH_RUNS
         value: "2"
 
-      # Public keyless Trademark Applications Daily XML feed. The first live
-      # activation intentionally uses a bounded recent window for a fast,
-      # quota-safe baseline; later runs overlap incrementally and operators can
-      # expand the backfill window under controlled storage monitoring.
+      # Public keyless USPTO Bulk Data Storage System product metadata. The
+      # structured BDSS API returns canonical Trademark Application Daily XML
+      # archive metadata, avoiding the JavaScript-rendered bulkdata web shell.
       - key: USPTO_BULK_SOURCE
-        value: listing
-      - key: USPTO_BULK_LISTING_URL
-        value: "https://bulkdata.uspto.gov/data3/trademark/dailyxml/applications/"
+        value: bdss
+      - key: USPTO_BDSS_API_BASE_URL
+        value: "https://bulkdata.uspto.gov/BDSS-API/products"
+      - key: USPTO_BDSS_DAILY_PRODUCT
+        value: TRTDXFAP
       - key: USPTO_LISTING_BASELINE_DAYS
         value: "7"
       - key: USPTO_INGESTION_OVERLAP_DAYS
@@ -187,9 +188,11 @@ services:
       - key: ELASTICSEARCH_INDEX
         value: trademarks_composite
       - key: USPTO_BULK_SOURCE
-        value: listing
-      - key: USPTO_BULK_LISTING_URL
-        value: "https://bulkdata.uspto.gov/data3/trademark/dailyxml/applications/"
+        value: bdss
+      - key: USPTO_BDSS_API_BASE_URL
+        value: "https://bulkdata.uspto.gov/BDSS-API/products"
+      - key: USPTO_BDSS_DAILY_PRODUCT
+        value: TRTDXFAP
       - key: USPTO_LISTING_BASELINE_DAYS
         value: "7"
       - key: USPTO_INGESTION_OVERLAP_DAYS
