@@ -144,7 +144,14 @@ export async function executeUsptoSearchRefresh({
       if (!updates.length) throw new Error('BASELINE_REQUIRED: Keyless USPTO bulk source returned no daily XML files inside the configured baseline window.');
     }
 
-    const run = await refreshRepo.startRun({ sourceRegistry: 'USPTO', requestedSinceDate });
+    const coverageKind = baselineMode === 'annual-baseline-plus-daily' ? 'baseline' : 'incremental';
+    const run = await refreshRepo.startRun({
+      sourceRegistry: 'USPTO',
+      requestedSinceDate,
+      coverageKind,
+      sourceRelease: null,
+      expectedFileCount: updates.length || null,
+    });
     runId = run.id;
 
     const discoveredFileCount = updates.length;
@@ -213,6 +220,7 @@ export async function executeUsptoSearchRefresh({
     console.log('USPTO search refresh complete', {
       runId: run.id,
       backend,
+      coverageKind,
       mode: baseline ? baselineMode : 'incremental-daily',
       since: requestedSinceDate,
       filesDiscovered: discoveredFileCount,
@@ -222,7 +230,7 @@ export async function executeUsptoSearchRefresh({
       dataThrough: dataThroughDate,
     });
 
-    return { status: 'complete', run: completedRun, baseline, baselineMode, backend };
+    return { status: 'complete', run: completedRun, baseline, baselineMode, coverageKind, backend };
   } catch (error) {
     const errorCode = classifyError(error);
     if (runId) await refreshRepo.markFailed({ runId, errorCode }).catch(() => {});

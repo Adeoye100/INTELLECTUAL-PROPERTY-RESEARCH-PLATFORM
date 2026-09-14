@@ -15,6 +15,11 @@ function refreshRunFromRow(row) {
     id: row.id,
     sourceRegistry: row.source_registry,
     status: row.status,
+    coverageKind: row.coverage_kind ?? 'incremental',
+    sourceRelease: row.source_release ?? null,
+    expectedFileCount: row.expected_file_count !== null && row.expected_file_count !== undefined
+      ? Number(row.expected_file_count)
+      : null,
     requestedSinceDate: formatDateOnly(row.requested_since_date),
     latestDiscoveredSourceDate: formatDateOnly(row.latest_discovered_source_date),
     dataThroughDate: formatDateOnly(row.data_through_date),
@@ -34,8 +39,9 @@ function refreshRunFromRow(row) {
 }
 
 const SELECT_COLUMNS = `
-  id, source_registry, status, requested_since_date, latest_discovered_source_date,
-  data_through_date, discovered_file_count, processed_record_count, changed_record_count,
+  id, source_registry, status, coverage_kind, source_release, expected_file_count,
+  requested_since_date, latest_discovered_source_date, data_through_date,
+  discovered_file_count, processed_record_count, changed_record_count,
   projected_record_count, projection_backlog_count, started_at, ingestion_completed_at,
   projection_completed_at, completed_at, error_code
 `;
@@ -69,15 +75,36 @@ export class RegistryRefreshRepository {
     };
   }
 
-  async startRun({ sourceRegistry, requestedSinceDate }) {
+  async startRun({
+    sourceRegistry,
+    requestedSinceDate,
+    coverageKind = 'incremental',
+    sourceRelease = null,
+    expectedFileCount = null,
+  }) {
     if (typeof sourceRegistry !== 'string' || !sourceRegistry.trim()) {
       throw new TypeError('startRun requires a sourceRegistry string.');
     }
+    if (!['incremental', 'baseline'].includes(coverageKind)) {
+      throw new TypeError('startRun coverageKind must be incremental or baseline.');
+    }
+    if (expectedFileCount !== null && (!Number.isSafeInteger(expectedFileCount) || expectedFileCount < 1)) {
+      throw new TypeError('startRun expectedFileCount must be a positive integer or null.');
+    }
     const result = await this.pool.query(
-      `INSERT INTO registry_refresh_runs (source_registry, status, requested_since_date, started_at)
-       VALUES ($1, 'running', $2, now())
+      `INSERT INTO registry_refresh_runs (
+         source_registry, status, coverage_kind, source_release, expected_file_count,
+         requested_since_date, started_at
+       )
+       VALUES ($1, 'running', $2, $3, $4, $5, now())
        RETURNING ${SELECT_COLUMNS}`,
-      [sourceRegistry.trim(), requestedSinceDate ?? null],
+      [
+        sourceRegistry.trim(),
+        coverageKind,
+        sourceRelease,
+        expectedFileCount,
+        requestedSinceDate ?? null,
+      ],
     );
     return refreshRunFromRow(result.rows[0]);
   }
@@ -163,6 +190,23 @@ export class RegistryRefreshRepository {
       `SELECT ${SELECT_COLUMNS}
        FROM registry_refresh_runs
        WHERE source_registry = $1 AND status = 'complete'
+       ORDER BY completed_at DESC
+       LIMIT 1`,
+      [sourceRegistry.trim()],
+    );
+    return result.rowCount ? refreshRunFromRow(result.rows[0]) : null;
+  }
+
+  async latestCompleteBaselineRun(sourceRegistry) {
+    if (typeof sourceRegistry !== 'string' || !sourceRegistry.trim()) {
+      throw new TypeError('latestCompleteBaselineRun requires a sourceRegistry string.');
+    }
+    const result = await this.pool.query(
+      `SELECT ${SELECT_COLUMNS}
+       FROM registry_refresh_runs
+       WHERE source_registry = $1
+         AND status = 'complete'
+         AND coverage_kind = 'baseline'
        ORDER BY completed_at DESC
        LIMIT 1`,
       [sourceRegistry.trim()],
