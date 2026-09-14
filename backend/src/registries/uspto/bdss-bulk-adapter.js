@@ -72,6 +72,22 @@ function safeDownloadUrl(value, trustedOrigin) {
   return url.toString();
 }
 
+function downloadBasename(value) {
+  try {
+    const segments = new URL(value).pathname.split('/').filter(Boolean);
+    const encoded = segments.at(-1) ?? '';
+    return decodeURIComponent(encoded);
+  } catch {
+    return null;
+  }
+}
+
+function discoveryError(message) {
+  const error = new Error(message);
+  error.code = 'BULK_DISCOVERY_FAILED';
+  return error;
+}
+
 export function parseBdssDailyFile(file, trustedOrigin) {
   if (!file || typeof file !== 'object') return null;
   const name = typeof file.fileName === 'string' ? file.fileName.trim() : '';
@@ -79,7 +95,7 @@ export function parseBdssDailyFile(file, trustedOrigin) {
   if (!match) return null;
   const date = dateFromYymmdd(match[1]);
   const url = safeDownloadUrl(file.fileDownloadUrl, trustedOrigin);
-  if (!date || !url) return null;
+  if (!date || !url || downloadBasename(url) !== name) return null;
   return {
     kind: 'daily',
     fileName: name,
@@ -107,6 +123,22 @@ function dateQuery(date, prefix) {
     [`${prefix}Month`]: String(date.getUTCMonth() + 1),
     [`${prefix}Day`]: String(date.getUTCDate()),
   };
+}
+
+async function consumeBoundedEntry(entry, {
+  sourceName,
+  maxBytes,
+  abortController,
+  onBytes,
+}) {
+  const bounded = limitReadableBytes(entry, {
+    sourceName,
+    operation: 'archive decompression',
+    maxBytes,
+    abortController,
+    onBytes,
+  });
+  for await (const _chunk of bounded) { /* drain while enforcing the shared decompression budget */ }
 }
 
 export class UsptoBdssBulkXmlAdapter extends RegistryAdapter {
@@ -166,7 +198,9 @@ export class UsptoBdssBulkXmlAdapter extends RegistryAdapter {
     const firstDay = startOfUtcDay(since);
     const files = bdssDailyFiles(await this.fetchManifest(firstDay), this.trustedOrigin)
       .filter((entry) => entry.date >= firstDay);
-    if (!files.length) throw new Error(`${this.sourceName} manifest contained no valid apcYYMMDD.zip application archives.`);
+    if (!files.length) {
+      throw discoveryError(`${this.sourceName} manifest contained no valid apcYYMMDD.zip application archives.`);
+    }
     return files;
   }
 
@@ -175,19 +209,31 @@ export class UsptoBdssBulkXmlAdapter extends RegistryAdapter {
     let xmlEntries = 0;
     let decompressedBytes = 0;
     for await (const entry of archive) {
-      if (entry.type !== 'File' || !entry.path.toLowerCase().endsWith('.xml')) {
+      const remaining = this.maxArchiveDecompressedBytes - decompressedBytes;
+      if (remaining < 1) throw new RegistryResponseSizeError(this.sourceName, 'archive decompression');
+      const onBytes = (size) => { decompressedBytes += size; };
+
+      if (entry.type !== 'File') {
         entry.autodrain();
         continue;
       }
+      if (!entry.path.toLowerCase().endsWith('.xml')) {
+        await consumeBoundedEntry(entry, {
+          sourceName: this.sourceName,
+          maxBytes: remaining,
+          abortController,
+          onBytes,
+        });
+        continue;
+      }
+
       xmlEntries += 1;
-      const remaining = this.maxArchiveDecompressedBytes - decompressedBytes;
-      if (remaining < 1) throw new RegistryResponseSizeError(this.sourceName, 'archive decompression');
       const bounded = limitReadableBytes(entry, {
         sourceName: this.sourceName,
         operation: 'archive decompression',
         maxBytes: remaining,
         abortController,
-        onBytes: (size) => { decompressedBytes += size; },
+        onBytes,
       });
       for await (const record of parseUsptoBulkXml(bounded)) yield record;
     }
@@ -200,6 +246,9 @@ export class UsptoBdssBulkXmlAdapter extends RegistryAdapter {
     }
     const url = safeDownloadUrl(update.url, this.trustedOrigin);
     if (!url) throw new Error(`${this.sourceName} archive URL must stay on the configured USPTO origin.`);
+    if (typeof update.fileName === 'string' && downloadBasename(url) !== update.fileName) {
+      throw new Error(`${this.sourceName} archive URL filename does not match the discovered archive metadata.`);
+    }
     if (update.expectedBytes && update.expectedBytes > this.maxArchiveCompressedBytes) {
       throw new RegistryResponseSizeError(this.sourceName, 'daily archive download');
     }
