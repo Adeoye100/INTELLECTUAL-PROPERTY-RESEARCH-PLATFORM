@@ -30,7 +30,6 @@ export class PostgresOfficeActionSource {
   }
 
   async searchOfficeActions(query = {}) {
-    await this.assertCorpusAvailable();
     const clauses = ['source_registry = $' + 1];
     const parameters = [this.sourceName];
 
@@ -95,6 +94,11 @@ export class PostgresOfficeActionSource {
     `;
 
     const result = await this.database.query(sql, parameters);
+    if (result.rows.length === 0) {
+      await this.assertCorpusAvailable();
+      return [];
+    }
+
     return result.rows.map((row) => ({
       sourceRegistry: row.source_registry,
       sourceReferenceId: row.source_reference_id,
