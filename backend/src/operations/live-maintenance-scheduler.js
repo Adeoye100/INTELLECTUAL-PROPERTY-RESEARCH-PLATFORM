@@ -34,6 +34,37 @@ function ingestionConfig(config) {
   };
 }
 
+async function logPersistedCorpusReadiness(system) {
+  if (!system?.pool || typeof system.pool.query !== 'function') return;
+  try {
+    const [registry, officeActions] = await Promise.all([
+      system.pool.query(
+        `SELECT COUNT(*)::bigint AS count, MAX(source_updated_at) AS data_through
+         FROM registry_trademarks WHERE source_registry = $1`,
+        ['USPTO'],
+      ),
+      system.pool.query(
+        `SELECT COUNT(*)::bigint AS count, MAX(office_action_date) AS data_through
+         FROM office_action_documents WHERE source_registry = $1`,
+        ['USPTO'],
+      ),
+    ]);
+    const registryRow = registry.rows?.[0] ?? {};
+    const officeActionRow = officeActions.rows?.[0] ?? {};
+    console.log('Persisted USPTO corpus readiness', {
+      trademarkRecordCount: Number(registryRow.count ?? 0),
+      trademarkDataThrough: registryRow.data_through ? String(registryRow.data_through).slice(0, 10) : null,
+      officeActionRecordCount: Number(officeActionRow.count ?? 0),
+      officeActionDataThrough: officeActionRow.data_through ? String(officeActionRow.data_through).slice(0, 10) : null,
+    });
+  } catch (error) {
+    console.warn('Persisted USPTO corpus readiness check failed', {
+      name: error?.name ?? 'Error',
+      code: error?.code ?? 'CORPUS_READINESS_CHECK_FAILED',
+    });
+  }
+}
+
 /**
  * Lightweight production maintenance host. Search can operate entirely from
  * the persisted Supabase/PostgreSQL corpus while optional upstream ingestion
@@ -95,6 +126,7 @@ export function startLiveMaintenance({ config, system }) {
     }
   };
 
+  void logPersistedCorpusReadiness(system);
   startPdf();
 
   if (!refreshEnabled) {
