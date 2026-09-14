@@ -118,6 +118,11 @@ export async function importUsptoBulkFile({
       error.code = 'USPTO_BULK_FILE_EMPTY';
       throw error;
     }
+    if (!dataThroughDate) {
+      const error = new Error('USPTO bulk file contained no valid source coverage date.');
+      error.code = 'USPTO_BULK_FILE_COVERAGE_DATE_MISSING';
+      throw error;
+    }
 
     await refreshRepository.markIngested({
       runId: run.id,
@@ -129,7 +134,7 @@ export async function importUsptoBulkFile({
     await refreshRepository.markComplete({
       runId: run.id,
       dataThroughDate,
-      projectedRecordCount: processedRecordCount,
+      projectedRecordCount: changedRecordCount,
       projectionBacklogCount: 0,
     });
 
