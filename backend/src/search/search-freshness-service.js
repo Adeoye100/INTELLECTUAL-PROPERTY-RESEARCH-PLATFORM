@@ -1,5 +1,13 @@
 import { AppError } from '../errors.js';
 
+function configuredFreshnessMode() {
+  const value = process.env.SEARCH_FRESHNESS_MODE?.trim().toLowerCase() || 'refresh-ledger';
+  if (!['refresh-ledger', 'corpus'].includes(value)) {
+    throw new Error('SEARCH_FRESHNESS_MODE must be refresh-ledger or corpus.');
+  }
+  return value;
+}
+
 export class SearchFreshnessService {
   constructor({
     repository,
@@ -26,6 +34,33 @@ export class SearchFreshnessService {
   }
 
   async getSearchFreshness(sourceRegistry = 'USPTO') {
+    if (configuredFreshnessMode() === 'corpus') {
+      if (typeof this.repository.corpusSummary !== 'function') {
+        throw new Error('SEARCH_FRESHNESS_MODE=corpus requires repository.corpusSummary().');
+      }
+      const corpus = await this.repository.corpusSummary(sourceRegistry);
+      if (!Number.isFinite(corpus.recordCount) || corpus.recordCount <= 0) {
+        return {
+          source: sourceRegistry,
+          status: 'stale',
+          dataThrough: corpus.dataThroughDate ?? null,
+          indexedAt: corpus.indexedAt ?? null,
+          refreshRunId: null,
+          refreshing: false,
+          sourceMode: 'persisted-bulk-corpus',
+        };
+      }
+      return {
+        source: sourceRegistry,
+        status: 'ready',
+        dataThrough: corpus.dataThroughDate ?? null,
+        indexedAt: corpus.indexedAt ?? null,
+        refreshRunId: null,
+        refreshing: false,
+        sourceMode: 'persisted-bulk-corpus',
+      };
+    }
+
     const now = this.clock();
     const currentTime = now instanceof Date ? now.getTime() : new Date(now).getTime();
 
@@ -84,8 +119,10 @@ export class SearchFreshnessService {
     if (freshness.status === 'stale') {
       throw new AppError(
         503,
-        'SEARCH_DATA_STALE',
-        'Trademark search is temporarily unavailable while registry data is refreshed.',
+        configuredFreshnessMode() === 'corpus' ? 'SEARCH_CORPUS_EMPTY' : 'SEARCH_DATA_STALE',
+        configuredFreshnessMode() === 'corpus'
+          ? 'USPTO registry search is temporarily unavailable because the persisted corpus is empty.'
+          : 'Trademark search is temporarily unavailable while registry data is refreshed.',
       );
     }
     return freshness;
