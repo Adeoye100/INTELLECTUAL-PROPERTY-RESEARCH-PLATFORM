@@ -42,6 +42,10 @@ describe('USPTO BDSS bulk XML adapter', () => {
       fileName: 'apc260911.zip',
       fileDownloadUrl: 'https://evil.example/apc260911.zip',
     }, trustedOrigin), null);
+    assert.equal(parseBdssDailyFile({
+      fileName: 'apc260911.zip',
+      fileDownloadUrl: 'https://bulkdata.uspto.gov/data3/trademark/dailyxml/applications/2026/apc260912.zip',
+    }, trustedOrigin), null);
   });
 
   it('deduplicates archive dates and sorts them chronologically', () => {
@@ -49,7 +53,7 @@ describe('USPTO BDSS bulk XML adapter', () => {
       productFiles: [
         { fileName: 'apc260912.zip', fileSize: 12, fileDownloadUrl: 'https://bulkdata.uspto.gov/data/apc260912.zip' },
         { fileName: 'apc260911.zip', fileSize: 11, fileDownloadUrl: 'https://bulkdata.uspto.gov/data/apc260911.zip' },
-        { fileName: 'apc260911.zip', fileSize: 99, fileDownloadUrl: 'https://bulkdata.uspto.gov/data/duplicate-apc260911.zip' },
+        { fileName: 'apc260911.zip', fileSize: 99, fileDownloadUrl: 'https://bulkdata.uspto.gov/data/apc260911.zip' },
         { fileName: 'ttab260911.zip', fileSize: 4, fileDownloadUrl: 'https://bulkdata.uspto.gov/data/ttab260911.zip' },
       ],
     };
@@ -91,7 +95,7 @@ describe('USPTO BDSS bulk XML adapter', () => {
     assert.equal(calls[0].headers['x-api-key'], undefined);
   });
 
-  it('rejects manifests without usable daily application archives', async () => {
+  it('classifies manifests without usable daily application archives as discovery failures', async () => {
     const adapter = new UsptoBdssBulkXmlAdapter({
       fetchImpl: async () => response({ productFiles: [{
         fileName: 'readme.txt',
@@ -100,7 +104,8 @@ describe('USPTO BDSS bulk XML adapter', () => {
     });
     await assert.rejects(
       adapter.discoverUpdates(new Date('2026-09-10T00:00:00.000Z')),
-      /no valid apcYYMMDD\.zip application archives/,
+      (error) => error?.code === 'BULK_DISCOVERY_FAILED'
+        && /no valid apcYYMMDD\.zip application archives/.test(error.message),
     );
   });
 
@@ -118,6 +123,24 @@ describe('USPTO BDSS bulk XML adapter', () => {
         })) { /* no-op */ }
       },
       /must stay on the configured USPTO origin/,
+    );
+    assert.equal(called, false);
+  });
+
+  it('rejects a same-origin download whose basename disagrees with the discovered filename', async () => {
+    let called = false;
+    const adapter = new UsptoBdssBulkXmlAdapter({
+      fetchImpl: async () => { called = true; return response('unexpected'); },
+    });
+    await assert.rejects(
+      async () => {
+        for await (const _record of adapter.fetchUpdate({
+          fileName: 'apc260911.zip',
+          date: new Date('2026-09-11T00:00:00.000Z'),
+          url: 'https://bulkdata.uspto.gov/data/apc260912.zip',
+        })) { /* no-op */ }
+      },
+      /filename does not match/,
     );
     assert.equal(called, false);
   });
