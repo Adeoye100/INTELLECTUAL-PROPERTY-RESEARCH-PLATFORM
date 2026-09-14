@@ -38,26 +38,35 @@ export class SearchFreshnessService {
       if (typeof this.repository.corpusSummary !== 'function') {
         throw new Error('SEARCH_FRESHNESS_MODE=corpus requires repository.corpusSummary().');
       }
-      const corpus = await this.repository.corpusSummary(sourceRegistry);
-      if (!Number.isFinite(corpus.recordCount) || corpus.recordCount <= 0) {
+      const [corpus, latestComplete] = await Promise.all([
+        this.repository.corpusSummary(sourceRegistry),
+        this.repository.latestCompleteRun(sourceRegistry),
+      ]);
+      const recordCount = Number(corpus.recordCount ?? 0);
+      const hasCompleteImport = Boolean(latestComplete?.id && latestComplete?.completedAt);
+      if (!Number.isFinite(recordCount) || recordCount <= 0 || !hasCompleteImport) {
         return {
           source: sourceRegistry,
           status: 'stale',
-          dataThrough: corpus.dataThroughDate ?? null,
-          indexedAt: corpus.indexedAt ?? null,
-          refreshRunId: null,
+          dataThrough: latestComplete?.dataThroughDate ?? corpus.dataThroughDate ?? null,
+          indexedAt: latestComplete?.completedAt ?? corpus.indexedAt ?? null,
+          refreshRunId: latestComplete?.id ?? null,
           refreshing: false,
           sourceMode: 'persisted-bulk-corpus',
+          recordCount,
+          corpusComplete: hasCompleteImport,
         };
       }
       return {
         source: sourceRegistry,
         status: 'ready',
-        dataThrough: corpus.dataThroughDate ?? null,
-        indexedAt: corpus.indexedAt ?? null,
-        refreshRunId: null,
+        dataThrough: latestComplete.dataThroughDate ?? corpus.dataThroughDate ?? null,
+        indexedAt: latestComplete.completedAt ?? corpus.indexedAt ?? null,
+        refreshRunId: latestComplete.id,
         refreshing: false,
         sourceMode: 'persisted-bulk-corpus',
+        recordCount,
+        corpusComplete: true,
       };
     }
 
@@ -117,11 +126,12 @@ export class SearchFreshnessService {
   async assertSearchReady(sourceRegistry = 'USPTO') {
     const freshness = await this.getSearchFreshness(sourceRegistry);
     if (freshness.status === 'stale') {
+      const corpusMode = configuredFreshnessMode() === 'corpus';
       throw new AppError(
         503,
-        configuredFreshnessMode() === 'corpus' ? 'SEARCH_CORPUS_EMPTY' : 'SEARCH_DATA_STALE',
-        configuredFreshnessMode() === 'corpus'
-          ? 'USPTO registry search is temporarily unavailable because the persisted corpus is empty.'
+        corpusMode ? 'SEARCH_CORPUS_UNAVAILABLE' : 'SEARCH_DATA_STALE',
+        corpusMode
+          ? 'USPTO registry search is temporarily unavailable until a verified bulk corpus import completes.'
           : 'Trademark search is temporarily unavailable while registry data is refreshed.',
       );
     }

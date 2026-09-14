@@ -11,12 +11,22 @@ afterEach(() => {
 });
 
 describe('persisted PostgreSQL corpus freshness', () => {
-  it('treats a non-empty USPTO corpus as searchable and exposes its source date', async () => {
+  it('treats a non-empty USPTO corpus as searchable only after a completed import and exposes source date', async () => {
     process.env.SEARCH_FRESHNESS_MODE = 'corpus';
-    let ledgerCalls = 0;
+    let latestRunCalls = 0;
+    let completeRunCalls = 0;
     const repository = {
-      async latestRun() { ledgerCalls += 1; return null; },
-      async latestCompleteRun() { ledgerCalls += 1; return null; },
+      async latestRun() { latestRunCalls += 1; return null; },
+      async latestCompleteRun(source) {
+        completeRunCalls += 1;
+        assert.equal(source, 'USPTO');
+        return {
+          id: 'run-1',
+          status: 'complete',
+          dataThroughDate: '2026-01-05',
+          completedAt: '2026-09-14T10:00:00.000Z',
+        };
+      },
       async corpusSummary(source) {
         assert.equal(source, 'USPTO');
         return {
@@ -33,7 +43,10 @@ describe('persisted PostgreSQL corpus freshness', () => {
     assert.equal(freshness.dataThrough, '2026-01-05');
     assert.equal(freshness.indexedAt, '2026-09-14T10:00:00.000Z');
     assert.equal(freshness.sourceMode, 'persisted-bulk-corpus');
-    assert.equal(ledgerCalls, 0);
+    assert.equal(freshness.refreshRunId, 'run-1');
+    assert.equal(freshness.corpusComplete, true);
+    assert.equal(latestRunCalls, 0);
+    assert.equal(completeRunCalls, 1);
   });
 
   it('fails closed when the configured persisted USPTO corpus is empty', async () => {
@@ -48,7 +61,27 @@ describe('persisted PostgreSQL corpus freshness', () => {
     const service = new SearchFreshnessService({ repository });
     await assert.rejects(
       () => service.assertSearchReady('USPTO'),
-      (error) => error?.status === 503 && error?.code === 'SEARCH_CORPUS_EMPTY',
+      (error) => error?.status === 503 && error?.code === 'SEARCH_CORPUS_UNAVAILABLE',
+    );
+  });
+
+  it('fails closed when rows exist but no completed import ledger proves corpus integrity', async () => {
+    process.env.SEARCH_FRESHNESS_MODE = 'corpus';
+    const repository = {
+      async latestRun() { return { id: 'run-partial', status: 'running' }; },
+      async latestCompleteRun() { return null; },
+      async corpusSummary() {
+        return { recordCount: 500, dataThroughDate: '2026-09-14', indexedAt: '2026-09-14T10:00:00.000Z' };
+      },
+    };
+    const service = new SearchFreshnessService({ repository });
+    const freshness = await service.getSearchFreshness('USPTO');
+    assert.equal(freshness.status, 'stale');
+    assert.equal(freshness.recordCount, 500);
+    assert.equal(freshness.corpusComplete, false);
+    await assert.rejects(
+      () => service.assertSearchReady('USPTO'),
+      (error) => error?.status === 503 && error?.code === 'SEARCH_CORPUS_UNAVAILABLE',
     );
   });
 
