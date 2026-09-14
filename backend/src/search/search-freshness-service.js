@@ -35,34 +35,42 @@ export class SearchFreshnessService {
 
   async getSearchFreshness(sourceRegistry = 'USPTO') {
     if (configuredFreshnessMode() === 'corpus') {
-      if (typeof this.repository.corpusSummary !== 'function') {
-        throw new Error('SEARCH_FRESHNESS_MODE=corpus requires repository.corpusSummary().');
+      if (typeof this.repository.corpusSummary !== 'function'
+        || typeof this.repository.latestCompleteBaselineRun !== 'function') {
+        throw new Error('SEARCH_FRESHNESS_MODE=corpus requires corpusSummary() and latestCompleteBaselineRun().');
       }
-      const [corpus, latestComplete] = await Promise.all([
+      const [corpus, latestComplete, latestBaseline] = await Promise.all([
         this.repository.corpusSummary(sourceRegistry),
         this.repository.latestCompleteRun(sourceRegistry),
+        this.repository.latestCompleteBaselineRun(sourceRegistry),
       ]);
       const recordCount = Number(corpus.recordCount ?? 0);
-      const hasCompleteImport = Boolean(latestComplete?.id && latestComplete?.completedAt);
-      if (!Number.isFinite(recordCount) || recordCount <= 0 || !hasCompleteImport) {
+      const hasCompleteBaseline = Boolean(latestBaseline?.id && latestBaseline?.completedAt);
+      const latestEvidence = latestComplete ?? latestBaseline;
+      const dataThrough = latestEvidence?.dataThroughDate ?? corpus.dataThroughDate ?? null;
+      const indexedAt = latestEvidence?.completedAt ?? corpus.indexedAt ?? null;
+
+      if (!Number.isFinite(recordCount) || recordCount <= 0 || !hasCompleteBaseline) {
         return {
           source: sourceRegistry,
           status: 'stale',
-          dataThrough: latestComplete?.dataThroughDate ?? corpus.dataThroughDate ?? null,
-          indexedAt: latestComplete?.completedAt ?? corpus.indexedAt ?? null,
-          refreshRunId: latestComplete?.id ?? null,
+          dataThrough,
+          indexedAt,
+          refreshRunId: latestEvidence?.id ?? null,
+          baselineRunId: latestBaseline?.id ?? null,
           refreshing: false,
           sourceMode: 'persisted-bulk-corpus',
           recordCount,
-          corpusComplete: hasCompleteImport,
+          corpusComplete: hasCompleteBaseline,
         };
       }
       return {
         source: sourceRegistry,
         status: 'ready',
-        dataThrough: latestComplete.dataThroughDate ?? corpus.dataThroughDate ?? null,
-        indexedAt: latestComplete.completedAt ?? corpus.indexedAt ?? null,
-        refreshRunId: latestComplete.id,
+        dataThrough,
+        indexedAt,
+        refreshRunId: latestEvidence?.id ?? latestBaseline.id,
+        baselineRunId: latestBaseline.id,
         refreshing: false,
         sourceMode: 'persisted-bulk-corpus',
         recordCount,
@@ -131,7 +139,7 @@ export class SearchFreshnessService {
         503,
         corpusMode ? 'SEARCH_CORPUS_UNAVAILABLE' : 'SEARCH_DATA_STALE',
         corpusMode
-          ? 'USPTO registry search is temporarily unavailable until a verified bulk corpus import completes.'
+          ? 'USPTO registry search is temporarily unavailable until a verified complete bulk baseline import finishes.'
           : 'Trademark search is temporarily unavailable while registry data is refreshed.',
       );
     }
