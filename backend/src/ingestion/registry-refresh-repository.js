@@ -104,7 +104,7 @@ export class RegistryRefreshRepository {
         runId,
         latestDiscoveredSourceDate ?? null,
         Math.max(0, discoveredFileCount ?? 0),
-        Math.max(0, changedRecordCount ?? 0),
+        Math.max(0, processedRecordCount ?? 0),
         Math.max(0, changedRecordCount ?? 0),
       ],
     );
