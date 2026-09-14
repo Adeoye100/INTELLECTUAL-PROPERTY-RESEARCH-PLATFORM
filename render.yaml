@@ -66,11 +66,11 @@ services:
       - key: AUTH_RATE_LIMIT_KEY_SECRET
         sync: false
 
-      # Search uses the canonical Supabase/PostgreSQL corpus directly.
-      # ELASTICSEARCH_URL remains only for the legacy config validator;
-      # SEARCH_BACKEND=postgres means no request is sent to it.
+      # Search is implemented on canonical PostgreSQL, but production activation
+      # remains fail-closed until an authorized/reachable USPTO source is
+      # configured and a successful freshness run is proven.
       - key: SEARCH_ENABLED
-        value: "true"
+        value: "false"
       - key: SEARCH_BACKEND
         value: postgres
       - key: ELASTICSEARCH_URL
@@ -88,9 +88,10 @@ services:
       - key: SEARCH_MAX_MISSED_REFRESH_RUNS
         value: "2"
 
-      # Public keyless USPTO Bulk Data Storage System product metadata. The
-      # structured BDSS API returns canonical Trademark Application Daily XML
-      # archive metadata, avoiding the JavaScript-rendered bulkdata web shell.
+      # The legacy public BDSS hostname is retained as a tested adapter option,
+      # but its current DNS is unavailable from production. Keep the in-process
+      # refresh disabled until USPTO ODP credentials or another approved source
+      # are configured and verified.
       - key: USPTO_BULK_SOURCE
         value: bdss
       - key: USPTO_BDSS_API_BASE_URL
@@ -102,7 +103,7 @@ services:
       - key: USPTO_INGESTION_OVERLAP_DAYS
         value: "3"
       - key: USPTO_REFRESH_IN_PROCESS_ENABLED
-        value: "true"
+        value: "false"
       - key: USPTO_REFRESH_INTERVAL_MS
         value: "21600000"
 
@@ -115,10 +116,12 @@ services:
       - key: OFFICE_ACTION_SEARCH_MAX_RESULTS
         value: "50"
 
+      # Watches depend on a fresh Search corpus and therefore remain fail-closed
+      # while the live USPTO ingestion source is externally blocked.
       - key: WATCH_ENABLED
-        value: "true"
+        value: "false"
       - key: WATCH_IN_PROCESS_ENABLED
-        value: "true"
+        value: "false"
       - key: WATCH_SCHEDULER_INTERVAL_MS
         value: "60000"
       - key: WATCH_SCHEDULER_BATCH_SIZE
@@ -155,9 +158,9 @@ services:
       - key: PAYSTACK_PROFESSIONAL_CURRENCY
         value: NGN
 
-  # Optional dedicated ingestion process. The API currently runs the same
-  # advisory-lock-protected refresh in-process, so provisioning this cron later
-  # is safe and does not require Elasticsearch or a USPTO API key.
+  # Optional dedicated ingestion process. Do not provision/activate this cron
+  # until an approved reachable USPTO source is configured; the job itself is
+  # retained so activation does not require another architecture change.
   - type: cron
     name: iprp-uspto-ingestion
     runtime: node
@@ -202,8 +205,8 @@ services:
       - key: SEARCH_MAX_MISSED_REFRESH_RUNS
         value: "2"
 
-  # Optional dedicated Watch worker. Production can use this instead of the
-  # in-process worker once the service is provisioned with the same secrets.
+  # Optional dedicated Watch worker. Keep unprovisioned until Search freshness
+  # is live; its internal feature gates are also fail-closed by default here.
   - type: worker
     name: iprp-watch-worker
     runtime: node
@@ -231,7 +234,7 @@ services:
       - key: REDIS_URL
         sync: false
       - key: SEARCH_ENABLED
-        value: "true"
+        value: "false"
       - key: SEARCH_BACKEND
         value: postgres
       - key: ELASTICSEARCH_URL
@@ -249,7 +252,7 @@ services:
       - key: SEARCH_MAX_MISSED_REFRESH_RUNS
         value: "2"
       - key: WATCH_ENABLED
-        value: "true"
+        value: "false"
       - key: WATCH_SCHEDULER_INTERVAL_MS
         value: "60000"
       - key: WATCH_SCHEDULER_BATCH_SIZE
