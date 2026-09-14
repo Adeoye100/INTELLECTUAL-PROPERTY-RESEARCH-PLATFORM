@@ -30,7 +30,9 @@ function classifyError(error) {
   if (!error) return 'UNKNOWN_REFRESH_ERROR';
   const message = error.message ?? '';
   const name = error.name ?? '';
+  const code = error.code ?? '';
 
+  if (code === 'BULK_DISCOVERY_FAILED') return 'BULK_DISCOVERY_FAILED';
   if (message.includes('BASELINE_REQUIRED')) return 'BASELINE_REQUIRED';
   if (message.includes('PROJECTION_BACKLOG_REMAINS')) return 'PROJECTION_BACKLOG_REMAINS';
   if (name === 'RegistryHttpError' && (message.includes('manifest') || message.includes('discovery'))) return 'BULK_DISCOVERY_FAILED';
