@@ -13,6 +13,11 @@ export class PostgresOfficeActionSource {
     this.database = database;
     this.sourceName = name;
     this.maximumResults = maximumResults;
+
+    // FederatedOfficeActionSearchService stores source methods as callbacks.
+    // Keep instance context intact when searchOfficeActions is invoked detached.
+    this.searchOfficeActions = this.searchOfficeActions.bind(this);
+    this.assertCorpusAvailable = this.assertCorpusAvailable.bind(this);
   }
 
   async assertCorpusAvailable() {
