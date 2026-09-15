@@ -3,6 +3,7 @@ import { badRequest } from '../errors.js';
 const SUPPORTED_PARAMETERS = new Set([
   'mark', 'jurisdiction', 'class', 'niceClass', 'status', 'owner', 'filedFrom', 'filedTo',
 ]);
+const SUPPORTED_JURISDICTIONS = new Set(['US', 'EU']);
 const STATUSES = new Set(['pending', 'registered', 'abandoned']);
 
 function invalid(field, message) {
@@ -39,11 +40,12 @@ function parseJurisdictions(value) {
   const normalized = values.map((entry) => {
     const jurisdiction = scalar(entry, 'jurisdiction').trim().toUpperCase();
     if (!jurisdiction) invalid('jurisdiction', 'jurisdiction values must not be empty.');
+    if (!SUPPORTED_JURISDICTIONS.has(jurisdiction)) {
+      invalid('jurisdiction', 'jurisdiction must be US (USPTO) or EU (EUIPO).');
+    }
     return jurisdiction;
   });
-  const unique = [...new Set(normalized)];
-  if (unique.length > 10) invalid('jurisdiction', 'A maximum of 10 jurisdictions is allowed.');
-  return unique;
+  return [...new Set(normalized)];
 }
 
 function parseNiceClasses(value) {
