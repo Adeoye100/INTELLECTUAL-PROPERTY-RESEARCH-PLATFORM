@@ -47,9 +47,14 @@ export class WatchScheduler {
             if (queued.enqueued) summary.enqueued += 1;
             if (queued.deduplicated) summary.deduplicated += 1;
             summary.advanced += 1;
+            const intervalMs = watch.pollIntervalMinutes * 60_000;
+            const scheduledAtMs = Date.parse(scheduledFor);
+            const cadenceBaseMs = Number.isFinite(scheduledAtMs)
+              ? Math.max(scheduledAtMs, now.getTime())
+              : now.getTime();
             return {
               advance: true,
-              nextPollAt: new Date(Date.parse(scheduledFor) + (watch.pollIntervalMinutes * 60_000)).toISOString(),
+              nextPollAt: new Date(cadenceBaseMs + intervalMs).toISOString(),
             };
           } catch (error) {
             summary.failures.push(failureCode(error));
