@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mockSearchResponse } from '../../lib/mocks/handlers';
-import { buildSearchRequestUrl, rankSearchResults, searchFiltersSchema } from './searchFilters';
+import { buildSearchRequestUrl, rankSearchResults, searchFiltersFromParams, searchFiltersSchema } from './searchFilters';
 
 describe('search filter contract', () => {
   it('serializes all effective filters into the request URL', () => {
@@ -16,6 +16,20 @@ describe('search filter contract', () => {
     expect(url.searchParams.get('owner')).toBe('Forge Holdings');
     expect(url.searchParams.get('filedFrom')).toBe('2023-01-01');
     expect(url.searchParams.get('filedTo')).toBe('2025-12-31');
+  });
+
+  it('accepts only USPTO and EUIPO jurisdictions', () => {
+    expect(searchFiltersSchema.safeParse({
+      mark: 'FORGE', jurisdictions: ['US', 'EU'], niceClass: '', status: '', owner: '', filedFrom: '', filedTo: '',
+    }).success).toBe(true);
+    expect(searchFiltersSchema.safeParse({
+      mark: 'FORGE', jurisdictions: ['GB'], niceClass: '', status: '', owner: '', filedFrom: '', filedTo: '',
+    }).success).toBe(false);
+  });
+
+  it('drops stale unsupported jurisdiction URL values and falls back to USPTO', () => {
+    const params = new URLSearchParams('mark=FORGE&jurisdiction=GB&jurisdiction=CA');
+    expect(searchFiltersFromParams(params).jurisdictions).toEqual(['US']);
   });
 
   it('validates the filing-date range', () => {
