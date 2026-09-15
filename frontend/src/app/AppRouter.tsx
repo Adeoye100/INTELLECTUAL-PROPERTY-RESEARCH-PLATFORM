@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ComponentType } from 'react';
+import { lazy, Suspense, type ComponentType, type ReactElement } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { AuthLayout } from './AuthLayout';
 import { MainLayout } from './MainLayout';
@@ -6,6 +6,7 @@ import { RouteErrorScreen, RouteLoading } from './RouteFeedback';
 import { RequireAdmin, RequireAuthentication, RequireRole, RoleHomeRedirect } from '../features/auth/RouteGuards';
 import { FeatureUnavailable } from './FeatureUnavailable';
 import { AdminUsersScreen } from '../features/admin/AdminUsersScreen';
+import { RuntimeFeatureBoundary } from '../features/system/RuntimeFeatureBoundary';
 import { features } from '../config/features';
 
 const BillingScreen = lazy(() => import('../features/billing/AdminScreen').then(({ AdminScreen }) => ({ default: AdminScreen })));
@@ -30,6 +31,34 @@ const WatchesScreen = lazy(() => import('../features/watches/WatchesScreen').the
 const PreliminaryWatchesScreen = lazy(() => import('../features/watches/PreliminaryWatchesScreen').then(({ PreliminaryWatchesScreen }) => ({ default: PreliminaryWatchesScreen })));
 const ReportsScreen = lazy(() => import('../features/reports/ReportsScreen').then(({ ReportsScreen }) => ({ default: ReportsScreen })));
 const PreliminaryReportsScreen = lazy(() => import('../features/reports/PreliminaryReportsScreen').then(({ PreliminaryReportsScreen }) => ({ default: PreliminaryReportsScreen })));
+
+function runtimeSearch(child: ReactElement) {
+  return (
+    <RuntimeFeatureBoundary
+      feature="search"
+      allowDegraded
+      blockedTitle="Registry search is unavailable"
+      blockedDetail="The persisted trademark corpus is not ready for research yet."
+      disabledTitle="Registry search is disabled"
+      disabledDetail="Search has not been enabled for this deployment."
+    >
+      {child}
+    </RuntimeFeatureBoundary>
+  );
+}
+
+function runtimeRisk(child: ReactElement) {
+  return (
+    <RuntimeFeatureBoundary
+      feature="riskAnalysis"
+      allowDegraded
+      blockedTitle="Risk analysis is unavailable"
+      blockedDetail="Risk evidence requires an available persisted trademark search corpus."
+    >
+      {child}
+    </RuntimeFeatureBoundary>
+  );
+}
 
 const router = createBrowserRouter([
   {
@@ -65,7 +94,7 @@ const router = createBrowserRouter([
         path: 'search',
         element: (
           <Suspense fallback={<RouteLoading />}>
-            {features.searchEnabled ? <SearchScreen /> : <PreliminarySearchScreen />}
+            {features.searchEnabled ? runtimeSearch(<SearchScreen />) : <PreliminarySearchScreen />}
           </Suspense>
         ),
       },
@@ -73,14 +102,14 @@ const router = createBrowserRouter([
         path: 'risk-analysis',
         element: (
           <Suspense fallback={<RouteLoading />}>
-            {features.searchEnabled ? <RiskAnalysisScreen /> : <PreliminaryRiskAnalysisScreen />}
+            {features.searchEnabled ? runtimeRisk(<RiskAnalysisScreen />) : <PreliminaryRiskAnalysisScreen />}
           </Suspense>
         ),
       },
       {
         path: 'search/risk/:searchId/:resultId',
         element: features.searchEnabled ? (
-          <Suspense fallback={<RouteLoading />}><RiskDetailScreen /></Suspense>
+          <Suspense fallback={<RouteLoading />}>{runtimeRisk(<RiskDetailScreen />)}</Suspense>
         ) : (
           <FeatureUnavailable title="Live search risk detail is unavailable" detail="Use Risk Analysis for preliminary comparisons of saved portfolio marks until live Search is activated." />
         ),
@@ -88,7 +117,7 @@ const router = createBrowserRouter([
       {
         path: 'search/risk/:id',
         element: features.searchEnabled ? (
-          <Suspense fallback={<RouteLoading />}><RiskDetailScreen /></Suspense>
+          <Suspense fallback={<RouteLoading />}>{runtimeRisk(<RiskDetailScreen />)}</Suspense>
         ) : (
           <FeatureUnavailable title="Live search risk detail is unavailable" detail="Use Risk Analysis for preliminary comparisons of saved portfolio marks until live Search is activated." />
         ),
@@ -96,7 +125,7 @@ const router = createBrowserRouter([
       {
         path: 'search-results/:searchId',
         element: features.searchEnabled ? (
-          <Suspense fallback={<RouteLoading />}><RiskDetailScreen /></Suspense>
+          <Suspense fallback={<RouteLoading />}>{runtimeRisk(<RiskDetailScreen />)}</Suspense>
         ) : (
           <FeatureUnavailable title="Live search history is unavailable" detail="Workspace Search remains usable against saved portfolio records until live registry Search is activated." />
         ),
@@ -105,7 +134,17 @@ const router = createBrowserRouter([
         path: 'office-actions',
         element: (
           <Suspense fallback={<RouteLoading />}>
-            {features.officeActionSearchEnabled ? <OfficeActionResearchScreen /> : <PreliminaryOfficeActionScreen />}
+            {features.officeActionSearchEnabled ? (
+              <RuntimeFeatureBoundary
+                feature="officeActions"
+                blockedTitle="Office Action research is not activated"
+                blockedDetail="A genuine Office Action corpus must be loaded and verified before this research surface is enabled."
+                disabledTitle="Office Action research is disabled"
+                disabledDetail="Office Action search has not been enabled for this deployment."
+              >
+                <OfficeActionResearchScreen />
+              </RuntimeFeatureBoundary>
+            ) : <PreliminaryOfficeActionScreen />}
           </Suspense>
         ),
       },
@@ -115,7 +154,17 @@ const router = createBrowserRouter([
         path: 'watches',
         element: (
           <Suspense fallback={<RouteLoading />}>
-            {features.watchEnabled ? <WatchesScreen /> : <PreliminaryWatchesScreen />}
+            {features.watchEnabled ? (
+              <RuntimeFeatureBoundary
+                feature="watches"
+                blockedTitle="Watches are unavailable"
+                blockedDetail="Watch records are not available in the current runtime."
+                disabledTitle="Watches are disabled"
+                disabledDetail="Watch automation has not been enabled for this deployment."
+              >
+                <WatchesScreen />
+              </RuntimeFeatureBoundary>
+            ) : <PreliminaryWatchesScreen />}
           </Suspense>
         ),
       },
@@ -124,7 +173,17 @@ const router = createBrowserRouter([
         element: (
           <RequireRole allowedRoles={['admin', 'attorney']}>
             <Suspense fallback={<RouteLoading />}>
-              {features.pdfExportEnabled ? <ReportsScreen /> : <PreliminaryReportsScreen />}
+              {features.pdfExportEnabled ? (
+                <RuntimeFeatureBoundary
+                  feature="reports"
+                  blockedTitle="Reports are unavailable"
+                  blockedDetail="Report generation is not writable in the current runtime."
+                  disabledTitle="Reports are disabled"
+                  disabledDetail="Server-side PDF export has not been enabled for this deployment."
+                >
+                  <ReportsScreen />
+                </RuntimeFeatureBoundary>
+              ) : <PreliminaryReportsScreen />}
             </Suspense>
           </RequireRole>
         ),
@@ -132,7 +191,24 @@ const router = createBrowserRouter([
       { path: 'permission-denied', lazy: lazyComponent(() => import('../features/auth/PermissionDeniedScreen'), 'PermissionDeniedScreen') },
       { path: 'admin', element: <RequireAdmin><Navigate to="/admin/users" replace /></RequireAdmin> },
       { path: 'admin/users', element: <RequireAdmin><AdminUsersScreen /></RequireAdmin> },
-      { path: 'admin/billing', element: <RequireAdmin><Suspense fallback={<RouteLoading />}><BillingScreen /></Suspense></RequireAdmin> },
+      {
+        path: 'admin/billing',
+        element: (
+          <RequireAdmin>
+            <Suspense fallback={<RouteLoading />}>
+              <RuntimeFeatureBoundary
+                feature="billing"
+                blockedTitle="Billing is unavailable"
+                blockedDetail="Billing is not active for this deployment."
+                disabledTitle="Billing is disabled"
+                disabledDetail="Paystack billing has not been activated."
+              >
+                <BillingScreen />
+              </RuntimeFeatureBoundary>
+            </Suspense>
+          </RequireAdmin>
+        ),
+      },
     ],
   },
 ]);

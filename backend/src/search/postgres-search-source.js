@@ -9,12 +9,21 @@ function push(values, value) {
   return `$${values.length}`;
 }
 
-function demoReadOnlyMode() {
-  const value = process.env.DEMO_READ_ONLY_MODE?.trim() || 'false';
+function strictBoolean(name, fallback = false) {
+  const value = process.env[name]?.trim();
+  if (value === undefined || value === '') return fallback;
   if (value !== 'true' && value !== 'false') {
-    throw new Error('DEMO_READ_ONLY_MODE must be true or false.');
+    throw new Error(`${name} must be true or false.`);
   }
   return value === 'true';
+}
+
+function indexFriendlySearchMode() {
+  const configured = process.env.SEARCH_INDEX_FRIENDLY_MODE?.trim();
+  if (configured !== undefined && configured !== '') {
+    return strictBoolean('SEARCH_INDEX_FRIENDLY_MODE', false);
+  }
+  return strictBoolean('DEMO_READ_ONLY_MODE', false);
 }
 
 function rowToResult(row) {
@@ -88,11 +97,20 @@ export class PostgresSearchSource {
 
     const limitParam = push(values, this.maxResults);
 
-    if (demoReadOnlyMode()) {
+    if (indexFriendlySearchMode()) {
       const candidateLimitParam = push(values, Math.min(Math.max(this.maxResults * 4, 100), 400));
       const filters = where.join('\n          AND ');
       const sql = `
         WITH candidate_ids AS (
+          (
+            SELECT id
+            FROM registry_trademarks
+            WHERE ${filters}
+              AND lower(mark_text) = lower(${markParam})
+            ORDER BY source_updated_at DESC NULLS LAST
+            LIMIT ${candidateLimitParam}
+          )
+          UNION
           (
             SELECT id
             FROM registry_trademarks
