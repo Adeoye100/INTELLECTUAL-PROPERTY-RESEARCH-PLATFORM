@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ComponentType } from 'react';
+import { lazy, Suspense, type ComponentType, type ReactElement } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { AuthLayout } from './AuthLayout';
 import { MainLayout } from './MainLayout';
@@ -32,7 +32,7 @@ const PreliminaryWatchesScreen = lazy(() => import('../features/watches/Prelimin
 const ReportsScreen = lazy(() => import('../features/reports/ReportsScreen').then(({ ReportsScreen }) => ({ default: ReportsScreen })));
 const PreliminaryReportsScreen = lazy(() => import('../features/reports/PreliminaryReportsScreen').then(({ PreliminaryReportsScreen }) => ({ default: PreliminaryReportsScreen })));
 
-function runtimeSearch(child: JSX.Element) {
+function runtimeSearch(child: ReactElement) {
   return (
     <RuntimeFeatureBoundary
       feature="search"
@@ -47,7 +47,7 @@ function runtimeSearch(child: JSX.Element) {
   );
 }
 
-function runtimeRisk(child: JSX.Element) {
+function runtimeRisk(child: ReactElement) {
   return (
     <RuntimeFeatureBoundary
       feature="riskAnalysis"
