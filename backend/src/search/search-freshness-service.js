@@ -8,6 +8,14 @@ function configuredFreshnessMode() {
   return value;
 }
 
+function demoReadOnlyMode() {
+  const value = process.env.DEMO_READ_ONLY_MODE?.trim() || 'false';
+  if (value !== 'true' && value !== 'false') {
+    throw new Error('DEMO_READ_ONLY_MODE must be true or false.');
+  }
+  return value === 'true';
+}
+
 export class SearchFreshnessService {
   constructor({
     repository,
@@ -49,6 +57,22 @@ export class SearchFreshnessService {
       const latestEvidence = latestComplete ?? latestBaseline;
       const dataThrough = latestEvidence?.dataThroughDate ?? corpus.dataThroughDate ?? null;
       const indexedAt = latestEvidence?.completedAt ?? corpus.indexedAt ?? null;
+
+      if (Number.isFinite(recordCount) && recordCount > 0 && !hasCompleteBaseline && demoReadOnlyMode()) {
+        return {
+          source: sourceRegistry,
+          status: 'degraded',
+          dataThrough,
+          indexedAt,
+          refreshRunId: latestEvidence?.id ?? null,
+          baselineRunId: null,
+          refreshing: false,
+          sourceMode: 'partial-demo-corpus',
+          recordCount,
+          corpusComplete: false,
+          demoReadOnly: true,
+        };
+      }
 
       if (!Number.isFinite(recordCount) || recordCount <= 0 || !hasCompleteBaseline) {
         return {
