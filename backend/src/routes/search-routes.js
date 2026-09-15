@@ -1,8 +1,18 @@
+import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { requireRole } from '../auth/middleware.js';
 import { AppError } from '../errors.js';
 import { RiskEnrichmentError } from '../risk/risk-enriched-search-service.js';
+import { mapRiskEnrichedSearchResponse } from '../search/search-result-mapper.js';
 import { parseSearchQuery } from '../search/search-query.js';
+
+function demoReadOnlyMode() {
+  const value = process.env.DEMO_READ_ONLY_MODE?.trim() || 'false';
+  if (value !== 'true' && value !== 'false') {
+    throw new Error('DEMO_READ_ONLY_MODE must be true or false.');
+  }
+  return value === 'true';
+}
 
 export function createSearchRouter(authenticate, searchService, { searchResultService } = {}) {
   const validAuthenticate = typeof authenticate === 'function'
@@ -29,6 +39,17 @@ export function createSearchRouter(authenticate, searchService, { searchResultSe
         const federatedResponse = await searchService.search(query, {
           requestId: request.auditContext?.requestId ?? null,
         });
+
+        if (demoReadOnlyMode()) {
+          const mapped = mapRiskEnrichedSearchResponse(randomUUID(), federatedResponse);
+          response.json({
+            ...mapped,
+            dataFreshness: federatedResponse?.dataFreshness ?? null,
+            demoReadOnly: true,
+          });
+          return;
+        }
+
         const persisted = await searchResultService.persistSearch({
           firmId: request.auth.firmId,
           requestedByUserId: request.auth.userId,
