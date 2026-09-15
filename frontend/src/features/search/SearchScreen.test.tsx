@@ -53,7 +53,8 @@ describe('SearchScreen', () => {
     const { fetchMock } = renderSearch();
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Mark' }), { target: { value: 'FORGE' } });
-    fireEvent.click(screen.getByRole('checkbox', { name: /European Union/ }));
+    expect(screen.getByRole('checkbox', { name: /European Union/ })).toBeDisabled();
+    expect(screen.getByText('Activation pending')).toBeVisible();
     fireEvent.change(screen.getByRole('textbox', { name: 'Nice class' }), { target: { value: '9, 35' } });
     fireEvent.change(screen.getByRole('combobox', { name: 'Status' }), { target: { value: 'registered' } });
     fireEvent.change(screen.getByRole('textbox', { name: 'Owner' }), { target: { value: 'Forge Holdings' } });
@@ -65,7 +66,7 @@ describe('SearchScreen', () => {
     const requestUrl = new URL(String(fetchMock.mock.calls[0][0]), 'https://example.test');
     expect(requestUrl.pathname).toBe('/api/v1/search');
     expect(requestUrl.searchParams.get('mark')).toBe('FORGE');
-    expect(requestUrl.searchParams.getAll('jurisdiction')).toEqual(['EU', 'US']);
+    expect(requestUrl.searchParams.getAll('jurisdiction')).toEqual(['US']);
     expect(requestUrl.searchParams.get('class')).toBe('9,35');
     expect(requestUrl.searchParams.get('status')).toBe('registered');
     expect(requestUrl.searchParams.get('owner')).toBe('Forge Holdings');

@@ -35,17 +35,18 @@ describe('parseSearchQuery', () => {
     assert.deepEqual(query, original);
   });
 
-  it('accepts a scalar jurisdiction and provides empty/null optional values', () => {
-    assert.deepEqual(parseSearchQuery({ mark: 'AB', jurisdiction: 'ng' }), {
-      mark: 'AB', jurisdictions: ['NG'], niceClasses: [], status: null, owner: null,
+  it('accepts the two supported registry jurisdictions', () => {
+    assert.deepEqual(parseSearchQuery({ mark: 'AB', jurisdiction: 'eu' }), {
+      mark: 'AB', jurisdictions: ['EU'], niceClasses: [], status: null, owner: null,
       filedFrom: null, filedTo: null,
     });
+    assert.deepEqual(parseSearchQuery({ mark: 'AB', jurisdiction: ['US', 'eu', 'US'] }).jurisdictions, ['US', 'EU']);
   });
 
-  it('deduplicates jurisdictions and enforces the maximum of ten', () => {
-    const jurisdictions = Array.from({ length: 10 }, (_, index) => `j${index}`);
-    assert.equal(parseSearchQuery({ mark: 'AB', jurisdiction: [...jurisdictions, 'J1'] }).jurisdictions.length, 10);
-    invalid({ mark: 'AB', jurisdiction: [...jurisdictions, 'J10'] }, 'jurisdiction');
+  it('rejects jurisdictions outside USPTO and EUIPO scope', () => {
+    for (const jurisdiction of ['GB', 'CA', 'AU', 'NG', 'JP']) {
+      invalid({ mark: 'AB', jurisdiction }, 'jurisdiction');
+    }
   });
 
   it('parses classes from 1 through 45 and deduplicates them', () => {
