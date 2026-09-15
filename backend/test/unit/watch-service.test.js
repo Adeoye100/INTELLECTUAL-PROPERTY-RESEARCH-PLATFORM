@@ -135,7 +135,7 @@ describe('watch service and repository boundary', () => {
     await repo.withDueWatchBatch({ now: scheduledFor, limit: 5, handleWatch: async () => ({ advance: true, nextPollAt: '2026-08-21T01:00:00.000Z' }) });
     const sql = calls.map(([statement]) => statement).join('\n');
     assert.match(sql, /WHERE firm_id = \$1 AND id = \$2/);
-    assert.match(sql, /ORDER BY created_at DESC, id DESC/);
+    assert.match(sql, /ORDER BY w\.created_at DESC, w\.id DESC/);
     assert.match(sql, /FOR UPDATE SKIP LOCKED/);
     assert.match(sql, /DELETE FROM watches WHERE firm_id = \$1 AND id = \$2/);
     assert.equal(sql.includes(firmId), false);
