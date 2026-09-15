@@ -14,6 +14,7 @@ import {
   X,
   Activity,
   BarChart3,
+  ShieldAlert,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from '../components/Button';
@@ -23,6 +24,7 @@ import { authRequest } from '../features/auth/authApi';
 import { SessionExpiryMonitor } from '../features/auth/SessionExpiryMonitor';
 import { appQueryClient } from '../lib/queryClient';
 import { navigationForRole } from '../features/auth/capabilities';
+import { useRuntimeCapabilities } from '../features/system/runtimeCapabilities';
 
 function getNavIcon(path: string) {
   switch (path) {
@@ -51,6 +53,7 @@ export const MainLayout: React.FC = () => {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const clearSession = useAuthStore((state) => state.clearSession);
+  const runtime = useRuntimeCapabilities();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const initials = user?.fullName
@@ -84,7 +87,7 @@ export const MainLayout: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex min-h-screen flex-col">
       <SessionExpiryMonitor />
       <a
         href="#main-content"
@@ -93,11 +96,11 @@ export const MainLayout: React.FC = () => {
         Skip to main content
       </a>
 
-      <header className="h-16 bg-forge-gradient flex items-center justify-between px-4 md:px-6 sticky top-0 z-40">
+      <header className="sticky top-0 z-40 flex h-16 items-center justify-between bg-forge-gradient px-4 md:px-6">
         <div className="flex items-center gap-3">
           <button
             type="button"
-            className="lg:hidden text-white p-1 rounded hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            className="rounded p-1 text-white hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white lg:hidden"
             aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}
             aria-expanded={mobileNavOpen}
             aria-controls="application-sidebar"
@@ -111,7 +114,7 @@ export const MainLayout: React.FC = () => {
         <div className="flex items-center gap-3 text-white">
           <ThemeToggle surface="app" />
           <div className="flex items-center gap-2 border-l border-white/20 pl-3">
-            <div className="w-8 h-8 rounded-full bg-forge-teal-700 flex items-center justify-center font-bold text-sm">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-forge-teal-700 text-sm font-bold">
               {initials}
             </div>
             <div className="hidden sm:block">
@@ -135,15 +138,15 @@ export const MainLayout: React.FC = () => {
         <aside
           id="application-sidebar"
           className={cn(
-            'fixed bottom-0 left-0 top-16 z-50 w-72',
-            'bg-forge-navy-800 text-white flex flex-col',
+            'fixed bottom-0 left-0 top-16 z-50 flex w-72 flex-col',
+            'bg-forge-navy-800 text-white',
             'transition-transform duration-200',
             'lg:sticky lg:top-16 lg:h-[calc(100vh-64px)] lg:w-64',
             'lg:translate-x-0',
-            mobileNavOpen ? 'translate-x-0' : '-translate-x-full'
+            mobileNavOpen ? 'translate-x-0' : '-translate-x-full',
           )}
         >
-          <nav className="flex-1 p-3 space-y-1 overflow-y-auto" aria-label="Application">
+          <nav className="flex-1 space-y-1 overflow-y-auto p-3" aria-label="Application">
             {navigationForRole(user?.role).map((item) => (
               <NavItem
                 key={item.to}
@@ -155,7 +158,7 @@ export const MainLayout: React.FC = () => {
             ))}
           </nav>
 
-          <div className="p-4 border-t border-white/10">
+          <div className="border-t border-white/10 p-4">
             <Button
               variant="ghost"
               className="w-full justify-start text-white hover:bg-white/10"
@@ -168,9 +171,19 @@ export const MainLayout: React.FC = () => {
           </div>
         </aside>
 
-        <main id="main-content" tabIndex={-1} className="min-w-0 flex-1 bg-background text-foreground p-4 md:p-6 xl:p-8 focus:outline-none">
-          <Outlet />
-        </main>
+        <div className="min-w-0 flex-1 bg-background text-foreground">
+          {runtime.data?.readOnly && (
+            <div className="flex items-start gap-2 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm md:px-6 xl:px-8" role="status">
+              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+              <p>
+                <strong>Research demo mode:</strong> Search and read-only research remain available. Changes to portfolio, watches, invitations, reports and billing are paused until the production database is writable.
+              </p>
+            </div>
+          )}
+          <main id="main-content" tabIndex={-1} className="min-w-0 p-4 focus:outline-none md:p-6 xl:p-8">
+            <Outlet />
+          </main>
+        </div>
       </div>
     </div>
   );
@@ -190,10 +203,10 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, onClick }) => {
       onClick={onClick}
       className={({ isActive }) =>
         cn(
-          'flex items-center gap-3 px-3 py-2 rounded transition-colors',
+          'flex items-center gap-3 rounded px-3 py-2 transition-colors',
           isActive
-            ? 'bg-forge-teal-700 text-white font-semibold'
-            : 'text-forge-subtext-onDark hover:bg-white/5 hover:text-white'
+            ? 'bg-forge-teal-700 font-semibold text-white'
+            : 'text-forge-subtext-onDark hover:bg-white/5 hover:text-white',
         )
       }
     >
