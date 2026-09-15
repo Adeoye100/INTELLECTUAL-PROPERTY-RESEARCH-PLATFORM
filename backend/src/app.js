@@ -20,6 +20,7 @@ import { createHealthRouter } from './routes/health-routes.js';
 import { createDashboardRouter } from './routes/dashboard-routes.js';
 import { createBillingRouter } from './routes/billing-routes.js';
 import { createCapabilityRouter } from './routes/capability-routes.js';
+import { createRuntimeCapabilityProvider } from './runtime-capability-provider.js';
 import {
   createRequestBoundsMiddleware,
   rejectUnsupportedRequestContent,
@@ -86,7 +87,17 @@ export function createApp({
     authRateLimiter,
     includeDiagnosticRoutes,
   }));
-  if (capabilityProvider) app.use('/api/v1', createCapabilityRouter(authenticate, capabilityProvider));
+
+  const resolvedCapabilityProvider = capabilityProvider ?? createRuntimeCapabilityProvider({
+    searchService,
+    officeActionSearchService,
+    watchService,
+    exportService,
+    billingService,
+    userRoleService,
+  });
+  app.use('/api/v1', createCapabilityRouter(authenticate, resolvedCapabilityProvider));
+
   if (dashboardAnalyticsService) app.use('/api/v1', createDashboardRouter(authenticate, dashboardAnalyticsService));
   if (searchService && searchResultService) {
     app.use('/api/v1', createSearchRouter(authenticate, searchService, { searchResultService }));
