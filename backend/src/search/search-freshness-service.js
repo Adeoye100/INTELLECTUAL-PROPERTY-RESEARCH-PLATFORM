@@ -8,12 +8,21 @@ function configuredFreshnessMode() {
   return value;
 }
 
-function demoReadOnlyMode() {
-  const value = process.env.DEMO_READ_ONLY_MODE?.trim() || 'false';
+function strictBoolean(name, fallback = false) {
+  const value = process.env[name]?.trim();
+  if (value === undefined || value === '') return fallback;
   if (value !== 'true' && value !== 'false') {
-    throw new Error('DEMO_READ_ONLY_MODE must be true or false.');
+    throw new Error(`${name} must be true or false.`);
   }
   return value === 'true';
+}
+
+function demoReadOnlyMode() {
+  return strictBoolean('DEMO_READ_ONLY_MODE', false);
+}
+
+function allowPartialCorpus() {
+  return strictBoolean('SEARCH_ALLOW_PARTIAL_CORPUS', false) || demoReadOnlyMode();
 }
 
 export class SearchFreshnessService {
@@ -58,7 +67,8 @@ export class SearchFreshnessService {
       const dataThrough = latestEvidence?.dataThroughDate ?? corpus.dataThroughDate ?? null;
       const indexedAt = latestEvidence?.completedAt ?? corpus.indexedAt ?? null;
 
-      if (Number.isFinite(recordCount) && recordCount > 0 && !hasCompleteBaseline && demoReadOnlyMode()) {
+      if (Number.isFinite(recordCount) && recordCount > 0 && !hasCompleteBaseline && allowPartialCorpus()) {
+        const readOnly = demoReadOnlyMode();
         return {
           source: sourceRegistry,
           status: 'degraded',
@@ -67,10 +77,11 @@ export class SearchFreshnessService {
           refreshRunId: latestEvidence?.id ?? null,
           baselineRunId: null,
           refreshing: false,
-          sourceMode: 'partial-demo-corpus',
+          sourceMode: readOnly ? 'partial-demo-corpus' : 'partial-corpus',
           recordCount,
           corpusComplete: false,
-          demoReadOnly: true,
+          demoReadOnly: readOnly,
+          partialCorpusAllowed: true,
         };
       }
 
