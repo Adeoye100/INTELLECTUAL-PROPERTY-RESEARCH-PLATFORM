@@ -19,7 +19,6 @@ import { createExportRouter } from './routes/export-routes.js';
 import { createHealthRouter } from './routes/health-routes.js';
 import { createDashboardRouter } from './routes/dashboard-routes.js';
 import { createBillingRouter } from './routes/billing-routes.js';
-import { createCapabilityRouter } from './routes/capability-routes.js';
 import { createRuntimeCapabilityProvider } from './runtime-capability-provider.js';
 import {
   createRequestBoundsMiddleware,
@@ -83,10 +82,6 @@ export function createApp({
   if (invitationService && userRoleService) {
     app.use('/api/v1/admin', createAdminRouter(authenticate, invitationService, userRoleService, { authRateLimiter }));
   }
-  app.use('/api/v1', createProtectedRouter(authenticate, {
-    authRateLimiter,
-    includeDiagnosticRoutes,
-  }));
 
   const resolvedCapabilityProvider = capabilityProvider ?? createRuntimeCapabilityProvider({
     searchService,
@@ -96,7 +91,11 @@ export function createApp({
     billingService,
     userRoleService,
   });
-  app.use('/api/v1', createCapabilityRouter(authenticate, resolvedCapabilityProvider));
+  app.use('/api/v1', createProtectedRouter(authenticate, {
+    authRateLimiter,
+    includeDiagnosticRoutes,
+    capabilityProvider: resolvedCapabilityProvider,
+  }));
 
   if (dashboardAnalyticsService) app.use('/api/v1', createDashboardRouter(authenticate, dashboardAnalyticsService));
   if (searchService && searchResultService) {
