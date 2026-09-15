@@ -1,47 +1,47 @@
-function demoReadOnlyMode() {
-  const value = process.env.DEMO_READ_ONLY_MODE?.trim() || 'false';
-  if (value !== 'true' && value !== 'false') throw new Error('DEMO_READ_ONLY_MODE must be true or false.');
+function strictEnvBoolean(name, fallback = false) {
+  const value = process.env[name]?.trim();
+  if (value === undefined || value === '') return fallback;
+  if (value !== 'true' && value !== 'false') throw new Error(`${name} must be true or false.`);
   return value === 'true';
 }
 
-function searchStatus(config, freshness) {
-  if (!config.searchEnabled) return 'disabled';
+async function getSearchFreshness(searchService) {
+  const freshnessService = searchService?.freshnessService;
+  if (!freshnessService || typeof freshnessService.getSearchFreshness !== 'function') return null;
+  try {
+    return await freshnessService.getSearchFreshness('USPTO');
+  } catch {
+    return null;
+  }
+}
+
+function normalizedSearchStatus(searchService, freshness) {
+  if (!searchService) return 'disabled';
   if (!freshness || freshness.status === 'stale') return 'blocked';
   if (freshness.status === 'degraded' || freshness.corpusComplete === false) return 'degraded';
   return 'available';
 }
 
-export function createRuntimeCapabilityProvider({ config, database, searchFreshnessService }) {
-  if (!config || !database || typeof database.query !== 'function' || !searchFreshnessService
-    || typeof searchFreshnessService.getSearchFreshness !== 'function') {
-    throw new TypeError('Runtime capability provider needs config, database and search freshness service.');
-  }
-
+/**
+ * Product-state metadata derived from the runtime that is actually mounted.
+ * It is intentionally conservative: uncertain capabilities are reported as
+ * blocked instead of making the frontend advertise an action that may fail.
+ */
+export function createRuntimeCapabilityProvider({
+  searchService = null,
+  officeActionSearchService = null,
+  watchService = null,
+  exportService = null,
+  billingService = null,
+  userRoleService = null,
+} = {}) {
   return async function runtimeCapabilities() {
-    const readOnly = demoReadOnlyMode();
-    let freshness = null;
-    if (config.searchEnabled) {
-      try {
-        freshness = await searchFreshnessService.getSearchFreshness('USPTO');
-      } catch {
-        freshness = null;
-      }
-    }
-
-    let officeActionCorpusAvailable = false;
-    if (config.officeActionSearchEnabled) {
-      try {
-        const result = await database.query(
-          'SELECT EXISTS (SELECT 1 FROM office_action_documents LIMIT 1) AS available',
-        );
-        officeActionCorpusAvailable = result.rows?.[0]?.available === true;
-      } catch {
-        officeActionCorpusAvailable = false;
-      }
-    }
-
-    const registrySearchStatus = searchStatus(config, freshness);
-    const writes = readOnly ? 'blocked' : 'available';
+    const readOnly = strictEnvBoolean('DEMO_READ_ONLY_MODE', false);
+    const watchAutomationEnabled = strictEnvBoolean('WATCH_ENABLED', false);
+    const officeActionCorpusReady = strictEnvBoolean('OFFICE_ACTION_CORPUS_READY', false);
+    const freshness = await getSearchFreshness(searchService);
+    const registrySearchStatus = normalizedSearchStatus(searchService, freshness);
+    const writeStatus = readOnly ? 'blocked' : 'available';
 
     return {
       mode: readOnly ? 'read-only-demo' : 'standard',
@@ -69,30 +69,29 @@ export function createRuntimeCapabilityProvider({ config, database, searchFreshn
           status: registrySearchStatus,
         },
         officeActions: {
-          status: !config.officeActionSearchEnabled
+          status: !officeActionSearchService
             ? 'disabled'
-            : officeActionCorpusAvailable ? 'available' : 'blocked',
-          reason: config.officeActionSearchEnabled && !officeActionCorpusAvailable
-            ? 'corpus-empty' : null,
+            : officeActionCorpusReady ? 'available' : 'blocked',
+          reason: officeActionSearchService && !officeActionCorpusReady ? 'corpus-not-activated' : null,
         },
         portfolio: {
           status: 'available',
-          writeStatus: writes,
+          writeStatus,
         },
         watches: {
-          status: 'available',
-          writeStatus: writes,
-          automationStatus: config.watchEnabled ? 'available' : 'disabled',
+          status: watchService ? 'available' : 'disabled',
+          writeStatus: watchService ? writeStatus : 'disabled',
+          automationStatus: watchAutomationEnabled ? 'available' : 'disabled',
         },
         reports: {
-          status: !config.pdfExportEnabled ? 'disabled' : readOnly ? 'blocked' : 'available',
+          status: !exportService ? 'disabled' : readOnly ? 'blocked' : 'available',
         },
         usersInvitations: {
-          status: 'available',
-          writeStatus: writes,
+          status: userRoleService ? 'available' : 'disabled',
+          writeStatus: userRoleService ? writeStatus : 'disabled',
         },
         billing: {
-          status: !config.paystackEnabled ? 'disabled' : readOnly ? 'blocked' : 'available',
+          status: !billingService ? 'disabled' : readOnly ? 'blocked' : 'available',
         },
       },
     };
