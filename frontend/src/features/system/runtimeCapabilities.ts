@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { getApiClient } from '../../lib/api/client';
 
 export type RuntimeFeatureStatus = 'available' | 'degraded' | 'blocked' | 'disabled' | 'pending';
@@ -42,10 +42,24 @@ export const loadRuntimeCapabilities = () =>
     .then((response) => response.runtimeCapabilities ?? null);
 
 export function useRuntimeCapabilities() {
-  return useQuery({
-    queryKey: ['runtime-capabilities'],
-    queryFn: loadRuntimeCapabilities,
-    retry: false,
-    staleTime: 30_000,
-  });
+  const [data, setData] = useState<RuntimeCapabilities | null | undefined>(undefined);
+  const [isError, setIsError] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    loadRuntimeCapabilities()
+      .then((next) => {
+        if (!active) return;
+        setData(next);
+        setIsError(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setData(null);
+        setIsError(true);
+      });
+    return () => { active = false; };
+  }, []);
+
+  return { data, isLoading: data === undefined && !isError, isError };
 }
