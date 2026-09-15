@@ -14,7 +14,9 @@ export const features = {
     return parseFeatureFlag(import.meta.env.VITE_OFFICE_ACTION_SEARCH_ENABLED, true);
   },
   get watchEnabled() {
-    return parseFeatureFlag(import.meta.env.VITE_WATCH_ENABLED, false);
+    // Runtime capability checks remain authoritative; production defaults to the
+    // full Watch interface now that the worker is enabled server-side.
+    return parseFeatureFlag(import.meta.env.VITE_WATCH_ENABLED, true);
   },
   get pdfExportEnabled() {
     // Reports are generated server-side by the authenticated PDF export pipeline.
