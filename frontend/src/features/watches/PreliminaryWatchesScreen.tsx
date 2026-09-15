@@ -1,5 +1,6 @@
 import { ShieldAlert } from 'lucide-react';
 import { useRuntimeCapabilities } from '../system/runtimeCapabilities';
+import { ReadOnlyWatchesScreen } from './ReadOnlyWatchesScreen';
 import { WatchesScreen } from './WatchesScreen';
 
 export function PreliminaryWatchesScreen() {
@@ -26,7 +27,7 @@ export function PreliminaryWatchesScreen() {
           </div>
         </div>
       </div>
-      <WatchesScreen />
+      {readOnly ? <ReadOnlyWatchesScreen /> : <WatchesScreen />}
     </div>
   );
 }
