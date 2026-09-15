@@ -1,9 +1,17 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { afterEach, describe, it } from 'node:test';
 import { PostgresSearchSource } from '../../src/search/postgres-search-source.js';
+
+const originalDemoMode = process.env.DEMO_READ_ONLY_MODE;
+
+afterEach(() => {
+  if (originalDemoMode === undefined) delete process.env.DEMO_READ_ONLY_MODE;
+  else process.env.DEMO_READ_ONLY_MODE = originalDemoMode;
+});
 
 describe('PostgresSearchSource', () => {
   it('builds a parameterized fuzzy/phonetic query and maps registry rows', async () => {
+    process.env.DEMO_READ_ONLY_MODE = 'false';
     let captured;
     const database = {
       async query(text, values) {
@@ -54,6 +62,30 @@ describe('PostgresSearchSource', () => {
       sourceReferenceId: '12345678',
       relevanceScore: 88.5,
     }]);
+  });
+
+  it('uses bounded index-friendly candidate branches in read-only demo mode', async () => {
+    process.env.DEMO_READ_ONLY_MODE = 'true';
+    let captured;
+    const database = {
+      async query(text, values) {
+        captured = { text, values };
+        return { rows: [] };
+      },
+    };
+    const source = new PostgresSearchSource({ sourceName: 'USPTO', database, maxResults: 50 });
+    await source.search({ mark: 'COCA-COLA', jurisdictions: ['US'], niceClasses: [9, 35, 42] });
+
+    assert.match(captured.text, /WITH candidate_ids AS/);
+    assert.match(captured.text, /mark_text % \$2/);
+    assert.match(captured.text, /to_tsvector\('simple', mark_text\) @@ plainto_tsquery/);
+    assert.match(captured.text, /soundex\(mark_text\) = soundex\(\$2\)/);
+    assert.match(captured.text, /UNION/);
+    assert.doesNotMatch(captured.text, /WHERE[\s\S]*lower\(mark_text\) = lower\(\$2\)[\s\S]*OR mark_text % \$2/);
+    assert.equal(captured.values[0], 'USPTO');
+    assert.equal(captured.values[1], 'COCA-COLA');
+    assert.equal(captured.values.at(-2), 50);
+    assert.equal(captured.values.at(-1), 200);
   });
 
   it('rejects empty mark input before querying the database', async () => {

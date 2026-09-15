@@ -9,6 +9,14 @@ function push(values, value) {
   return `$${values.length}`;
 }
 
+function demoReadOnlyMode() {
+  const value = process.env.DEMO_READ_ONLY_MODE?.trim() || 'false';
+  if (value !== 'true' && value !== 'false') {
+    throw new Error('DEMO_READ_ONLY_MODE must be true or false.');
+  }
+  return value === 'true';
+}
+
 function rowToResult(row) {
   return {
     recordId: row.id,
@@ -78,6 +86,67 @@ export class PostgresSearchSource {
       where.push(`filing_date <= ${param}::date`);
     }
 
+    const limitParam = push(values, this.maxResults);
+
+    if (demoReadOnlyMode()) {
+      const candidateLimitParam = push(values, Math.min(Math.max(this.maxResults * 4, 100), 400));
+      const filters = where.join('\n          AND ');
+      const sql = `
+        WITH candidate_ids AS (
+          (
+            SELECT id
+            FROM registry_trademarks
+            WHERE ${filters}
+              AND mark_text % ${markParam}
+            ORDER BY similarity(mark_text, ${markParam}) DESC, source_updated_at DESC NULLS LAST
+            LIMIT ${candidateLimitParam}
+          )
+          UNION
+          (
+            SELECT id
+            FROM registry_trademarks
+            WHERE ${filters}
+              AND to_tsvector('simple', mark_text) @@ plainto_tsquery('simple', ${markParam})
+            ORDER BY ts_rank_cd(to_tsvector('simple', mark_text), plainto_tsquery('simple', ${markParam})) DESC,
+                     source_updated_at DESC NULLS LAST
+            LIMIT ${candidateLimitParam}
+          )
+          UNION
+          (
+            SELECT id
+            FROM registry_trademarks
+            WHERE ${filters}
+              AND soundex(mark_text) = soundex(${markParam})
+            ORDER BY source_updated_at DESC NULLS LAST
+            LIMIT ${candidateLimitParam}
+          )
+        )
+        SELECT
+          r.id,
+          r.mark_text,
+          r.owner,
+          r.jurisdiction,
+          r.nice_classes,
+          r.status,
+          r.filing_date,
+          r.source_registry,
+          r.source_reference_id,
+          (
+            CASE WHEN lower(r.mark_text) = lower(${markParam}) THEN 100 ELSE 0 END
+            + (similarity(r.mark_text, ${markParam}) * 60)
+            + (ts_rank_cd(to_tsvector('simple', r.mark_text), plainto_tsquery('simple', ${markParam})) * 30)
+            + CASE WHEN soundex(r.mark_text) = soundex(${markParam}) THEN 15 ELSE 0 END
+          )::double precision AS relevance_score
+        FROM candidate_ids c
+        JOIN registry_trademarks r ON r.id = c.id
+        ORDER BY relevance_score DESC, r.source_updated_at DESC NULLS LAST, r.source_reference_id ASC
+        LIMIT ${limitParam}
+      `;
+
+      const result = await this.database.query(sql, values);
+      return result.rows.map(rowToResult);
+    }
+
     where.push(`(
       lower(mark_text) = lower(${markParam})
       OR mark_text % ${markParam}
@@ -85,7 +154,6 @@ export class PostgresSearchSource {
       OR soundex(mark_text) = soundex(${markParam})
     )`);
 
-    const limitParam = push(values, this.maxResults);
     const sql = `
       SELECT
         id,
