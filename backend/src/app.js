@@ -19,6 +19,7 @@ import { createExportRouter } from './routes/export-routes.js';
 import { createHealthRouter } from './routes/health-routes.js';
 import { createDashboardRouter } from './routes/dashboard-routes.js';
 import { createBillingRouter } from './routes/billing-routes.js';
+import { createCapabilityRouter } from './routes/capability-routes.js';
 import {
   createRequestBoundsMiddleware,
   rejectUnsupportedRequestContent,
@@ -46,6 +47,7 @@ export function createApp({
   dashboardAnalyticsService = null,
   billingService = null,
   matterService = null,
+  capabilityProvider = null,
 }) {
   if (!Number.isSafeInteger(trustProxyHops) || trustProxyHops < 0 || trustProxyHops > 10) {
     throw new Error('trustProxyHops must be an integer between 0 and 10.');
@@ -84,6 +86,7 @@ export function createApp({
     authRateLimiter,
     includeDiagnosticRoutes,
   }));
+  if (capabilityProvider) app.use('/api/v1', createCapabilityRouter(authenticate, capabilityProvider));
   if (dashboardAnalyticsService) app.use('/api/v1', createDashboardRouter(authenticate, dashboardAnalyticsService));
   if (searchService && searchResultService) {
     app.use('/api/v1', createSearchRouter(authenticate, searchService, { searchResultService }));
