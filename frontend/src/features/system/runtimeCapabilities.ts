@@ -33,8 +33,13 @@ export interface RuntimeCapabilities {
   };
 }
 
+interface MembershipCapabilityEnvelope {
+  runtimeCapabilities?: RuntimeCapabilities;
+}
+
 export const loadRuntimeCapabilities = () =>
-  getApiClient().requestJson<RuntimeCapabilities>('/capabilities');
+  getApiClient().requestJson<MembershipCapabilityEnvelope>('/me')
+    .then((response) => response.runtimeCapabilities ?? null);
 
 export function useRuntimeCapabilities() {
   return useQuery({
