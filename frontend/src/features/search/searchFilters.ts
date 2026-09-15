@@ -3,9 +3,16 @@ import type { SearchResult, RiskLevel } from '../../types';
 
 const optionalText = z.string().trim();
 
+export const supportedJurisdictions = ['US', 'EU'] as const;
+export type SupportedJurisdiction = (typeof supportedJurisdictions)[number];
+
+const supportedJurisdictionSchema = z.enum(supportedJurisdictions);
+const isSupportedJurisdiction = (value: string): value is SupportedJurisdiction =>
+  supportedJurisdictions.includes(value as SupportedJurisdiction);
+
 export const searchFiltersSchema = z.object({
   mark: optionalText.refine((value) => value.length === 0 || value.length >= 2, 'Enter at least 2 characters.'),
-  jurisdictions: z.array(z.string()).min(1, 'Choose at least one jurisdiction.'),
+  jurisdictions: z.array(supportedJurisdictionSchema).min(1, 'Choose at least one jurisdiction.'),
   niceClass: optionalText.refine((value) => value.length === 0 || /^\d+(\s*,\s*\d+)*$/.test(value), 'Enter numeric classes separated by commas.'),
   status: z.enum(['', 'pending', 'registered', 'abandoned']),
   owner: optionalText,
@@ -64,15 +71,21 @@ export const searchFiltersToParams = (filters: SearchFilters) => {
   return params;
 };
 
-export const searchFiltersFromParams = (params: URLSearchParams): SearchFilters => ({
-  mark: params.get('mark') ?? '',
-  jurisdictions: params.getAll('jurisdiction').length ? params.getAll('jurisdiction') : ['US'],
-  niceClass: params.get('niceClass') ?? params.get('class') ?? '',
-  status: (['pending', 'registered', 'abandoned'].includes(params.get('status') ?? '') ? params.get('status') : '') as SearchFilters['status'],
-  owner: params.get('owner') ?? '',
-  filedFrom: params.get('filedFrom') ?? '',
-  filedTo: params.get('filedTo') ?? '',
-});
+export const searchFiltersFromParams = (params: URLSearchParams): SearchFilters => {
+  const requestedJurisdictions = params.getAll('jurisdiction')
+    .map((value) => value.trim().toUpperCase())
+    .filter(isSupportedJurisdiction);
+
+  return {
+    mark: params.get('mark') ?? '',
+    jurisdictions: requestedJurisdictions.length ? [...new Set(requestedJurisdictions)] : ['US'],
+    niceClass: params.get('niceClass') ?? params.get('class') ?? '',
+    status: (['pending', 'registered', 'abandoned'].includes(params.get('status') ?? '') ? params.get('status') : '') as SearchFilters['status'],
+    owner: params.get('owner') ?? '',
+    filedFrom: params.get('filedFrom') ?? '',
+    filedTo: params.get('filedTo') ?? '',
+  };
+};
 
 export const buildSearchRequestUrl = (filters: SearchFilters) =>
   `/search?${searchFiltersToParams(filters).toString()}`;
