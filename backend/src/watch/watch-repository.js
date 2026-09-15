@@ -2,13 +2,18 @@ const WATCH_COLUMNS = `
   id, firm_id, portfolio_mark_id, owner_user_id, state, alert_channel, alert_mode,
   poll_interval_minutes, next_poll_at, last_polled_at, last_poll_status, last_error_code, created_at, updated_at`;
 
+const WATCH_SUMMARY_COLUMNS = `
+  w.id, w.firm_id, w.portfolio_mark_id, w.owner_user_id, w.state, w.alert_channel, w.alert_mode,
+  w.poll_interval_minutes, w.next_poll_at, w.last_polled_at, w.last_poll_status, w.last_error_code,
+  w.created_at, w.updated_at, p.mark_text, p.jurisdiction`;
+
 function timestamp(value) {
   if (value === null || value === undefined) return null;
   return value instanceof Date ? value.toISOString() : String(value);
 }
 
 export function watchFromRow(row) {
-  return {
+  const watch = {
     id: row.id,
     firmId: row.firm_id,
     portfolioMarkId: row.portfolio_mark_id,
@@ -25,13 +30,19 @@ export function watchFromRow(row) {
     createdAt: timestamp(row.created_at),
     updatedAt: timestamp(row.updated_at),
   };
+  if (row.mark_text !== undefined) watch.markText = row.mark_text;
+  if (row.jurisdiction !== undefined) watch.jurisdiction = row.jurisdiction;
+  return watch;
 }
 
-function watchWhere(firmId, filters) {
+function watchWhere(firmId, filters, alias = 'w') {
   const values = [firmId];
-  const clauses = ['firm_id = $1'];
-  if (filters.state) { values.push(filters.state); clauses.push(`state = $${values.length}`); }
-  if (filters.portfolioMarkId) { values.push(filters.portfolioMarkId); clauses.push(`portfolio_mark_id = $${values.length}`); }
+  const clauses = [`${alias}.firm_id = $1`];
+  if (filters.state) { values.push(filters.state); clauses.push(`${alias}.state = $${values.length}`); }
+  if (filters.portfolioMarkId) {
+    values.push(filters.portfolioMarkId);
+    clauses.push(`${alias}.portfolio_mark_id = $${values.length}`);
+  }
   return { values, where: clauses.join(' AND ') };
 }
 
@@ -69,11 +80,16 @@ export class WatchRepository {
 
   async create({ firmId, actorUserId, input, nextPollAt, transaction = null }) {
     const result = await executor(this, transaction).query(
-      `INSERT INTO watches (
-        firm_id, portfolio_mark_id, owner_user_id, state, alert_channel, alert_mode, poll_interval_minutes, next_poll_at
-      ) VALUES (
-        $1, $2, (SELECT id FROM users WHERE supabase_user_id = $3 AND firm_id = $1), $4, $5, $6, $7, $8
-      ) RETURNING ${WATCH_COLUMNS}`,
+      `WITH changed AS (
+        INSERT INTO watches (
+          firm_id, portfolio_mark_id, owner_user_id, state, alert_channel, alert_mode, poll_interval_minutes, next_poll_at
+        ) VALUES (
+          $1, $2, (SELECT id FROM users WHERE supabase_user_id = $3 AND firm_id = $1), $4, $5, $6, $7, $8
+        ) RETURNING *
+      )
+      SELECT ${WATCH_SUMMARY_COLUMNS}
+      FROM changed w
+      JOIN portfolio_marks p ON p.id = w.portfolio_mark_id AND p.firm_id = w.firm_id`,
       [firmId, input.portfolioMarkId, actorUserId, input.state, input.alertChannel ?? 'in-app', input.alertMode ?? 'real-time', input.pollIntervalMinutes, nextPollAt],
     );
     return result.rowCount ? watchFromRow(result.rows[0]) : null;
@@ -81,11 +97,17 @@ export class WatchRepository {
 
   async list({ firmId, filters, pagination }) {
     const { values, where } = watchWhere(firmId, filters);
-    const counted = await this.database.query(`SELECT count(*)::integer AS total FROM watches WHERE ${where}`, values);
+    const counted = await this.database.query(
+      `SELECT count(*)::integer AS total FROM watches w WHERE ${where}`,
+      values,
+    );
     const pageValues = [...values, pagination.pageSize, (pagination.page - 1) * pagination.pageSize];
     const listed = await this.database.query(
-      `SELECT ${WATCH_COLUMNS} FROM watches WHERE ${where}
-       ORDER BY created_at DESC, id DESC
+      `SELECT ${WATCH_SUMMARY_COLUMNS}
+       FROM watches w
+       JOIN portfolio_marks p ON p.id = w.portfolio_mark_id AND p.firm_id = w.firm_id
+       WHERE ${where}
+       ORDER BY w.created_at DESC, w.id DESC
        LIMIT $${pageValues.length - 1} OFFSET $${pageValues.length}`,
       pageValues,
     );
@@ -94,7 +116,11 @@ export class WatchRepository {
 
   async get({ firmId, watchId, transaction = null }) {
     const result = await executor(this, transaction).query(
-      `SELECT ${WATCH_COLUMNS} FROM watches WHERE firm_id = $1 AND id = $2`, [firmId, watchId],
+      `SELECT ${WATCH_SUMMARY_COLUMNS}
+       FROM watches w
+       JOIN portfolio_marks p ON p.id = w.portfolio_mark_id AND p.firm_id = w.firm_id
+       WHERE w.firm_id = $1 AND w.id = $2`,
+      [firmId, watchId],
     );
     return result.rowCount ? watchFromRow(result.rows[0]) : null;
   }
@@ -113,8 +139,13 @@ export class WatchRepository {
       return `${names[field]} = $${values.length}`;
     });
     const result = await executor(this, transaction).query(
-      `UPDATE watches SET ${assignments.join(', ')}, updated_at = now()
-       WHERE firm_id = $1 AND id = $2 RETURNING ${WATCH_COLUMNS}`,
+      `WITH changed AS (
+        UPDATE watches SET ${assignments.join(', ')}, updated_at = now()
+        WHERE firm_id = $1 AND id = $2 RETURNING *
+      )
+      SELECT ${WATCH_SUMMARY_COLUMNS}
+      FROM changed w
+      JOIN portfolio_marks p ON p.id = w.portfolio_mark_id AND p.firm_id = w.firm_id`,
       values,
     );
     return result.rowCount ? watchFromRow(result.rows[0]) : null;
