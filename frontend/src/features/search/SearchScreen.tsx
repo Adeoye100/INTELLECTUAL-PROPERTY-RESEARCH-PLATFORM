@@ -27,11 +27,8 @@ import {
 import { searchTrademarks } from './searchApi';
 
 const jurisdictions = [
-  ['US', 'United States (USPTO)'],
-  ['EU', 'European Union (EUIPO)'],
-  ['GB', 'United Kingdom (UKIPO)'],
-  ['CA', 'Canada (CIPO)'],
-  ['AU', 'Australia (IP Australia)'],
+  { value: 'US', label: 'United States (USPTO)', status: 'Available', disabled: false },
+  { value: 'EU', label: 'European Union (EUIPO)', status: 'Activation pending', disabled: true },
 ] as const;
 
 const loadInitialFilters = (params: URLSearchParams, userId: string | undefined) => {
@@ -138,7 +135,7 @@ export const SearchScreen: React.FC = () => {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-bold text-text-primary">Trademark Search</h1>
-        <p className="text-sm text-text-secondary">Cross-registry search with explicit filters and ranked confusion risk.</p>
+        <p className="text-sm text-text-secondary">USPTO and EUIPO trademark research with explicit filters and ranked confusion risk.</p>
       </header>
 
       {onboardingComplete && (
@@ -159,9 +156,17 @@ export const SearchScreen: React.FC = () => {
               </div>
 
               <fieldset>
-                <legend className="mb-1 text-xs font-bold uppercase text-muted-foreground">Jurisdiction</legend>
+                <legend className="mb-1 text-xs font-bold uppercase text-muted-foreground">Registry</legend>
                 <div className="space-y-2">
-                  {jurisdictions.map(([value, label]) => <label key={value} className="flex cursor-pointer items-center gap-2 text-sm text-foreground"><input type="checkbox" value={value} {...register('jurisdictions')} className="rounded text-accent focus:ring-accent" />{label}</label>)}
+                  {jurisdictions.map(({ value, label, status, disabled }) => (
+                    <label key={value} className={`flex items-start gap-2 text-sm text-foreground ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
+                      <input type="checkbox" value={value} {...register('jurisdictions')} disabled={disabled} className="mt-0.5 rounded text-accent focus:ring-accent" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block">{label}</span>
+                        <span className="block text-xs text-muted-foreground">{status}</span>
+                      </span>
+                    </label>
+                  ))}
                 </div>
                 {errors.jurisdictions && <p className="mt-1 text-xs text-risk-high">{errors.jurisdictions.message}</p>}
               </fieldset>
@@ -183,7 +188,7 @@ export const SearchScreen: React.FC = () => {
 
         <section className="min-w-0 space-y-4 lg:col-span-3" aria-label="Trademark search results">
           {!submittedFilters ? (
-            <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-forge-silver-300 bg-surface-card py-24 text-center"><SearchIcon className="mb-4 h-12 w-12 text-forge-silver-300" aria-hidden="true" /><h2 className="text-lg font-semibold text-text-primary">Ready to search</h2><p className="max-w-sm text-text-secondary">Set the visible filters and submit to query the connected registries.</p></div>
+            <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-forge-silver-300 bg-surface-card py-24 text-center"><SearchIcon className="mb-4 h-12 w-12 text-forge-silver-300" aria-hidden="true" /><h2 className="text-lg font-semibold text-text-primary">Ready to search</h2><p className="max-w-sm text-text-secondary">Search the available USPTO corpus. EUIPO activation is the next registry integration.</p></div>
           ) : searchQuery.isLoading ? (
             <div className="space-y-3" role="status" aria-label="Loading trademark results"><div className="h-12 animate-pulse rounded bg-forge-silver-100" /><div className="h-64 animate-pulse rounded bg-forge-silver-100" /><span className="sr-only">Loading trademark results…</span></div>
           ) : searchQuery.isError ? (
