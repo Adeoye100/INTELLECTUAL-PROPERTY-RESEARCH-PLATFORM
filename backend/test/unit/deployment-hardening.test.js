@@ -21,7 +21,7 @@ describe('initial-deployment database boundary', () => {
 });
 
 describe('Render blueprint configuration contracts', () => {
-  it('activates database-backed research and server reports while upstream refresh, Watch, and billing stay fail-closed', async () => {
+  it('activates database-backed research, in-process Watch automation, and server reports while upstream refresh and billing stay fail-closed', async () => {
     const renderYaml = await readFile(new URL('../../../render.yaml', import.meta.url), 'utf8');
     const apiBlock = renderYaml.split('- type: web')[1]?.split('- type:')[0] || '';
 
@@ -67,8 +67,8 @@ describe('Render blueprint configuration contracts', () => {
     assert.ok(apiBlock.includes('key: PDF_EXPORT_ENABLED\n        value: "true"'));
     assert.ok(apiBlock.includes('key: PDF_EXPORT_IN_PROCESS_ENABLED\n        value: "true"'));
 
-    assert.ok(apiBlock.includes('key: WATCH_ENABLED\n        value: "false"'));
-    assert.ok(apiBlock.includes('key: WATCH_IN_PROCESS_ENABLED\n        value: "false"'));
+    assert.ok(apiBlock.includes('key: WATCH_ENABLED\n        value: "true"'));
+    assert.ok(apiBlock.includes('key: WATCH_IN_PROCESS_ENABLED\n        value: "true"'));
     assert.ok(apiBlock.includes('key: PAYSTACK_ENABLED\n        value: "false"'));
   });
 });
