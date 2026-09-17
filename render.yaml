@@ -121,11 +121,13 @@ services:
       - key: OFFICE_ACTION_SEARCH_MAX_RESULTS
         value: "50"
 
-      # Watches are outside this activation pass and remain fail-closed.
+      # Watch automation runs in-process on the API service using the shared
+      # Redis queue and writable PostgreSQL state. The dedicated worker below
+      # remains disabled to avoid duplicate consumers.
       - key: WATCH_ENABLED
-        value: "false"
+        value: "true"
       - key: WATCH_IN_PROCESS_ENABLED
-        value: "false"
+        value: "true"
       - key: WATCH_SCHEDULER_INTERVAL_MS
         value: "60000"
       - key: WATCH_SCHEDULER_BATCH_SIZE
@@ -212,7 +214,8 @@ services:
       - key: SEARCH_MAX_MISSED_REFRESH_RUNS
         value: "2"
 
-  # Optional dedicated Watch worker. It remains disabled for this release.
+  # Optional dedicated Watch worker. It remains disabled because the API runs
+  # the Watch worker in-process, avoiding duplicate consumers.
   - type: worker
     name: iprp-watch-worker
     runtime: node
