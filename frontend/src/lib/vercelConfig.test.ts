@@ -10,6 +10,7 @@ const originalEnvironment = vi.hoisted(() => {
 });
 
 import { createVercelConfig } from '../../../vercel.ts';
+import { createFrontendRootVercelConfig } from '../../vercel.ts';
 
 const productionEnvironment = {
   VITE_SUPABASE_URL: 'https://ccslkfqnziikcsgbrwfd.supabase.co',
@@ -45,6 +46,18 @@ describe('Vercel response-header configuration', () => {
     expect(csp?.value).not.toMatch(/\*|localhost/i);
   });
 
+  it('keeps frontend-root routing and security policy aligned with repo-root deployments', () => {
+    const repoRoot = createVercelConfig(productionEnvironment);
+    const frontendRoot = createFrontendRootVercelConfig(productionEnvironment);
+
+    expect(frontendRoot.rewrites).toEqual(repoRoot.rewrites);
+    expect(frontendRoot.headers).toEqual(repoRoot.headers);
+    expect(frontendRoot.framework).toBe('vite');
+    expect(frontendRoot.installCommand).toBe('corepack enable && pnpm install --frozen-lockfile');
+    expect(frontendRoot.buildCommand).toBe('pnpm run build');
+    expect(frontendRoot.outputDirectory).toBe('dist');
+  });
+
   it('fails with a controlled error before constructing a malformed header', () => {
     expect(() => createVercelConfig({
       VITE_API_BASE_URL: productionEnvironment.VITE_API_BASE_URL,
@@ -52,12 +65,20 @@ describe('Vercel response-header configuration', () => {
     expect(() => createVercelConfig({
       VITE_SUPABASE_URL: productionEnvironment.VITE_SUPABASE_URL,
     })).toThrow('VITE_API_BASE_URL');
+    expect(() => createFrontendRootVercelConfig({
+      VITE_API_BASE_URL: productionEnvironment.VITE_API_BASE_URL,
+    })).toThrow('VITE_SUPABASE_URL');
+    expect(() => createFrontendRootVercelConfig({
+      VITE_SUPABASE_URL: productionEnvironment.VITE_SUPABASE_URL,
+    })).toThrow('VITE_API_BASE_URL');
   });
 
   it('does not serialize backend-only secret references into frontend configuration', () => {
     const serialized = JSON.stringify(createVercelConfig(productionEnvironment));
+    const frontendSerialized = JSON.stringify(createFrontendRootVercelConfig(productionEnvironment));
 
     expect(serialized).not.toMatch(/secret|service.*role|database/i);
+    expect(frontendSerialized).not.toMatch(/secret|service.*role|database/i);
   });
 });
 
