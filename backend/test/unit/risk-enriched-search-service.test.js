@@ -14,6 +14,10 @@ function result(overrides = {}) {
     niceClasses: [9, 42],
     sourceRegistry: 'USPTO',
     sourceReferenceId: 'US-100',
+    owner: null,
+    jurisdiction: 'US',
+    filingDate: null,
+    status: 'registered',
     relevanceScore: 1,
     ...overrides,
   };
@@ -127,6 +131,35 @@ describe('RiskEnrichedSearchService', () => {
       searchService: createSearchService(response), riskScorer: createScorer(),
     }).search(query);
     assert.deepEqual(enriched, response);
+  });
+
+
+  it('drops malformed corpus candidates without failing valid search results', async () => {
+    const calls = [];
+    const response = {
+      results: [
+        result({ recordId: 'valid', sourceReferenceId: 'US-VALID' }),
+        result({ recordId: 'bad-class', sourceReferenceId: 'US-CLASS', niceClasses: [200] }),
+        result({ recordId: 'bad-mark', sourceReferenceId: 'US-MARK', markText: '***' }),
+        result({ recordId: 'bad-owner', sourceReferenceId: 'US-OWNER', owner: 'x'.repeat(501) }),
+      ],
+      sourceStatuses: [{ source: 'USPTO', status: 'complete', resultCount: 4 }],
+      partial: false,
+      requestId: 'dirty-corpus',
+    };
+    const enriched = await new RiskEnrichedSearchService({
+      searchService: createSearchService(response),
+      riskScorer: createScorer(() => ({}), calls),
+    }).search(query);
+
+    assert.deepEqual(enriched.results.map((entry) => entry.recordId), ['valid']);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].candidate.recordId, 'valid');
+    assert.deepEqual(enriched.sourceStatuses, [
+      { source: 'USPTO', status: 'complete', resultCount: 1 },
+    ]);
+    assert.equal(enriched.partial, false);
+    assert.equal(enriched.requestId, 'dirty-corpus');
   });
 
   it('ranks High before Medium before Low, then breaks same-rating ties by composite score', async () => {
