@@ -36,6 +36,7 @@ export const OfficeActionResearchScreen: React.FC = () => {
   const [selectedOfficeAction, setSelectedOfficeAction] = useState<OfficeActionSearchResult | null>(null);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [linkTargetType, setLinkTargetType] = useState<'portfolio' | 'matter'>('portfolio');
+  const [matterPortfolioMarkId, setMatterPortfolioMarkId] = useState('');
   const [submittedFilters, setSubmittedFilters] = useState<OfficeActionSearchRequest | null>(null);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const [linkMessage, setLinkMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -66,7 +67,7 @@ export const OfficeActionResearchScreen: React.FC = () => {
   const portfolioMarksQuery = useQuery<PortfolioMark[]>({
     queryKey: ['portfolio'],
     queryFn: () => listPortfolioMarks().then((res) => res.items),
-    enabled: isLinkModalOpen && linkTargetType === 'portfolio',
+    enabled: isLinkModalOpen,
   });
 
   // Load matters for linking
@@ -108,10 +109,8 @@ export const OfficeActionResearchScreen: React.FC = () => {
   });
 
   const matterLinkMutation = useMutation({
-    mutationFn: async ({ matterId, item }: { matterId: string; item: OfficeActionSearchResult }) => {
-      // First save reference under portfolio/firm scope
-      const dummyMarkId = portfolioMarksQuery.data?.[0]?.id || '00000000-0000-0000-0000-000000000001';
-      const ref = await createOfficeActionRef(dummyMarkId, item);
+    mutationFn: async ({ matterId, portfolioMarkId, item }: { matterId: string; portfolioMarkId: string; item: OfficeActionSearchResult }) => {
+      const ref = await createOfficeActionRef(portfolioMarkId, item);
       return linkOfficeActionToMatter(matterId, ref.id);
     },
     onSuccess: async () => {
@@ -126,6 +125,7 @@ export const OfficeActionResearchScreen: React.FC = () => {
   const handleLinkClick = (officeAction: OfficeActionSearchResult) => {
     setLinkMessage(null);
     setSelectedOfficeAction(officeAction);
+    setMatterPortfolioMarkId('');
     setIsLinkModalOpen(true);
   };
 
@@ -412,33 +412,71 @@ export const OfficeActionResearchScreen: React.FC = () => {
               {portfolioLinkMutation.isPending && <p role="status" aria-live="polite" className="text-xs text-muted-foreground">Linking office action to mark…</p>}
             </div>
           ) : (
-            <div className="space-y-2">
-              <h4 className="font-bold text-foreground text-xs uppercase text-muted-foreground">Select Matter Case File</h4>
-              {mattersQuery.isLoading && <p className="text-sm text-muted-foreground" role="status">Loading matter case files…</p>}
-              {mattersQuery.isError && (
-                <div role="alert" className="rounded bg-destructive/10 p-3 text-sm text-destructive">
-                  <p>Matters could not be loaded.</p>
-                  <Button size="sm" className="mt-2" onClick={() => void mattersQuery.refetch()}>Retry matters</Button>
-                </div>
-              )}
-              {!mattersQuery.isLoading && !mattersQuery.isError && mattersQuery.data?.length === 0 && (
-                <p className="rounded border border-dashed border-border p-4 text-center text-sm text-muted-foreground">No matter case files are available to link.</p>
-              )}
-              {mattersQuery.data?.map((matter) => (
-                <button
-                  type="button"
-                  key={matter.id}
-                  className="w-full p-3 border border-border rounded text-left hover:bg-muted/50 transition-colors disabled:opacity-50"
-                  onClick={() => selectedOfficeAction && matterLinkMutation.mutate({ matterId: matter.id, item: selectedOfficeAction })}
-                  disabled={matterLinkMutation.isPending}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="oa-matter-portfolio-context" className="block text-xs font-bold uppercase text-muted-foreground">
+                  Portfolio context
+                </label>
+                <select
+                  id="oa-matter-portfolio-context"
+                  className="w-full rounded border border-input bg-background px-3 py-2 text-sm text-foreground focus:ring-2 focus:ring-ring"
+                  value={matterPortfolioMarkId}
+                  onChange={(event) => setMatterPortfolioMarkId(event.target.value)}
+                  disabled={portfolioMarksQuery.isLoading || portfolioMarksQuery.isError}
                 >
-                  <div className="font-medium text-foreground text-sm">{matter.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    Client Ref: {matter.clientRef || 'N/A'} | Created: {new Date(matter.createdAt).toLocaleDateString()}
+                  <option value="">Select the portfolio mark this precedent concerns</option>
+                  {portfolioMarksQuery.data?.map((mark) => (
+                    <option key={mark.id} value={mark.id}>{mark.markText} · {mark.jurisdiction}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Office Action references are firm-scoped through a real portfolio mark before they can be attached to a matter.
+                </p>
+                {portfolioMarksQuery.isError && (
+                  <div role="alert" className="rounded bg-destructive/10 p-3 text-sm text-destructive">
+                    <p>Portfolio marks could not be loaded.</p>
+                    <Button size="sm" className="mt-2" onClick={() => void portfolioMarksQuery.refetch()}>Retry portfolio</Button>
                   </div>
-                </button>
-              ))}
-              {matterLinkMutation.isPending && <p role="status" aria-live="polite" className="text-xs text-muted-foreground">Linking office action to matter…</p>}
+                )}
+                {!portfolioMarksQuery.isLoading && !portfolioMarksQuery.isError && portfolioMarksQuery.data?.length === 0 && (
+                  <p className="rounded border border-dashed border-border p-3 text-sm text-muted-foreground">
+                    Create a portfolio mark before linking an Office Action precedent to a matter.
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="font-bold text-foreground text-xs uppercase text-muted-foreground">Select Matter Case File</h4>
+                {mattersQuery.isLoading && <p className="text-sm text-muted-foreground" role="status">Loading matter case files…</p>}
+                {mattersQuery.isError && (
+                  <div role="alert" className="rounded bg-destructive/10 p-3 text-sm text-destructive">
+                    <p>Matters could not be loaded.</p>
+                    <Button size="sm" className="mt-2" onClick={() => void mattersQuery.refetch()}>Retry matters</Button>
+                  </div>
+                )}
+                {!mattersQuery.isLoading && !mattersQuery.isError && mattersQuery.data?.length === 0 && (
+                  <p className="rounded border border-dashed border-border p-4 text-center text-sm text-muted-foreground">No matter case files are available to link.</p>
+                )}
+                {mattersQuery.data?.map((matter) => (
+                  <button
+                    type="button"
+                    key={matter.id}
+                    className="w-full p-3 border border-border rounded text-left hover:bg-muted/50 transition-colors disabled:opacity-50"
+                    onClick={() => selectedOfficeAction && matterPortfolioMarkId && matterLinkMutation.mutate({
+                      matterId: matter.id,
+                      portfolioMarkId: matterPortfolioMarkId,
+                      item: selectedOfficeAction,
+                    })}
+                    disabled={matterLinkMutation.isPending || !matterPortfolioMarkId}
+                  >
+                    <div className="font-medium text-foreground text-sm">{matter.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      Client Ref: {matter.clientRef || 'N/A'} | Created: {new Date(matter.createdAt).toLocaleDateString()}
+                    </div>
+                  </button>
+                ))}
+                {matterLinkMutation.isPending && <p role="status" aria-live="polite" className="text-xs text-muted-foreground">Linking office action to matter…</p>}
+              </div>
             </div>
           )}
         </div>
