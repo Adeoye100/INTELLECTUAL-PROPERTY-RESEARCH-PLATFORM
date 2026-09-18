@@ -101,7 +101,7 @@ export class PostgresSearchSource {
       const candidateLimitParam = push(values, Math.min(Math.max(this.maxResults * 4, 100), 400));
       const filters = where.join('\n          AND ');
       const sql = `
-        WITH candidate_ids AS (
+        WITH lexical_candidate_ids AS (
           (
             SELECT id
             FROM registry_trademarks
@@ -115,29 +115,45 @@ export class PostgresSearchSource {
             SELECT id
             FROM registry_trademarks
             WHERE ${filters}
-              AND mark_text % ${markParam}
-            ORDER BY similarity(mark_text, ${markParam}) DESC, source_updated_at DESC NULLS LAST
-            LIMIT ${candidateLimitParam}
-          )
-          UNION
-          (
-            SELECT id
-            FROM registry_trademarks
-            WHERE ${filters}
               AND to_tsvector('simple', mark_text) @@ plainto_tsquery('simple', ${markParam})
             ORDER BY ts_rank_cd(to_tsvector('simple', mark_text), plainto_tsquery('simple', ${markParam})) DESC,
                      source_updated_at DESC NULLS LAST
             LIMIT ${candidateLimitParam}
           )
+        ),
+        lexical_count AS (
+          SELECT count(*)::integer AS value FROM lexical_candidate_ids
+        ),
+        phonetic_candidate_ids AS (
+          SELECT id
+          FROM registry_trademarks
+          WHERE ${filters}
+            AND (SELECT value FROM lexical_count) < ${limitParam}
+            AND soundex(mark_text) = soundex(${markParam})
+          ORDER BY source_updated_at DESC NULLS LAST
+          LIMIT ${candidateLimitParam}
+        ),
+        fast_candidate_ids AS (
+          SELECT id FROM lexical_candidate_ids
           UNION
-          (
-            SELECT id
-            FROM registry_trademarks
-            WHERE ${filters}
-              AND soundex(mark_text) = soundex(${markParam})
-            ORDER BY source_updated_at DESC NULLS LAST
-            LIMIT ${candidateLimitParam}
-          )
+          SELECT id FROM phonetic_candidate_ids
+        ),
+        fast_count AS (
+          SELECT count(*)::integer AS value FROM fast_candidate_ids
+        ),
+        fuzzy_candidate_ids AS (
+          SELECT id
+          FROM registry_trademarks
+          WHERE ${filters}
+            AND (SELECT value FROM fast_count) < ${limitParam}
+            AND mark_text % ${markParam}
+          ORDER BY similarity(mark_text, ${markParam}) DESC, source_updated_at DESC NULLS LAST
+          LIMIT ${candidateLimitParam}
+        ),
+        candidate_ids AS (
+          SELECT id FROM fast_candidate_ids
+          UNION
+          SELECT id FROM fuzzy_candidate_ids
         )
         SELECT
           r.id,
