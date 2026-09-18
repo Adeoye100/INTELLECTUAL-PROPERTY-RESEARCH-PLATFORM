@@ -28,7 +28,7 @@ describe('PostgresSearchSource', () => {
             jurisdiction: 'US',
             nice_classes: [35, 42],
             status: 'registered',
-            filing_date: '2024-01-02',
+            filing_date: new Date('2024-01-02T00:00:00.000Z'),
             source_registry: 'USPTO',
             source_reference_id: '12345678',
             relevance_score: 88.5,
