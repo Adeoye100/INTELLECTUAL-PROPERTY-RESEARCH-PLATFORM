@@ -26,7 +26,7 @@ function toNormalizedRecord(caseFile) {
 
   const niceClasses = [...new Set(caseFile.niceClasses
     .map((value) => Number(value))
-    .filter((value) => Number.isSafeInteger(value) && value > 0))]
+    .filter((value) => Number.isSafeInteger(value) && value >= 1 && value <= 45))]
     .sort((left, right) => left - right);
   const owners = [...new Set(caseFile.owners.map(normalizedText).filter(Boolean))];
 
