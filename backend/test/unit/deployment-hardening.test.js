@@ -70,5 +70,9 @@ describe('Render blueprint configuration contracts', () => {
     assert.ok(apiBlock.includes('key: WATCH_ENABLED\n        value: "true"'));
     assert.ok(apiBlock.includes('key: WATCH_IN_PROCESS_ENABLED\n        value: "true"'));
     assert.ok(apiBlock.includes('key: PAYSTACK_ENABLED\n        value: "false"'));
+    assert.ok(apiBlock.includes(
+      'key: REDIS_URL\n        fromService:\n          name: iprp-redis\n          type: keyvalue\n          property: connectionString',
+    ));
+    assert.equal(apiBlock.includes('key: REDIS_URL\n        sync: false'), false);
   });
 });
