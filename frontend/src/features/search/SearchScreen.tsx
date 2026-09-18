@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ApiError } from '../../lib/api/client';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { AlertTriangle, FilterX, MoveHorizontal, Search as SearchIcon } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -52,7 +52,6 @@ const loadInitialFilters = (params: URLSearchParams, userId: string | undefined)
 };
 
 export const SearchScreen: React.FC = () => {
-  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const user = useAuthStore((state) => state.user);
   const completePath = useOnboardingStore((state) => state.completePath);
@@ -88,7 +87,13 @@ export const SearchScreen: React.FC = () => {
   const hasIncompleteSources = sourceStatuses.some(({ status }) => status !== 'complete');
   const allSourcesUnavailable = sourceStatuses.length > 0 && sourceStatuses.every(({ status }) => status === 'unavailable');
 
-  const onSubmit = async (values: SearchFilters) => {
+  useEffect(() => {
+    if (!searchQuery.isSuccess || !user || onboardingComplete || searchParams.get('onboarding') !== 'search') return;
+    completePath(user.id, 'search');
+    setOnboardingComplete(true);
+  }, [completePath, onboardingComplete, searchParams, searchQuery.isSuccess, user]);
+
+  const onSubmit = (values: SearchFilters) => {
     const normalized = normalizeSearchFilters(values);
     const nextParams = searchFiltersToParams(normalized);
     const onboarding = searchParams.get('onboarding');
@@ -96,19 +101,6 @@ export const SearchScreen: React.FC = () => {
     setSearchParams(nextParams, { replace: true });
     if (user) localStorage.setItem(searchFilterStorageKey(user.id), JSON.stringify(normalized));
     setSubmittedFilters(normalized);
-
-    try {
-      await queryClient.fetchQuery({
-        queryKey: ['search', normalized],
-        queryFn: () => searchTrademarks(normalized),
-      });
-      if (user && onboarding === 'search') {
-        completePath(user.id, 'search');
-        setOnboardingComplete(true);
-      }
-    } catch {
-      // The query error state renders the retry action.
-    }
   };
 
   const clearFilters = () => {
@@ -181,7 +173,7 @@ export const SearchScreen: React.FC = () => {
                 <div><label htmlFor="search-filed-to" className="mb-1 block text-xs font-semibold text-muted-foreground">To</label><input {...register('filedTo')} id="search-filed-to" type="date" aria-invalid={Boolean(errors.filedTo)} aria-describedby={errors.filedTo ? 'search-date-error' : undefined} className="w-full rounded border border-input bg-background px-3 py-2 text-foreground focus-visible:ring-2 focus-visible:ring-ring" />{errors.filedTo && <p id="search-date-error" className="mt-1 text-xs text-risk-high">{errors.filedTo.message}</p>}</div>
               </fieldset>
 
-              <div className="flex flex-col gap-2"><Button type="submit" className="w-full" disabled={isSubmitting}>{isSubmitting ? 'Searching…' : 'Search trademarks'}</Button><Button type="button" variant="ghost" className="w-full" onClick={clearFilters}><FilterX className="mr-2 h-4 w-4" aria-hidden="true" />Clear filters</Button></div>
+              <div className="flex flex-col gap-2"><Button type="submit" className="w-full" disabled={isSubmitting || searchQuery.isFetching}>{isSubmitting || searchQuery.isFetching ? 'Searching…' : 'Search trademarks'}</Button><Button type="button" variant="ghost" className="w-full" onClick={clearFilters}><FilterX className="mr-2 h-4 w-4" aria-hidden="true" />Clear filters</Button></div>
             </form>
           </Card>
         </aside>
@@ -205,8 +197,8 @@ export const SearchScreen: React.FC = () => {
                       ? 'Trademark search is temporarily unavailable while registry data is being refreshed.'
                       : 'Your filters are preserved. Retry when the registry connection is available.'}
                   </p>
-                  <Button className="mt-4" onClick={() => void searchQuery.refetch()}>
-                    {isStaleError ? 'Check availability' : 'Retry search'}
+                  <Button className="mt-4" onClick={() => void searchQuery.refetch()} disabled={searchQuery.isFetching}>
+                    {searchQuery.isFetching ? 'Checking…' : isStaleError ? 'Check availability' : 'Retry search'}
                   </Button>
                 </div>
               );
@@ -222,9 +214,9 @@ export const SearchScreen: React.FC = () => {
                 </div>
               )}
               {allSourcesUnavailable && rankedResults.length === 0 ? (
-                <div className="rounded-lg border border-risk-high/30 bg-risk-high/10 p-8 text-center" role="alert"><h2 className="font-bold text-text-primary">All registry sources are unavailable</h2><p className="mt-1 text-sm text-text-secondary">No reliable result set can be shown yet. Your filters remain saved.</p><Button className="mt-4" onClick={() => void searchQuery.refetch()}>Retry sources</Button></div>
+                <div className="rounded-lg border border-risk-high/30 bg-risk-high/10 p-8 text-center" role="alert"><h2 className="font-bold text-text-primary">All registry sources are unavailable</h2><p className="mt-1 text-sm text-text-secondary">No reliable result set can be shown yet. Your filters remain saved.</p><Button className="mt-4" onClick={() => void searchQuery.refetch()} disabled={searchQuery.isFetching}>{searchQuery.isFetching ? 'Retrying…' : 'Retry sources'}</Button></div>
               ) : rankedResults.length === 0 ? (
-                <div className="rounded-lg border border-forge-silver-300 bg-surface-card p-12 text-center"><h2 className="font-bold text-text-primary">No results found</h2><p className="mt-1 text-sm text-text-secondary">No current matches satisfy every submitted filter.</p>{hasIncompleteSources && <Button className="mt-4" onClick={() => void searchQuery.refetch()}>Check pending sources</Button>}</div>
+                <div className="rounded-lg border border-forge-silver-300 bg-surface-card p-12 text-center"><h2 className="font-bold text-text-primary">No results found</h2><p className="mt-1 text-sm text-text-secondary">No current matches satisfy every submitted filter.</p>{hasIncompleteSources && <Button className="mt-4" onClick={() => void searchQuery.refetch()} disabled={searchQuery.isFetching}>{searchQuery.isFetching ? 'Checking…' : 'Check pending sources'}</Button>}</div>
               ) : (
                 <>
                   <div className="flex flex-wrap items-start justify-between gap-3 px-1 text-sm text-text-secondary"><div><p>Showing {rankedResults.length} ranked matches.</p>{searchQuery.isFetching && <p role="status">Checking for additional source results without clearing this table…</p>}{selectedIds.size > 0 && <p>{selectedIds.size} result{selectedIds.size === 1 ? '' : 's'} selected.</p>}</div><div className="flex flex-wrap gap-2">{hasIncompleteSources && <Button variant="outline" size="sm" onClick={() => void searchQuery.refetch()} disabled={searchQuery.isFetching}>{searchQuery.isFetching ? 'Refreshing sources…' : 'Refresh sources'}</Button>}<PdfExport request={{ reportType: 'search-results', context: { searchId: rankedResults[0]?.searchId ?? '' } }} disabled={!rankedResults[0]?.searchId} label="Export results PDF" /></div></div>
