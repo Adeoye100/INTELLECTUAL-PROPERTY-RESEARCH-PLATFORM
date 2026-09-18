@@ -36,8 +36,16 @@ describe('BE-10 provisional synthetic confusion-risk calibration fixtures', () =
 
   it('keeps enriched ordering stable when the candidate order changes', async () => {
     const candidates = [
-      { recordId: 'candidate-z', markText: 'Forge', niceClasses: [9], sourceRegistry: 'USPTO', sourceReferenceId: 'Z', relevanceScore: null },
-      { recordId: 'candidate-a', markText: 'Forge', niceClasses: [9], sourceRegistry: 'EUIPO', sourceReferenceId: 'A', relevanceScore: null },
+      {
+        recordId: 'candidate-z', markText: 'Forge', niceClasses: [9], sourceRegistry: 'USPTO',
+        sourceReferenceId: 'Z', owner: null, jurisdiction: 'US', filingDate: null,
+        status: 'registered', relevanceScore: null,
+      },
+      {
+        recordId: 'candidate-a', markText: 'Forge', niceClasses: [9], sourceRegistry: 'EUIPO',
+        sourceReferenceId: 'A', owner: null, jurisdiction: 'EU', filingDate: null,
+        status: 'registered', relevanceScore: null,
+      },
     ];
     const serviceFor = (results) => new RiskEnrichedSearchService({
       searchService: { async search() { return { results, sourceStatuses: [], partial: false, requestId: 'synthetic-order' }; } },

@@ -32,6 +32,52 @@ function isNonEmptyString(value) {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+function boundedString(value, maximum) {
+  return isNonEmptyString(value) && value.trim().length <= maximum;
+}
+
+function validDateOnly(value) {
+  if (value === null) return true;
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+  return candidate.getUTCFullYear() === year
+    && candidate.getUTCMonth() + 1 === month
+    && candidate.getUTCDate() === day;
+}
+
+function isUsableCandidateResult(result) {
+  if (!result || typeof result !== 'object') return false;
+  if (!boundedString(result.recordId, 200)
+    || !boundedString(result.markText, 500)
+    || !boundedString(result.sourceRegistry, 100)
+    || !boundedString(result.sourceReferenceId, 200)
+    || !boundedString(result.jurisdiction, 20)
+    || !boundedString(result.status, 30)
+    || (result.owner !== null && !boundedString(result.owner, 500))
+    || !Array.isArray(result.niceClasses)
+    || result.niceClasses.length > 45
+    || result.niceClasses.some((niceClass) => !Number.isSafeInteger(niceClass) || niceClass < 1 || niceClass > 45)
+    || !validDateOnly(result.filingDate)) {
+    return false;
+  }
+  try {
+    normalizeMarkText(result.markText);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function adjustedSourceStatuses(sourceStatuses, droppedBySource) {
+  if (droppedBySource.size === 0 || !Array.isArray(sourceStatuses)) return sourceStatuses;
+  return sourceStatuses.map((status) => {
+    const dropped = droppedBySource.get(status?.source) ?? 0;
+    if (dropped === 0 || !Number.isSafeInteger(status?.resultCount)) return status;
+    return { ...status, resultCount: Math.max(0, status.resultCount - dropped) };
+  });
+}
+
 function hasCompleteEvidence(riskAnalysis) {
   if (!Array.isArray(riskAnalysis.matchedMarkRefs) || riskAnalysis.matchedMarkRefs.length !== 3) {
     return false;
@@ -130,31 +176,45 @@ export class RiskEnrichedSearchService {
       markText: query.mark,
       niceClasses: [...query.niceClasses],
     };
-    const results = response.results.map((result) => {
+    const results = [];
+    const droppedBySource = new Map();
+
+    for (const result of response.results) {
+      if (!isUsableCandidateResult(result)) {
+        if (boundedString(result?.sourceRegistry, 100)) {
+          droppedBySource.set(
+            result.sourceRegistry,
+            (droppedBySource.get(result.sourceRegistry) ?? 0) + 1,
+          );
+        }
+        continue;
+      }
+
+      const candidate = {
+        recordId: result.recordId,
+        markText: result.markText,
+        niceClasses: [...result.niceClasses],
+        sourceRegistry: result.sourceRegistry,
+        sourceReferenceId: result.sourceReferenceId,
+      };
       try {
-        const candidate = {
-          recordId: result.recordId,
-          markText: result.markText,
-          niceClasses: Array.isArray(result.niceClasses) ? [...result.niceClasses] : result.niceClasses,
-          sourceRegistry: result.sourceRegistry,
-          sourceReferenceId: result.sourceReferenceId,
-        };
         const riskAnalysis = this.riskScorer({
           proposedMark: { ...proposedMark, niceClasses: [...proposedMark.niceClasses] },
           candidate,
         });
         assertCompleteRiskAnalysis(riskAnalysis, candidate);
-        return { ...result, riskAnalysis };
+        results.push({ ...result, riskAnalysis });
       } catch {
-        // Deliberately avoid logging candidate or query details at this boundary.
+        // Valid candidates still fail closed if the scorer or evidence contract breaks.
+        // Candidate/query details are deliberately not logged at this boundary.
         throw new RiskEnrichmentError();
       }
-    });
+    }
 
     results.sort(compareResults);
     return {
       results,
-      sourceStatuses: response.sourceStatuses,
+      sourceStatuses: adjustedSourceStatuses(response.sourceStatuses, droppedBySource),
       partial: response.partial,
       requestId: response.requestId,
     };
