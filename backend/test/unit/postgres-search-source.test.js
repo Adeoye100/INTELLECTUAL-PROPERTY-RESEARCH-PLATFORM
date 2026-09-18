@@ -3,15 +3,19 @@ import { afterEach, describe, it } from 'node:test';
 import { PostgresSearchSource } from '../../src/search/postgres-search-source.js';
 
 const originalDemoMode = process.env.DEMO_READ_ONLY_MODE;
+const originalIndexFriendlyMode = process.env.SEARCH_INDEX_FRIENDLY_MODE;
 
 afterEach(() => {
   if (originalDemoMode === undefined) delete process.env.DEMO_READ_ONLY_MODE;
   else process.env.DEMO_READ_ONLY_MODE = originalDemoMode;
+  if (originalIndexFriendlyMode === undefined) delete process.env.SEARCH_INDEX_FRIENDLY_MODE;
+  else process.env.SEARCH_INDEX_FRIENDLY_MODE = originalIndexFriendlyMode;
 });
 
 describe('PostgresSearchSource', () => {
   it('builds a parameterized fuzzy/phonetic query and maps registry rows', async () => {
     process.env.DEMO_READ_ONLY_MODE = 'false';
+    process.env.SEARCH_INDEX_FRIENDLY_MODE = 'false';
     let captured;
     const database = {
       async query(text, values) {
@@ -64,8 +68,8 @@ describe('PostgresSearchSource', () => {
     }]);
   });
 
-  it('uses bounded index-friendly candidate branches in read-only demo mode', async () => {
-    process.env.DEMO_READ_ONLY_MODE = 'true';
+  it('uses adaptive bounded candidate branches in index-friendly mode', async () => {
+    process.env.SEARCH_INDEX_FRIENDLY_MODE = 'true';
     let captured;
     const database = {
       async query(text, values) {
@@ -76,11 +80,17 @@ describe('PostgresSearchSource', () => {
     const source = new PostgresSearchSource({ sourceName: 'USPTO', database, maxResults: 50 });
     await source.search({ mark: 'COCA-COLA', jurisdictions: ['US'], niceClasses: [9, 35, 42] });
 
-    assert.match(captured.text, /WITH candidate_ids AS/);
-    assert.match(captured.text, /mark_text % \$2/);
+    assert.match(captured.text, /WITH lexical_candidate_ids AS/);
+    assert.match(captured.text, /lexical_count AS/);
+    assert.match(captured.text, /phonetic_candidate_ids AS/);
+    assert.match(captured.text, /fast_count AS/);
+    assert.match(captured.text, /fuzzy_candidate_ids AS/);
+    assert.match(captured.text, /lower\(mark_text\) = lower\(\$2\)/);
     assert.match(captured.text, /to_tsvector\('simple', mark_text\) @@ plainto_tsquery/);
+    assert.match(captured.text, /\(SELECT value FROM lexical_count\) < \$5/);
     assert.match(captured.text, /soundex\(mark_text\) = soundex\(\$2\)/);
-    assert.match(captured.text, /UNION/);
+    assert.match(captured.text, /\(SELECT value FROM fast_count\) < \$5/);
+    assert.match(captured.text, /mark_text % \$2/);
     assert.doesNotMatch(captured.text, /WHERE[\s\S]*lower\(mark_text\) = lower\(\$2\)[\s\S]*OR mark_text % \$2/);
     assert.equal(captured.values[0], 'USPTO');
     assert.equal(captured.values[1], 'COCA-COLA');
