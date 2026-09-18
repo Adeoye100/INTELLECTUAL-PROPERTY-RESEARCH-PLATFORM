@@ -108,7 +108,10 @@ export function startLiveMaintenance({ config, system }) {
     if (!pdfEnabled || stopped || pdfStarted || !system.pdfExportRuntime?.worker) return;
     system.pdfExportRuntime.worker.start();
     pdfStarted = true;
-    console.log('In-process PDF export worker started.');
+    console.log('In-process PDF export worker started.', {
+      storageProvider: config.pdfExportStorageProvider,
+      queueKey: config.pdfExportQueueKey,
+    });
   };
 
   const refresh = async () => {
