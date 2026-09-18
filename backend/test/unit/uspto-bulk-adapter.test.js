@@ -66,6 +66,30 @@ describe('USPTO Bulk XML adapter', () => {
     ]);
   });
 
+  it('drops out-of-range international class codes at the USPTO ingestion boundary', async () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+      <trademark-applications-daily>
+        <case-file>
+          <serial-number>99999999</serial-number>
+          <transaction-date>20260918</transaction-date>
+          <case-file-header>
+            <filing-date>20260917</filing-date>
+            <status-code>700</status-code>
+            <mark-identification>BOUNDARY MARK</mark-identification>
+          </case-file-header>
+          <classifications>
+            <classification><international-code>9</international-code></classification>
+            <classification><international-code>200</international-code></classification>
+            <classification><international-code>42</international-code></classification>
+            <classification><international-code>0</international-code></classification>
+          </classifications>
+        </case-file>
+      </trademark-applications-daily>`;
+    const records = await collect(parseUsptoBulkXml(Readable.from([Buffer.from(xml)])));
+    assert.equal(records.length, 1);
+    assert.deepEqual(records[0].niceClasses, [9, 42]);
+  });
+
   it('discovers and sorts actual apcYYMMDD link names', () => {
     const links = dailyFileLinks(`
       <a href="files/apc260105.zip">January 5</a>
