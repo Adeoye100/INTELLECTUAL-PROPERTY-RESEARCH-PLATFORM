@@ -34,6 +34,14 @@ function ingestionConfig(config) {
   };
 }
 
+function diagnosticDateOnly(value) {
+  if (!value) return null;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
+  const normalized = String(value).trim();
+  const match = /^(\d{4}-\d{2}-\d{2})(?:$|T|\s)/.exec(normalized);
+  return match ? match[1] : null;
+}
+
 async function logPersistedCorpusReadiness(system) {
   if (!system?.pool || typeof system.pool.query !== 'function') return;
   try {
@@ -53,9 +61,9 @@ async function logPersistedCorpusReadiness(system) {
     const officeActionRow = officeActions.rows?.[0] ?? {};
     console.log('Persisted USPTO corpus readiness', {
       trademarkRecordCount: Number(registryRow.count ?? 0),
-      trademarkDataThrough: registryRow.data_through ? String(registryRow.data_through).slice(0, 10) : null,
+      trademarkDataThrough: diagnosticDateOnly(registryRow.data_through),
       officeActionRecordCount: Number(officeActionRow.count ?? 0),
-      officeActionDataThrough: officeActionRow.data_through ? String(officeActionRow.data_through).slice(0, 10) : null,
+      officeActionDataThrough: diagnosticDateOnly(officeActionRow.data_through),
     });
   } catch (error) {
     console.warn('Persisted USPTO corpus readiness check failed', {

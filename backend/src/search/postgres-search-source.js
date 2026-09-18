@@ -26,6 +26,20 @@ function indexFriendlySearchMode() {
   return strictBoolean('DEMO_READ_ONLY_MODE', false);
 }
 
+function dateOnly(value, field) {
+  if (value === null || value === undefined) return null;
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) throw new TypeError(`${field} must be a valid date.`);
+    return value.toISOString().slice(0, 10);
+  }
+  if (typeof value === 'string') {
+    const normalized = value.trim();
+    const match = /^(\d{4}-\d{2}-\d{2})(?:$|T|\s)/.exec(normalized);
+    if (match) return match[1];
+  }
+  throw new TypeError(`${field} must be a valid date.`);
+}
+
 function rowToResult(row) {
   return {
     recordId: row.id,
@@ -34,7 +48,7 @@ function rowToResult(row) {
     jurisdiction: row.jurisdiction,
     niceClasses: Array.isArray(row.nice_classes) ? row.nice_classes : [],
     status: row.status,
-    filingDate: row.filing_date == null ? null : String(row.filing_date).slice(0, 10),
+    filingDate: dateOnly(row.filing_date, 'filing_date'),
     sourceRegistry: row.source_registry,
     sourceReferenceId: row.source_reference_id,
     relevanceScore: Number(row.relevance_score ?? 0),
