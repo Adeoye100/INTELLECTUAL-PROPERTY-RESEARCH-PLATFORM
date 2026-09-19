@@ -248,7 +248,7 @@ export class UserRepository {
       `SELECT u.*, f.name AS firm_name, f.subscription_tier
        FROM users u
        JOIN firms f ON f.id = u.firm_id
-       WHERE u.email = $1`,
+       WHERE u.email = $1 AND u.active = true`,
       [email],
     );
     return result.rowCount ? mapUser(result.rows[0]) : null;
@@ -259,7 +259,7 @@ export class UserRepository {
       `SELECT u.*, f.name AS firm_name, f.subscription_tier
        FROM users u
        JOIN firms f ON f.id = u.firm_id
-       WHERE u.id = $1`,
+       WHERE u.id = $1 AND u.active = true`,
       [id],
     );
     return result.rowCount ? mapUser(result.rows[0]) : null;
