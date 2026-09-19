@@ -1,5 +1,5 @@
 import { act } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AdminUsersScreen } from './AdminUsersScreen';
 
@@ -40,17 +40,18 @@ describe('AdminUsersScreen', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     render(<AdminUsersScreen />);
-    expect(await screen.findByText('member@example.test')).toBeVisible();
+    const membersTable = await screen.findByRole('table');
+    expect(within(membersTable).getByText('member@example.test')).toBeVisible();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove access' }));
+    fireEvent.click(within(membersTable).getByRole('button', { name: 'Remove access' }));
     await waitFor(() => {
       expect(fetchMock.mock.calls.some(([input, init]) => (
         String(input).endsWith('/api/v1/admin/users/11111111-1111-4111-8111-111111111111')
         && init?.method === 'DELETE'
       ))).toBe(true);
     });
-    expect(await screen.findByText('Access removed')).toBeVisible();
-    expect(screen.getByRole('combobox', { name: 'Role for member@example.test' })).toBeDisabled();
+    await waitFor(() => expect(within(membersTable).getByText('Access removed')).toBeVisible());
+    expect(within(membersTable).getByRole('combobox', { name: 'Role for member@example.test' })).toBeDisabled();
   });
 
   it('does not remove access when the Admin cancels the confirmation', async () => {
@@ -65,8 +66,9 @@ describe('AdminUsersScreen', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(false);
 
     render(<AdminUsersScreen />);
-    await screen.findByText('member@example.test');
-    fireEvent.click(screen.getByRole('button', { name: 'Remove access' }));
+    const membersTable = await screen.findByRole('table');
+    expect(within(membersTable).getByText('member@example.test')).toBeVisible();
+    fireEvent.click(within(membersTable).getByRole('button', { name: 'Remove access' }));
 
     await act(async () => {});
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false);
