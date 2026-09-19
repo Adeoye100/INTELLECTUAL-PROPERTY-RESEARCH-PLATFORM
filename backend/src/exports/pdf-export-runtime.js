@@ -6,6 +6,7 @@ import { PdfRenderer } from './pdf-renderer.js';
 import { RedisPdfExportQueue } from './pdf-export-queue.js';
 import { PdfExportProcessor } from './pdf-export-processor.js';
 import { PdfExportWorker } from './pdf-export-worker.js';
+import { recoverQueuedPdfExports } from './pdf-export-recovery.js';
 
 export function createPdfExportRuntime({
   config, redisClient, database, exportAuditService, searchResultService, portfolioMarkService,
@@ -33,5 +34,6 @@ export function createPdfExportRuntime({
   const worker = new PdfExportWorker({
     queue, processor, intervalMs: config.pdfExportWorkerIntervalMs, maxJobsPerTick: config.pdfExportWorkerMaxJobs,
   });
-  return { repository, queue, storage: privateStorage, sourceLoader, renderer, exportService, processor, worker };
+  const recoverQueuedJobs = () => recoverQueuedPdfExports({ repository, queue, clock });
+  return { repository, queue, storage: privateStorage, sourceLoader, renderer, exportService, processor, worker, recoverQueuedJobs };
 }
