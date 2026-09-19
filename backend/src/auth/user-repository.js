@@ -7,6 +7,7 @@ const mapUser = (row) => ({
   role: row.role,
   passwordHash: row.password_hash,
   lastLoginAt: row.last_login_at,
+  active: row.active ?? true,
   firm: row.firm_name ? {
     id: row.firm_id,
     name: row.firm_name,
@@ -52,7 +53,7 @@ export class UserRepository {
     const result = await this.pool.query(
       `SELECT role, firm_id
        FROM users
-       WHERE supabase_user_id = $1`,
+       WHERE supabase_user_id = $1 AND active = true`,
       [supabaseUserId],
     );
     if (!result.rowCount) return null;
@@ -64,12 +65,13 @@ export class UserRepository {
       `WITH existing AS (
          SELECT role, firm_id
          FROM users
-         WHERE supabase_user_id = $1
+         WHERE supabase_user_id = $1 AND active = true
        ), linked AS (
          UPDATE users
          SET supabase_user_id = $1
          WHERE supabase_user_id IS NULL
            AND email = $2
+           AND active = true
            AND NOT EXISTS (SELECT 1 FROM existing)
          RETURNING role, firm_id
        )
@@ -98,7 +100,7 @@ export class UserRepository {
         `SELECT u.*, f.name AS firm_name, f.subscription_tier
          FROM users u
          JOIN firms f ON f.id = u.firm_id
-         WHERE u.supabase_user_id = $1`,
+         WHERE u.supabase_user_id = $1 AND u.active = true`,
         [supabaseUserId],
       );
       if (existingUser.rowCount) {
@@ -110,7 +112,7 @@ export class UserRepository {
         `WITH linked AS (
            UPDATE users
            SET supabase_user_id = $1
-           WHERE supabase_user_id IS NULL AND email = $2
+           WHERE supabase_user_id IS NULL AND email = $2 AND active = true
            RETURNING *
          )
          SELECT linked.*, f.name AS firm_name, f.subscription_tier
@@ -169,7 +171,7 @@ export class UserRepository {
          )
          SELECT $1, u.firm_id, u.id, $4, $5, $6, $7
          FROM users u
-         WHERE u.id = $2 AND u.firm_id = $3 AND u.role = 'admin'
+         WHERE u.id = $2 AND u.firm_id = $3 AND u.role = 'admin' AND u.active = true
          RETURNING *
        )
        SELECT inserted.*, firms.name AS firm_name
@@ -246,7 +248,7 @@ export class UserRepository {
       `SELECT u.*, f.name AS firm_name, f.subscription_tier
        FROM users u
        JOIN firms f ON f.id = u.firm_id
-       WHERE u.email = $1`,
+       WHERE u.email = $1 AND u.active = true`,
       [email],
     );
     return result.rowCount ? mapUser(result.rows[0]) : null;
@@ -257,7 +259,7 @@ export class UserRepository {
       `SELECT u.*, f.name AS firm_name, f.subscription_tier
        FROM users u
        JOIN firms f ON f.id = u.firm_id
-       WHERE u.id = $1`,
+       WHERE u.id = $1 AND u.active = true`,
       [id],
     );
     return result.rowCount ? mapUser(result.rows[0]) : null;
@@ -265,9 +267,9 @@ export class UserRepository {
 
   async findRoleTargetForUpdate({ firmId, userId, transaction }) {
     const result = await transaction.query(
-      `SELECT id, firm_id, role, supabase_user_id
+      `SELECT id, firm_id, role, supabase_user_id, active
        FROM users
-       WHERE firm_id = $1 AND id = $2
+       WHERE firm_id = $1 AND id = $2 AND active = true
        FOR UPDATE`,
       [firmId, userId],
     );
@@ -278,13 +280,13 @@ export class UserRepository {
       firmId: row.firm_id,
       role: row.role,
       supabaseUserId: row.supabase_user_id,
-      active: true,
+      active: row.active,
     };
   }
 
   async listActiveAdminsForUpdate({ firmId, transaction }) {
     const result = await transaction.query(
-      `SELECT id FROM users WHERE firm_id = $1 AND role = 'admin' FOR UPDATE`,
+      `SELECT id FROM users WHERE firm_id = $1 AND role = 'admin' AND active = true FOR UPDATE`,
       [firmId],
     );
     return result.rows.map((row) => row.id);
@@ -293,8 +295,8 @@ export class UserRepository {
   async updateRole({ firmId, userId, role, transaction }) {
     const result = await transaction.query(
       `UPDATE users SET role = $3
-       WHERE firm_id = $1 AND id = $2
-       RETURNING id, firm_id, role, supabase_user_id`,
+       WHERE firm_id = $1 AND id = $2 AND active = true
+       RETURNING id, firm_id, role, supabase_user_id, active`,
       [firmId, userId, role],
     );
     if (!result.rowCount) return null;
@@ -304,13 +306,32 @@ export class UserRepository {
       firmId: row.firm_id,
       role: row.role,
       supabaseUserId: row.supabase_user_id,
-      active: true,
+      active: row.active,
+    };
+  }
+
+  async deactivateMembership({ firmId, userId, transaction }) {
+    const result = await transaction.query(
+      `UPDATE users
+       SET active = false
+       WHERE firm_id = $1 AND id = $2 AND active = true
+       RETURNING id, firm_id, role, supabase_user_id, active`,
+      [firmId, userId],
+    );
+    if (!result.rowCount) return null;
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      firmId: row.firm_id,
+      role: row.role,
+      supabaseUserId: row.supabase_user_id,
+      active: row.active,
     };
   }
 
   async recordLogin(id) {
     const result = await this.pool.query(
-      'UPDATE users SET last_login_at = now() WHERE id = $1 RETURNING last_login_at',
+      'UPDATE users SET last_login_at = now() WHERE id = $1 AND active = true RETURNING last_login_at',
       [id],
     );
     return result.rows[0]?.last_login_at ?? null;

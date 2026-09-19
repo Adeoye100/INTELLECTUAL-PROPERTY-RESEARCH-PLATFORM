@@ -20,6 +20,17 @@ describe('initial-deployment database boundary', () => {
   });
 });
 
+describe('ongoing Supabase Data API boundary', () => {
+  it('revokes browser-role grants from current and future public tables', async () => {
+    const migration = await readFile(new URL('../../migrations/030_lock_down_future_public_grants.sql', import.meta.url), 'utf8');
+    assert.match(migration, /REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM %I/);
+    assert.match(migration, /REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM %I/);
+    assert.match(migration, /ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL PRIVILEGES ON TABLES FROM %I/);
+    assert.match(migration, /ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL PRIVILEGES ON SEQUENCES FROM %I/);
+    assert.match(migration, /ARRAY\['anon', 'authenticated'\]/);
+  });
+});
+
 describe('Render blueprint configuration contracts', () => {
   it('activates database-backed research, in-process Watch automation, and server reports while upstream refresh and billing stay fail-closed', async () => {
     const renderYaml = await readFile(new URL('../../../render.yaml', import.meta.url), 'utf8');
@@ -70,5 +81,11 @@ describe('Render blueprint configuration contracts', () => {
     assert.ok(apiBlock.includes('key: WATCH_ENABLED\n        value: "true"'));
     assert.ok(apiBlock.includes('key: WATCH_IN_PROCESS_ENABLED\n        value: "true"'));
     assert.ok(apiBlock.includes('key: PAYSTACK_ENABLED\n        value: "false"'));
+    assert.ok(apiBlock.includes(
+      'key: REDIS_URL\n        fromService:\n          name: iprp-redis\n          type: keyvalue\n          property: connectionString',
+    ));
+    assert.equal(apiBlock.includes('key: REDIS_URL\n        sync: false'), false);
+    assert.ok(renderYaml.includes('- type: keyvalue\n    name: iprp-redis'));
+    assert.ok(renderYaml.includes('name: iprp-redis\n    plan: free\n    region: frankfurt\n    ipAllowList: []\n    maxmemoryPolicy: allkeys-lru'));
   });
 });

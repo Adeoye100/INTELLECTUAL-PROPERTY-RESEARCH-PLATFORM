@@ -34,7 +34,8 @@ export class UserRoleService {
     if (!userRepository || typeof userRepository.withTransaction !== 'function'
       || typeof userRepository.findRoleTargetForUpdate !== 'function'
       || typeof userRepository.listActiveAdminsForUpdate !== 'function'
-      || typeof userRepository.updateRole !== 'function') {
+      || typeof userRepository.updateRole !== 'function'
+      || typeof userRepository.deactivateMembership !== 'function') {
       throw new TypeError('UserRoleService needs the established transaction-capable user repository.');
     }
     if (!auditService || typeof auditService.record !== 'function') {
@@ -48,14 +49,53 @@ export class UserRoleService {
     this.roleFirmResolver = roleFirmResolver;
   }
 
+  async deactivateMember({ firmId, actorUserId, targetUserId, requestContext = null }) {
+    const scopedFirmId = uuid(firmId, 'firmId');
+    const scopedActorUserId = uuid(actorUserId, 'actorUserId');
+    const scopedTargetUserId = uuid(targetUserId, 'id');
+    return this.userRepository.withTransaction(async (transaction) => {
+      const before = await this.userRepository.findRoleTargetForUpdate({
+        firmId: scopedFirmId, userId: scopedTargetUserId, transaction,
+      });
+      if (!before) throw userNotFound();
+      if (before.supabaseUserId === scopedActorUserId) {
+        throw conflict('SELF_REMOVAL_FORBIDDEN', 'Admins cannot remove their own firm membership.');
+      }
+      if (before.role === 'admin') {
+        const activeAdminIds = await this.userRepository.listActiveAdminsForUpdate({
+          firmId: scopedFirmId, transaction,
+        });
+        if (activeAdminIds.length <= 1) {
+          throw conflict('LAST_ACTIVE_ADMIN', 'A firm must retain at least one active Admin.');
+        }
+      }
+      const after = await this.userRepository.deactivateMembership({
+        firmId: scopedFirmId, userId: scopedTargetUserId, transaction,
+      });
+      if (!after) throw userNotFound();
+      await this.auditService.record({
+        transaction,
+        requireTransaction: true,
+        firmId: scopedFirmId,
+        actorUserId: scopedActorUserId,
+        action: AUDIT_ACTIONS.USER_DEACTIVATED,
+        entityType: AUDIT_ENTITY_TYPES.USER,
+        entityId: scopedTargetUserId,
+        beforeState: userRoleAuditSnapshot(before),
+        afterState: userRoleAuditSnapshot(after),
+        metadata: { changedFields: ['active'] },
+        requestContext,
+      });
+      if (after.supabaseUserId) await this.roleFirmResolver.invalidate(after.supabaseUserId);
+      return userRoleAuditSnapshot(after);
+    });
+  }
+
   async changeRole({ firmId, actorUserId, targetUserId, input, requestContext = null }) {
     const scopedFirmId = uuid(firmId, 'firmId');
     const scopedActorUserId = uuid(actorUserId, 'actorUserId');
     const scopedTargetUserId = uuid(targetUserId, 'id');
     const role = parseUserRoleChange(input);
-    if (scopedActorUserId === scopedTargetUserId) {
-      throw conflict('SELF_ROLE_CHANGE_FORBIDDEN', 'Users cannot change their own role.');
-    }
     return this.userRepository.withTransaction(async (transaction) => {
       const before = await this.userRepository.findRoleTargetForUpdate({
         firmId: scopedFirmId, userId: scopedTargetUserId, transaction,

@@ -56,6 +56,7 @@ export function AdminUsersScreen() {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<UserRole>('viewer');
   const [saving, setSaving] = useState(false);
+  const [memberBusyId, setMemberBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -102,6 +103,8 @@ export function AdminUsersScreen() {
   };
 
   const changeRole = async (member: Member, nextRole: UserRole) => {
+    if (member.status !== 'active') return;
+    setMemberBusyId(member.id);
     setError(null);
     setNotice(null);
     try {
@@ -112,7 +115,32 @@ export function AdminUsersScreen() {
       setNotice('Member role updated.');
       await load();
     } catch {
-      setError('The role could not be changed. The final active Admin cannot be demoted and users cannot change their own role.');
+      setError('The role could not be changed. A firm must always retain at least one active Admin.');
+    } finally {
+      setMemberBusyId(null);
+    }
+  };
+
+  const removeMember = async (member: Member) => {
+    if (member.status !== 'active') return;
+    if (!window.confirm(`Remove ${member.email} from this firm? Their historical work remains preserved and they can be invited again later.`)) return;
+    setMemberBusyId(member.id);
+    setError(null);
+    setNotice(null);
+    try {
+      await getApiClient().requestJson(`/admin/users/${member.id}`, { method: 'DELETE' });
+      setNotice('Member access removed. Their historical records were preserved.');
+      await load();
+    } catch (err) {
+      if (err instanceof ApiError && err.serverCode === 'SELF_REMOVAL_FORBIDDEN') {
+        setError('You cannot remove your own Admin membership.');
+      } else if (err instanceof ApiError && err.serverCode === 'LAST_ACTIVE_ADMIN') {
+        setError('The final active Admin cannot be removed.');
+      } else {
+        setError('The member could not be removed. Please retry.');
+      }
+    } finally {
+      setMemberBusyId(null);
     }
   };
 
@@ -194,19 +222,26 @@ export function AdminUsersScreen() {
           <>
             <div className="mt-4 hidden overflow-x-auto md:block">
               <table className="w-full text-left">
-                <thead><tr className="border-b border-border"><th className="p-2">Member</th><th className="p-2">Role</th><th className="p-2">Status</th><th className="p-2">Last login</th></tr></thead>
+                <thead><tr className="border-b border-border"><th className="p-2">Member</th><th className="p-2">Role</th><th className="p-2">Status</th><th className="p-2">Last login</th><th className="p-2">Actions</th></tr></thead>
                 <tbody>
                   {members.map((member) => (
                     <tr className="border-b border-border" key={member.id}>
                       <td className="p-2">{member.email}</td>
                       <td className="p-2">
                         <label className="sr-only" htmlFor={`role-${member.id}`}>Role for {member.email}</label>
-                        <select id={`role-${member.id}`} value={member.role} onChange={(event) => void changeRole(member, event.target.value as UserRole)} className="rounded border border-input bg-background p-1 text-foreground">
+                        <select id={`role-${member.id}`} value={member.role} onChange={(event) => void changeRole(member, event.target.value as UserRole)} disabled={member.status !== 'active' || memberBusyId === member.id} className="rounded border border-input bg-background p-1 text-foreground disabled:cursor-not-allowed disabled:opacity-60">
                           <option value="admin">Admin</option><option value="attorney">Attorney</option><option value="viewer">Viewer</option>
                         </select>
                       </td>
                       <td className="p-2">{member.status}</td>
                       <td className="p-2">{member.lastLoginAt ? new Date(member.lastLoginAt).toLocaleString() : 'Not recorded'}</td>
+                      <td className="p-2">
+                        {member.status === 'active' ? (
+                          <Button size="sm" variant="outline" disabled={memberBusyId === member.id} onClick={() => void removeMember(member)}>
+                            {memberBusyId === member.id ? 'Updating…' : 'Remove access'}
+                          </Button>
+                        ) : <span className="text-xs text-muted-foreground">Access removed</span>}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -218,10 +253,15 @@ export function AdminUsersScreen() {
                   <p className="font-semibold">{member.email}</p>
                   <p className="text-sm text-muted-foreground">{member.status} · {member.lastLoginAt ? new Date(member.lastLoginAt).toLocaleString() : 'No login recorded'}</p>
                   <label className="mt-2 block text-sm">Role
-                    <select value={member.role} onChange={(event) => void changeRole(member, event.target.value as UserRole)} className="ml-2 rounded border border-input bg-background p-1 text-foreground">
+                    <select value={member.role} onChange={(event) => void changeRole(member, event.target.value as UserRole)} disabled={member.status !== 'active' || memberBusyId === member.id} className="ml-2 rounded border border-input bg-background p-1 text-foreground disabled:cursor-not-allowed disabled:opacity-60">
                       <option value="admin">Admin</option><option value="attorney">Attorney</option><option value="viewer">Viewer</option>
                     </select>
                   </label>
+                  {member.status === 'active' ? (
+                    <Button className="mt-3" size="sm" variant="outline" disabled={memberBusyId === member.id} onClick={() => void removeMember(member)}>
+                      {memberBusyId === member.id ? 'Updating…' : 'Remove access'}
+                    </Button>
+                  ) : <p className="mt-3 text-xs text-muted-foreground">Access removed. Invite this email again to reactivate membership.</p>}
                 </article>
               ))}
             </div>

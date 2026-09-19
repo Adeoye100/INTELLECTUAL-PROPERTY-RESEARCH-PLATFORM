@@ -13,6 +13,7 @@ import { PdfRenderer } from '../../src/exports/pdf-renderer.js';
 import { DatabasePdfStorage, InMemoryPdfStorage, exportStorageKey, validateExportStorageKey, sha256 } from '../../src/exports/export-storage.js';
 import { deterministicPdfExportJobId, RedisPdfExportQueue, validatePdfExportJob } from '../../src/exports/pdf-export-queue.js';
 import { PdfExportProcessor } from '../../src/exports/pdf-export-processor.js';
+import { recoverQueuedPdfExports } from '../../src/exports/pdf-export-recovery.js';
 import { createExportRouter } from '../../src/routes/export-routes.js';
 import { createApp } from '../../src/app.js';
 
@@ -279,6 +280,42 @@ describe('Renderer, private storage, queue job, and worker boundaries', () => {
 
     const redis = { async set() { return 'OK'; }, async lPush() {}, async zAdd() {}, async del() {}, async eval() { return '{"padding":"'.concat('a'.repeat(2_000), '"}'); } };
     await assert.rejects(() => new RedisPdfExportQueue({ redisClient: redis }).dequeue(), { code: 'EXPORT_JOB_INVALID' });
+  });
+
+  it('re-enqueues stale durable queued exports after an ephemeral Redis queue restart', async () => {
+    const recoveredAt = '2026-09-19T05:00:00.000Z';
+    const queuedAt = '2026-09-19T04:00:00.000Z';
+    const records = [exportRecord({ queuedAt, createdAt: queuedAt, updatedAt: queuedAt })];
+    const jobs = [];
+    const result = await recoverQueuedPdfExports({
+      repository: {
+        async listQueuedBefore({ before, limit }) {
+          assert.equal(before, '2026-09-19T04:55:00.000Z');
+          assert.equal(limit, 100);
+          return records;
+        },
+      },
+      queue: {
+        async enqueue(job) {
+          jobs.push(job);
+          return { enqueued: true, deduplicated: false, jobId: job.jobId };
+        },
+      },
+      clock: () => new Date(recoveredAt),
+    });
+
+    assert.deepEqual(result, {
+      scanned: 1,
+      enqueued: 1,
+      deduplicated: 0,
+      cutoff: '2026-09-19T04:55:00.000Z',
+    });
+    assert.equal(jobs.length, 1);
+    assert.equal(jobs[0].exportId, exportId);
+    assert.equal(jobs[0].firmId, firmId);
+    assert.equal(jobs[0].scheduledFor, queuedAt);
+    assert.equal(jobs[0].attempt, 0);
+    assert.equal(jobs[0].jobId, deterministicPdfExportJobId(exportId, queuedAt, 0));
   });
 
   it('validates versioned jobs and completes an export once without duplicate rendering', async () => {

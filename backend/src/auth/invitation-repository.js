@@ -37,7 +37,8 @@ function publicUser(row) {
   return {
     id: row.id, firmId: row.firm_id, email: row.email, role: row.role,
     lastLoginAt: row.last_login_at ? timestamp(row.last_login_at) : null,
-    status: 'active',
+    status: row.active === false ? 'inactive' : 'active',
+    active: row.active !== false,
   };
 }
 
@@ -65,7 +66,7 @@ export class InvitationRepository {
 
   async listMembers({ firmId }) {
     const result = await this.pool.query(
-      `SELECT id, firm_id, email, role, last_login_at FROM users WHERE firm_id = $1 ORDER BY email ASC`,
+      `SELECT id, firm_id, email, role, last_login_at, active FROM users WHERE firm_id = $1 ORDER BY active DESC, email ASC`,
       [firmId],
     );
     return result.rows.map(publicUser);
@@ -88,7 +89,7 @@ export class InvitationRepository {
 
   async assertAdmin(transaction, { firmId, actorSupabaseUserId }) {
     const result = await transaction.query(
-      `SELECT id FROM users WHERE firm_id = $1 AND supabase_user_id = $2 AND role = 'admin' FOR UPDATE`,
+      `SELECT id FROM users WHERE firm_id = $1 AND supabase_user_id = $2 AND role = 'admin' AND active = true FOR UPDATE`,
       [firmId, actorSupabaseUserId],
     );
     if (!result.rowCount) throw invitationError('ADMIN_REQUIRED');
@@ -104,7 +105,7 @@ export class InvitationRepository {
          AND superseded_by IS NULL AND expires_at <= now()`,
       [firmId, email],
     );
-    const member = await transaction.query(`SELECT id FROM users WHERE firm_id = $1 AND email = $2 FOR UPDATE`, [firmId, email]);
+    const member = await transaction.query(`SELECT id FROM users WHERE firm_id = $1 AND email = $2 AND active = true FOR UPDATE`, [firmId, email]);
     if (member.rowCount) throw invitationError('MEMBER_EXISTS');
     const active = await transaction.query(
       `SELECT id FROM firm_invitations WHERE firm_id = $1 AND email = $2
@@ -194,31 +195,68 @@ export class InvitationRepository {
     if (invitation.status !== 'pending') throw invitationError('UNAVAILABLE');
     if (email !== invitation.email) throw invitationError('EMAIL_MISMATCH');
 
-    const identity = await transaction.query('SELECT id FROM users WHERE supabase_user_id = $1 FOR UPDATE', [supabaseUserId]);
-    if (identity.rowCount) throw invitationError('IDENTITY_EXISTS');
-    const existingEmail = await transaction.query('SELECT id, firm_id, supabase_user_id FROM users WHERE email = $1 FOR UPDATE', [email]);
+    const identity = await transaction.query(
+      'SELECT id, firm_id, email, role, supabase_user_id, active, last_login_at FROM users WHERE supabase_user_id = $1 FOR UPDATE',
+      [supabaseUserId],
+    );
     let user;
-    if (existingEmail.rowCount) {
-      const existing = existingEmail.rows[0];
-      if (existing.supabase_user_id) throw invitationError('ACCOUNT_RECOVERY_REQUIRED');
-      if (existing.firm_id !== invitation.firmId) throw invitationError('MEMBERSHIP_EXISTS');
-      const linked = await transaction.query(
-        `UPDATE users SET supabase_user_id = $2 WHERE id = $1 AND supabase_user_id IS NULL
-         RETURNING id, firm_id, email, role, last_login_at`,
-        [existing.id, supabaseUserId],
+    let reactivated = false;
+    let membershipBefore = null;
+    if (identity.rowCount) {
+      const existingIdentity = identity.rows[0];
+      if (existingIdentity.active === true) throw invitationError('IDENTITY_EXISTS');
+      if (existingIdentity.firm_id !== invitation.firmId || existingIdentity.email !== email) {
+        throw invitationError('MEMBERSHIP_EXISTS');
+      }
+      membershipBefore = {
+        id: existingIdentity.id,
+        role: existingIdentity.role,
+        active: false,
+      };
+      const reactivatedResult = await transaction.query(
+        `UPDATE users SET active = true, role = $2
+         WHERE id = $1 AND active = false
+         RETURNING id, firm_id, email, role, last_login_at, active`,
+        [existingIdentity.id, invitation.role],
       );
-      if (!linked.rowCount) throw invitationError('ACCOUNT_RECOVERY_REQUIRED');
-      user = publicUser(linked.rows[0]);
+      if (!reactivatedResult.rowCount) throw invitationError('ACCOUNT_RECOVERY_REQUIRED');
+      user = publicUser(reactivatedResult.rows[0]);
+      reactivated = true;
     } else {
-      const inserted = await transaction.query(
-        `INSERT INTO users (firm_id, email, password_hash, role, supabase_user_id)
-         VALUES ($1, $2, NULL, $3, $4) RETURNING id, firm_id, email, role, last_login_at`,
-        [invitation.firmId, email, invitation.role, supabaseUserId],
+      const existingEmail = await transaction.query(
+        'SELECT id, firm_id, role, supabase_user_id, active FROM users WHERE email = $1 FOR UPDATE',
+        [email],
       );
-      user = publicUser(inserted.rows[0]);
+      if (existingEmail.rowCount) {
+        const existing = existingEmail.rows[0];
+        if (existing.firm_id !== invitation.firmId) throw invitationError('MEMBERSHIP_EXISTS');
+        if (existing.active === true && existing.supabase_user_id) throw invitationError('ACCOUNT_RECOVERY_REQUIRED');
+        membershipBefore = {
+          id: existing.id,
+          role: existing.role ?? invitation.role,
+          active: false,
+        };
+        const linked = await transaction.query(
+          `UPDATE users
+           SET supabase_user_id = $2, role = $3, active = true
+           WHERE id = $1 AND active = false
+           RETURNING id, firm_id, email, role, last_login_at, active`,
+          [existing.id, supabaseUserId, invitation.role],
+        );
+        if (!linked.rowCount) throw invitationError('ACCOUNT_RECOVERY_REQUIRED');
+        user = publicUser(linked.rows[0]);
+        reactivated = true;
+      } else {
+        const inserted = await transaction.query(
+          `INSERT INTO users (firm_id, email, password_hash, role, supabase_user_id)
+           VALUES ($1, $2, NULL, $3, $4) RETURNING id, firm_id, email, role, last_login_at, active`,
+          [invitation.firmId, email, invitation.role, supabaseUserId],
+        );
+        user = publicUser(inserted.rows[0]);
+      }
     }
     await transaction.query('UPDATE firm_invitations SET used_at = now(), accepted_at = now() WHERE id = $1', [invitation.id]);
     const accepted = await transaction.query(`${invitationSelect} WHERE invitation.id = $1`, [invitation.id]);
-    return { invitation: invitationFromRow(accepted.rows[0]), user };
+    return { invitation: invitationFromRow(accepted.rows[0]), user, reactivated, membershipBefore };
   }
 }

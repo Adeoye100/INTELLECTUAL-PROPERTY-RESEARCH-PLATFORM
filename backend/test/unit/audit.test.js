@@ -293,13 +293,17 @@ function roleRepository(users) {
       try { return await work({ async query() {} }); } catch (error) { state.users = previous; state.rolledBack += 1; throw error; }
     },
     async findRoleTargetForUpdate({ firmId: scope, userId }) {
-      const user = state.users.find((item) => item.firmId === scope && item.id === userId);
+      const user = state.users.find((item) => item.firmId === scope && item.id === userId && item.active !== false);
       return user ? structuredClone(user) : null;
     },
-    async listActiveAdminsForUpdate({ firmId: scope }) { return state.users.filter((item) => item.firmId === scope && item.role === 'admin').map((item) => item.id); },
+    async listActiveAdminsForUpdate({ firmId: scope }) { return state.users.filter((item) => item.firmId === scope && item.role === 'admin' && item.active !== false).map((item) => item.id); },
     async updateRole({ firmId: scope, userId, role }) {
-      const user = state.users.find((item) => item.firmId === scope && item.id === userId);
+      const user = state.users.find((item) => item.firmId === scope && item.id === userId && item.active !== false);
       if (!user) return null; user.role = role; return structuredClone(user);
+    },
+    async deactivateMembership({ firmId: scope, userId }) {
+      const user = state.users.find((item) => item.firmId === scope && item.id === userId && item.active !== false);
+      if (!user) return null; user.active = false; return structuredClone(user);
     },
   };
 }
@@ -320,6 +324,27 @@ describe('role change and read route boundaries', () => {
     await assert.rejects(() => service.changeRole({ firmId, actorUserId, targetUserId: thirdUserId, input: { role: 'viewer' } }), { code: 'USER_NOT_FOUND' });
     await assert.rejects(() => service.changeRole({ firmId, actorUserId, targetUserId: entityId, input: { role: 'viewer' } }), { code: 'USER_ROLE_NOOP' });
     await assert.rejects(() => service.changeRole({ firmId, actorUserId, targetUserId: localActorId, input: { role: 'viewer' } }), { code: 'LAST_ACTIVE_ADMIN' });
+  });
+
+  it('deactivates another member, invalidates authorization cache, and protects self/last Admin', async () => {
+    const repository = roleRepository([
+      { id: localActorId, firmId, role: 'admin', supabaseUserId: actorUserId, active: true },
+      { id: entityId, firmId, role: 'attorney', supabaseUserId: secondUserId, active: true },
+      { id: secondUserId, firmId, role: 'admin', supabaseUserId: thirdUserId, active: true },
+    ]);
+    const cacheInvalidations = []; const audit = transactionAudit();
+    const service = new UserRoleService({ userRepository: repository, auditService: audit, roleFirmResolver: { async invalidate(id) { cacheInvalidations.push(id); } } });
+
+    assert.deepEqual(
+      await service.deactivateMember({ firmId, actorUserId, targetUserId: entityId }),
+      { id: entityId, role: 'attorney', active: false },
+    );
+    assert.equal(audit.calls.at(-1).action, AUDIT_ACTIONS.USER_DEACTIVATED);
+    assert.deepEqual(cacheInvalidations, [secondUserId]);
+    await assert.rejects(() => service.deactivateMember({ firmId, actorUserId, targetUserId: localActorId }), { code: 'SELF_REMOVAL_FORBIDDEN' });
+
+    repository.state.users.find((user) => user.id === secondUserId).active = false;
+    await assert.rejects(() => service.deactivateMember({ firmId, actorUserId: secondUserId, targetUserId: localActorId }), { code: 'LAST_ACTIVE_ADMIN' });
   });
 
   it('allows self-demotion only when another active Admin remains, and rolls it back if auditing fails', async () => {

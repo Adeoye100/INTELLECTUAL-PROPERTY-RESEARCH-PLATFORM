@@ -41,5 +41,13 @@ export function createAdminRouter(authenticate, invitationService, userRoleServi
       input: request.userRoleInput, requestContext: request.auditContext,
     }));
   });
+  router.delete('/users/:userId', async (request, response) => {
+    const targetUserId = validUuid(request.params.userId, 'userId');
+    await userRoleService.deactivateMember({
+      firmId: request.auth.firmId, actorUserId: request.auth.userId, targetUserId,
+      requestContext: request.auditContext,
+    });
+    response.status(204).end();
+  });
   return router;
 }

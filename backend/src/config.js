@@ -142,8 +142,14 @@ function redisUrl(env, environment) {
   }
   if (environment === 'production') {
     rejectProductionPlaceholder(value, 'REDIS_URL', environment);
-    if (parsed.protocol !== 'rediss:' || isLoopbackHost(parsed.hostname)) {
-      throw new Error('REDIS_URL must use rediss and a non-loopback host in production.');
+    const renderPrivateKeyValue = env.RENDER === 'true'
+      && parsed.protocol === 'redis:'
+      && /^red-[a-z0-9-]+$/i.test(parsed.hostname)
+      && (parsed.port === '' || parsed.port === '6379')
+      && (parsed.pathname === '' || parsed.pathname === '/');
+    const externalTlsRedis = parsed.protocol === 'rediss:' && !isLoopbackHost(parsed.hostname);
+    if (!renderPrivateKeyValue && !externalTlsRedis) {
+      throw new Error('REDIS_URL must use rediss in production, except for Render same-region private Key Value URLs.');
     }
   }
   return value;

@@ -104,11 +104,26 @@ export function startLiveMaintenance({ config, system }) {
     console.log('In-process watch worker started after Search freshness activation.');
   };
 
-  const startPdf = () => {
+  const startPdf = async () => {
     if (!pdfEnabled || stopped || pdfStarted || !system.pdfExportRuntime?.worker) return;
+    if (typeof system.pdfExportRuntime.recoverQueuedJobs === 'function') {
+      try {
+        const recovered = await system.pdfExportRuntime.recoverQueuedJobs();
+        console.log('PDF export queue recovery completed.', recovered);
+      } catch (error) {
+        console.warn('PDF export queue recovery failed.', {
+          name: error?.name ?? 'Error',
+          code: error?.code ?? 'EXPORT_RECOVERY_FAILED',
+        });
+      }
+    }
+    if (stopped || pdfStarted) return;
     system.pdfExportRuntime.worker.start();
     pdfStarted = true;
-    console.log('In-process PDF export worker started.');
+    console.log('In-process PDF export worker started.', {
+      storageProvider: config.pdfExportStorageProvider,
+      queueKey: config.pdfExportQueueKey,
+    });
   };
 
   const refresh = async () => {
@@ -135,7 +150,7 @@ export function startLiveMaintenance({ config, system }) {
   };
 
   void logPersistedCorpusReadiness(system);
-  startPdf();
+  void startPdf();
 
   if (!refreshEnabled) {
     startWatch();

@@ -117,6 +117,22 @@ export class ExportRepository {
     return result.rows.map(exportFromRow);
   }
 
+  async listQueuedBefore({ before, limit = 100 }) {
+    if (typeof before !== 'string' || Number.isNaN(Date.parse(before))
+      || !Number.isSafeInteger(limit) || limit < 1 || limit > 500) {
+      throw new TypeError('ExportRepository listQueuedBefore requires a valid cutoff and bounded limit.');
+    }
+    const result = await this.database.query(
+      `SELECT ${COLUMNS}
+       FROM exports
+       WHERE status = 'queued' AND queued_at <= $1::timestamptz
+       ORDER BY queued_at ASC, id ASC
+       LIMIT $2`,
+      [before, limit],
+    );
+    return result.rows.map(exportFromRow);
+  }
+
   async claimQueued({ transaction, firmId, exportId, processingStartedAt }) {
     const result = await executor(this, transaction).query(
       `UPDATE exports SET status = 'processing', processing_started_at = $3, updated_at = $3

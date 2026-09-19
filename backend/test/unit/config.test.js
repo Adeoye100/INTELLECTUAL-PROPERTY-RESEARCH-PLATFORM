@@ -295,6 +295,23 @@ describe('production deployment configuration', () => {
     ]) assert.throws(() => loadConfig(productionEnvironment(overrides)));
   });
 
+  it('accepts Render same-region private Key Value URLs in production only on Render', () => {
+    const config = loadConfig(productionEnvironment({
+      RENDER: 'true',
+      REDIS_URL: 'redis://red-da84jocs728c73am7of0:6379',
+    }));
+    assert.equal(config.redisUrl, 'redis://red-da84jocs728c73am7of0:6379');
+
+    assert.throws(() => loadConfig(productionEnvironment({
+      REDIS_URL: 'redis://red-da84jocs728c73am7of0:6379',
+    })), /Render same-region private Key Value/);
+
+    assert.throws(() => loadConfig(productionEnvironment({
+      RENDER: 'true',
+      REDIS_URL: 'redis://redis.provider.test:6379',
+    })), /Render same-region private Key Value/);
+  });
+
   it('bounds HTTP connection limits and rejects an unsafe timeout relationship', () => {
     for (const overrides of [
       { HTTP_KEEP_ALIVE_TIMEOUT_MS: '999' },

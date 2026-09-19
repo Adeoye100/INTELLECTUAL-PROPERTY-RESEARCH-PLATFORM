@@ -46,7 +46,10 @@ services:
       - key: HTTP_MAX_HEADERS_COUNT
         value: "100"
       - key: REDIS_URL
-        sync: false
+        fromService:
+          name: iprp-redis
+          type: keyvalue
+          property: connectionString
       - key: CORS_ALLOWED_ORIGINS
         sync: false
       - key: TRUST_PROXY_HOPS
@@ -175,6 +178,16 @@ services:
       - key: PAYSTACK_PROFESSIONAL_CURRENCY
         value: NGN
 
+  # Shared private queue/cache. This declaration binds the existing Frankfurt
+  # Render Key Value instance into the Blueprint so fromService REDIS_URL
+  # references resolve deterministically.
+  - type: keyvalue
+    name: iprp-redis
+    plan: free
+    region: frankfurt
+    ipAllowList: []
+    maxmemoryPolicy: allkeys-lru
+
   # Optional upstream ingestion process. Keep disabled while production is
   # intentionally operating from the already-persisted Supabase corpus.
   - type: cron
@@ -248,7 +261,10 @@ services:
       - key: DATABASE_STATEMENT_TIMEOUT_MS
         value: "15000"
       - key: REDIS_URL
-        sync: false
+        fromService:
+          name: iprp-redis
+          type: keyvalue
+          property: connectionString
       - key: SEARCH_ENABLED
         value: "false"
       - key: SEARCH_BACKEND
@@ -313,7 +329,10 @@ services:
       - key: DATABASE_STATEMENT_TIMEOUT_MS
         value: "15000"
       - key: REDIS_URL
-        sync: false
+        fromService:
+          name: iprp-redis
+          type: keyvalue
+          property: connectionString
       - key: PDF_EXPORT_ENABLED
         value: "false"
       - key: PDF_EXPORT_STORAGE_PROVIDER

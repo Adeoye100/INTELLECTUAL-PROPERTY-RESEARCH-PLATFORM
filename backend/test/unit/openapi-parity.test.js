@@ -8,7 +8,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const expected = {
   '/healthz': ['get'], '/readyz': ['get'],
   '/api/v1/auth/invitations/{token}': ['get'], '/api/v1/auth/invitations/{token}/redeem': ['post'],
-  '/api/v1/provisioning/organization-intents': ['post'], '/api/v1/provisioning/firm': ['post'], '/api/v1/me': ['get'], '/api/v1/admin/users': ['get'], '/api/v1/admin/invitations': ['get', 'post'], '/api/v1/admin/invitations/{invitationId}/resend': ['post'], '/api/v1/admin/invitations/{invitationId}': ['delete'], '/api/v1/admin/users/{userId}/role': ['patch'],
+  '/api/v1/provisioning/organization-intents': ['post'], '/api/v1/provisioning/firm': ['post'], '/api/v1/me': ['get'], '/api/v1/admin/users': ['get'], '/api/v1/admin/invitations': ['get', 'post'], '/api/v1/admin/invitations/{invitationId}/resend': ['post'], '/api/v1/admin/invitations/{invitationId}': ['delete'], '/api/v1/admin/users/{userId}': ['delete'], '/api/v1/admin/users/{userId}/role': ['patch'],
   '/api/v1/dashboard/analytics': ['get'],
   '/api/v1/billing/webhook': ['post'], '/api/v1/billing': ['get'], '/api/v1/billing/checkout': ['post'], '/api/v1/billing/verify': ['post'],
   '/api/v1/matters': ['get', 'post'], '/api/v1/matters/{id}': ['get'], '/api/v1/matters/{id}/risk-results': ['post'],

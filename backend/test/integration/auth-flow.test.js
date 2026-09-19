@@ -129,7 +129,7 @@ describe('auth API with real PostgreSQL and Redis', () => {
       columns.rows.filter(({ table_name }) => table_name === 'users').map(({ column_name }) => column_name),
       [
         'id', 'firm_id', 'email', 'password_hash', 'role', 'created_at', 'last_login_at',
-        'supabase_user_id',
+        'supabase_user_id', 'active',
       ],
     );
     const passwordHashColumn = await system.pool.query(`
@@ -258,6 +258,59 @@ describe('auth API with real PostgreSQL and Redis', () => {
     assert.equal(accepted.body.firm.id, firmId);
     assert.equal(accepted.body.user.role, 'attorney');
     assert.equal(accepted.body.firm.name, firmName);
+  });
+
+  it('removes a firm seat without deleting history and allows invitation-based reactivation', async () => {
+    const members = await request(system.app)
+      .get('/api/v1/admin/users')
+      .set('Authorization', 'Bearer admin-signup-token');
+    assert.equal(members.status, 200);
+    const invitedMember = members.body.users.find((member) => member.email === invitedEmail);
+    assert.ok(invitedMember);
+
+    const removed = await request(system.app)
+      .delete(`/api/v1/admin/users/${invitedMember.id}`)
+      .set('Authorization', 'Bearer admin-signup-token');
+    assert.equal(removed.status, 204);
+
+    const storedInactive = await system.pool.query(
+      'SELECT active FROM users WHERE id = $1',
+      [invitedMember.id],
+    );
+    assert.equal(storedInactive.rows[0].active, false);
+
+    const membershipAfterRemoval = await request(system.app)
+      .get('/api/v1/me')
+      .set('Authorization', 'Bearer invited-first-use-token');
+    assert.equal(membershipAfterRemoval.status, 200);
+    assert.equal(membershipAfterRemoval.body.role, null);
+    assert.equal(membershipAfterRemoval.body.firmId, null);
+
+    const blockedAdmin = await request(system.app)
+      .get('/api/v1/admin/users')
+      .set('Authorization', 'Bearer invited-first-use-token');
+    assert.equal(blockedAdmin.status, 403);
+
+    const reinvite = await request(system.app)
+      .post('/api/v1/admin/invitations')
+      .set('Authorization', 'Bearer admin-signup-token')
+      .send({ fullName: 'Invited Viewer', email: invitedEmail, role: 'viewer' });
+    assert.equal(reinvite.status, 201);
+    const messages = system.invitationService.invitationMailer.messages.filter((message) => message.to === invitedEmail);
+    const token = messages.at(-1).text.match(/\/auth\/invite\/([^/\s]+)/)[1];
+
+    const reactivated = await request(system.app)
+      .post(`/api/v1/auth/invitations/${token}/redeem`)
+      .set('Authorization', 'Bearer invited-first-use-token');
+    assert.equal(reactivated.status, 201);
+    assert.equal(reactivated.body.user.status, 'active');
+
+    const restored = await request(system.app)
+      .get('/api/v1/me')
+      .set('Authorization', 'Bearer invited-first-use-token');
+    assert.equal(restored.status, 200);
+    assert.equal(restored.body.role, 'viewer');
+    assert.equal(restored.body.firmId, firmId);
   });
 
   it('rejects reuse of an accepted invitation with a clear error', async () => {

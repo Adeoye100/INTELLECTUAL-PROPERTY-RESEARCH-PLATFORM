@@ -63,6 +63,7 @@ describe('SearchScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Search trademarks' }));
 
     await screen.findByRole('table', { name: /ranked by explicit risk/i });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     const requestUrl = new URL(String(fetchMock.mock.calls[0][0]), 'https://example.test');
     expect(requestUrl.pathname).toBe('/api/v1/search');
     expect(requestUrl.searchParams.get('mark')).toBe('FORGE');
