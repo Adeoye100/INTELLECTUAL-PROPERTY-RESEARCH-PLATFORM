@@ -279,10 +279,17 @@ describe('auth API with real PostgreSQL and Redis', () => {
     );
     assert.equal(storedInactive.rows[0].active, false);
 
-    const blocked = await request(system.app)
+    const membershipAfterRemoval = await request(system.app)
       .get('/api/v1/me')
       .set('Authorization', 'Bearer invited-first-use-token');
-    assert.equal(blocked.status, 401);
+    assert.equal(membershipAfterRemoval.status, 200);
+    assert.equal(membershipAfterRemoval.body.role, null);
+    assert.equal(membershipAfterRemoval.body.firmId, null);
+
+    const blockedAdmin = await request(system.app)
+      .get('/api/v1/admin/users')
+      .set('Authorization', 'Bearer invited-first-use-token');
+    assert.equal(blockedAdmin.status, 403);
 
     const reinvite = await request(system.app)
       .post('/api/v1/admin/invitations')
