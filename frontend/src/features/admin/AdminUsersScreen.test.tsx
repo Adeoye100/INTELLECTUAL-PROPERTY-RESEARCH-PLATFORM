@@ -56,6 +56,7 @@ describe('AdminUsersScreen', () => {
 
   it('does not remove access when the Admin cancels the confirmation', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      void init;
       const url = String(input);
       const body = url.endsWith('/api/v1/admin/users')
         ? { users: [{ id: '11111111-1111-4111-8111-111111111111', email: 'member@example.test', role: 'viewer', status: 'active', lastLoginAt: null }] }
