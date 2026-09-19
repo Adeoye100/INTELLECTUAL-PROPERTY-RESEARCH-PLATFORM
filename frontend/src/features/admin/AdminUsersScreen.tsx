@@ -115,7 +115,7 @@ export function AdminUsersScreen() {
       setNotice('Member role updated.');
       await load();
     } catch {
-      setError('The role could not be changed. The final active Admin cannot be demoted and users cannot change their own role.');
+      setError('The role could not be changed. A firm must always retain at least one active Admin.');
     } finally {
       setMemberBusyId(null);
     }
