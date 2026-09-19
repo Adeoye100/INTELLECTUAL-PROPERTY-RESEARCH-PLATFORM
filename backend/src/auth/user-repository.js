@@ -112,7 +112,7 @@ export class UserRepository {
         `WITH linked AS (
            UPDATE users
            SET supabase_user_id = $1
-           WHERE supabase_user_id IS NULL AND email = $2
+           WHERE supabase_user_id IS NULL AND email = $2 AND active = true
            RETURNING *
          )
          SELECT linked.*, f.name AS firm_name, f.subscription_tier
@@ -171,7 +171,7 @@ export class UserRepository {
          )
          SELECT $1, u.firm_id, u.id, $4, $5, $6, $7
          FROM users u
-         WHERE u.id = $2 AND u.firm_id = $3 AND u.role = 'admin'
+         WHERE u.id = $2 AND u.firm_id = $3 AND u.role = 'admin' AND u.active = true
          RETURNING *
        )
        SELECT inserted.*, firms.name AS firm_name
@@ -267,9 +267,9 @@ export class UserRepository {
 
   async findRoleTargetForUpdate({ firmId, userId, transaction }) {
     const result = await transaction.query(
-      `SELECT id, firm_id, role, supabase_user_id
+      `SELECT id, firm_id, role, supabase_user_id, active
        FROM users
-       WHERE firm_id = $1 AND id = $2
+       WHERE firm_id = $1 AND id = $2 AND active = true
        FOR UPDATE`,
       [firmId, userId],
     );
@@ -306,7 +306,7 @@ export class UserRepository {
       firmId: row.firm_id,
       role: row.role,
       supabaseUserId: row.supabase_user_id,
-      active: true,
+      active: row.active,
     };
   }
 
