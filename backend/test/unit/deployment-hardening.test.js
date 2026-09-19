@@ -22,7 +22,7 @@ describe('initial-deployment database boundary', () => {
 
 describe('ongoing Supabase Data API boundary', () => {
   it('revokes browser-role grants from current and future public tables', async () => {
-    const migration = await readFile(new URL('../../migrations/029_lock_down_future_public_grants.sql', import.meta.url), 'utf8');
+    const migration = await readFile(new URL('../../migrations/030_lock_down_future_public_grants.sql', import.meta.url), 'utf8');
     assert.match(migration, /REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM %I/);
     assert.match(migration, /REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM %I/);
     assert.match(migration, /ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL PRIVILEGES ON TABLES FROM %I/);
