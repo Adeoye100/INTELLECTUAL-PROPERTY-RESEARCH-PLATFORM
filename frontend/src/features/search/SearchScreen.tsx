@@ -60,7 +60,6 @@ export const SearchScreen: React.FC = () => {
     initialState.submitted ? normalizeSearchFilters(initialState.filters) : null,
   );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
-  const [onboardingComplete, setOnboardingComplete] = useState(false);
   const {
     register,
     handleSubmit,
@@ -87,11 +86,12 @@ export const SearchScreen: React.FC = () => {
   const hasIncompleteSources = sourceStatuses.some(({ status }) => status !== 'complete');
   const allSourcesUnavailable = sourceStatuses.length > 0 && sourceStatuses.every(({ status }) => status === 'unavailable');
 
+  const onboardingComplete = searchQuery.isSuccess && Boolean(user) && searchParams.get('onboarding') === 'search';
+
   useEffect(() => {
-    if (!searchQuery.isSuccess || !user || onboardingComplete || searchParams.get('onboarding') !== 'search') return;
+    if (!onboardingComplete || !user) return;
     completePath(user.id, 'search');
-    setOnboardingComplete(true);
-  }, [completePath, onboardingComplete, searchParams, searchQuery.isSuccess, user]);
+  }, [completePath, onboardingComplete, user]);
 
   const onSubmit = (values: SearchFilters) => {
     const normalized = normalizeSearchFilters(values);
