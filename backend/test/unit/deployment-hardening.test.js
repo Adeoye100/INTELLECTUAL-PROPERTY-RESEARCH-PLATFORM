@@ -48,8 +48,10 @@ describe('Render blueprint configuration contracts', () => {
       'SEARCH_REFRESH_EXPECTED_INTERVAL_HOURS',
       'SEARCH_MAX_MISSED_REFRESH_RUNS',
       'USPTO_BULK_SOURCE',
-      'USPTO_BDSS_API_BASE_URL',
-      'USPTO_BDSS_DAILY_PRODUCT',
+      'USPTO_ODP_API_KEY',
+      'USPTO_ODP_API_BASE_URL',
+      'USPTO_ODP_ANNUAL_PRODUCT',
+      'USPTO_ODP_DAILY_PRODUCT',
       'USPTO_LISTING_BASELINE_DAYS',
       'USPTO_REFRESH_IN_PROCESS_ENABLED',
       'OFFICE_ACTION_SEARCH_ENABLED',
@@ -73,6 +75,12 @@ describe('Render blueprint configuration contracts', () => {
     assert.ok(apiBlock.includes('key: SEARCH_ENABLED\n        value: "true"'));
     assert.ok(apiBlock.includes('key: SEARCH_BACKEND\n        value: postgres'));
     assert.ok(apiBlock.includes('key: SEARCH_FRESHNESS_MODE\n        value: corpus'));
+    assert.ok(apiBlock.includes('key: USPTO_BULK_SOURCE\n        value: odp'));
+    assert.ok(apiBlock.includes('key: USPTO_ODP_API_KEY\n        sync: false'));
+    assert.ok(apiBlock.includes('key: USPTO_ODP_API_BASE_URL\n        value: "https://api.uspto.gov/api/v1/datasets/products"'));
+    assert.ok(apiBlock.includes('key: USPTO_ODP_ANNUAL_PRODUCT\n        value: TRTYRAP'));
+    assert.ok(apiBlock.includes('key: USPTO_ODP_DAILY_PRODUCT\n        value: TRTDXFAP'));
+    assert.equal(apiBlock.includes('key: USPTO_BDSS_API_BASE_URL'), false);
     assert.ok(apiBlock.includes('key: USPTO_REFRESH_IN_PROCESS_ENABLED\n        value: "false"'));
     assert.ok(apiBlock.includes('key: OFFICE_ACTION_SEARCH_ENABLED\n        value: "true"'));
     assert.ok(apiBlock.includes('key: PDF_EXPORT_ENABLED\n        value: "true"'));
