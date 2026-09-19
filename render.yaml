@@ -178,6 +178,16 @@ services:
       - key: PAYSTACK_PROFESSIONAL_CURRENCY
         value: NGN
 
+  # Shared private queue/cache. This declaration binds the existing Frankfurt
+  # Render Key Value instance into the Blueprint so fromService REDIS_URL
+  # references resolve deterministically.
+  - type: keyvalue
+    name: iprp-redis
+    plan: free
+    region: frankfurt
+    ipAllowList: []
+    maxmemoryPolicy: allkeys-lru
+
   # Optional upstream ingestion process. Keep disabled while production is
   # intentionally operating from the already-persisted Supabase corpus.
   - type: cron
