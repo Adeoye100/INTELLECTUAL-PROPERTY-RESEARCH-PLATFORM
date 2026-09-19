@@ -53,14 +53,14 @@ export class UserRoleService {
     const scopedFirmId = uuid(firmId, 'firmId');
     const scopedActorUserId = uuid(actorUserId, 'actorUserId');
     const scopedTargetUserId = uuid(targetUserId, 'id');
-    if (scopedActorUserId === scopedTargetUserId) {
-      throw conflict('SELF_REMOVAL_FORBIDDEN', 'Admins cannot remove their own firm membership.');
-    }
     return this.userRepository.withTransaction(async (transaction) => {
       const before = await this.userRepository.findRoleTargetForUpdate({
         firmId: scopedFirmId, userId: scopedTargetUserId, transaction,
       });
       if (!before) throw userNotFound();
+      if (before.supabaseUserId === scopedActorUserId) {
+        throw conflict('SELF_REMOVAL_FORBIDDEN', 'Admins cannot remove their own firm membership.');
+      }
       if (before.role === 'admin') {
         const activeAdminIds = await this.userRepository.listActiveAdminsForUpdate({
           firmId: scopedFirmId, transaction,
