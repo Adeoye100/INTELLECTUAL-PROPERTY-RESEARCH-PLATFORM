@@ -74,5 +74,7 @@ describe('Render blueprint configuration contracts', () => {
       'key: REDIS_URL\n        fromService:\n          name: iprp-redis\n          type: keyvalue\n          property: connectionString',
     ));
     assert.equal(apiBlock.includes('key: REDIS_URL\n        sync: false'), false);
+    assert.ok(renderYaml.includes('- type: keyvalue\n    name: iprp-redis'));
+    assert.ok(renderYaml.includes('name: iprp-redis\n    plan: free\n    region: frankfurt\n    ipAllowList: []\n    maxmemoryPolicy: allkeys-lru'));
   });
 });
