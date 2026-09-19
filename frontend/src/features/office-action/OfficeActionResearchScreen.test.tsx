@@ -73,7 +73,7 @@ describe('OfficeActionResearchScreen', () => {
 
   it('renders Office Action metadata as text rather than markup', async () => {
     const user = userEvent.setup();
-    renderScreen({ id: 'oa1', portfolioMarkId: null, sourceReferenceId: '<office-action-reference>', referenceText: '<office-action-reference>', examinerReasoningSummary: '<office-action-summary>', linkedPrecedentRef: null });
+    renderScreen({ ...officeAction, sourceReferenceId: '<office-action-reference>', referenceText: '<office-action-reference>', examinerReasoningSummary: '<office-action-summary>' });
     await user.type(screen.getByRole('textbox', { name: 'Mark Text' }), 'FORGE');
     await user.click(screen.getByRole('button', { name: 'Apply Filters' }));
     expect(await screen.findByText('<office-action-reference>')).toBeVisible();
