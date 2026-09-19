@@ -1271,6 +1271,28 @@
         }
       }
     },
+    "/api/v1/admin/users/{userId}": {
+      "delete": {
+        "operationId": "deactivateAdminUserMembership",
+        "x-roles": ["admin"],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "204": { "description": "Firm membership access removed while historical records remain preserved." },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
     "/api/v1/admin/users/{userId}/role": {
       "patch": {
         "operationId": "changeAdminUserRole",
