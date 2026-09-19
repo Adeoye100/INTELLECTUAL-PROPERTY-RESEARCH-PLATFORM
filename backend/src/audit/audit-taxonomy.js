@@ -10,6 +10,8 @@ export const AUDIT_ACTIONS = Object.freeze({
   ALERT_READ: 'alert.read',
   ALERT_DISMISSED: 'alert.dismissed',
   USER_ROLE_CHANGED: 'user.role_changed',
+  USER_DEACTIVATED: 'user.deactivated',
+  USER_REACTIVATED: 'user.reactivated',
   INVITATION_ISSUED: 'invitation.issued',
   INVITATION_RESENT: 'invitation.resent',
   INVITATION_REVOKED: 'invitation.revoked',
