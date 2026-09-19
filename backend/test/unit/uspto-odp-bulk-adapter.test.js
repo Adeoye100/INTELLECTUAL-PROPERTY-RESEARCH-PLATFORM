@@ -121,7 +121,8 @@ describe('USPTO ODP bulk XML adapter', () => {
     assert.equal(calls[1].headers['x-api-key'], undefined);
   });
 
-  it('requires explicit ODP credentials when the production source is ODP', () => {
+  it('defaults bulk refresh to ODP and requires its server credential', () => {
+    assert.throws(() => loadUsptoBulkSourceConfig({}), /USPTO_ODP_API_KEY/);
     assert.throws(() => loadUsptoBulkSourceConfig({ USPTO_BULK_SOURCE: 'odp' }), /USPTO_ODP_API_KEY/);
     assert.deepEqual(loadUsptoBulkSourceConfig({
       USPTO_BULK_SOURCE: 'odp', USPTO_ODP_API_KEY: 'key',

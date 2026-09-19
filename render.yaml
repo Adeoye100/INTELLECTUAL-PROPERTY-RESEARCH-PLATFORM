@@ -102,14 +102,18 @@ services:
       - key: SEARCH_MAX_MISSED_REFRESH_RUNS
         value: "2"
 
-      # Upstream bulk refresh remains off. The active Search path consumes only
-      # the already-parsed canonical database corpus and reports its data-through
-      # date to users.
+      # Upstream bulk refresh remains off until the server-only USPTO ODP API
+      # key is supplied. Search continues from the persisted canonical corpus
+      # and reports its data-through date truthfully.
       - key: USPTO_BULK_SOURCE
-        value: bdss
-      - key: USPTO_BDSS_API_BASE_URL
-        value: "https://bulkdata.uspto.gov/BDSS-API/products"
-      - key: USPTO_BDSS_DAILY_PRODUCT
+        value: odp
+      - key: USPTO_ODP_API_KEY
+        sync: false
+      - key: USPTO_ODP_API_BASE_URL
+        value: "https://api.uspto.gov/api/v1/datasets/products"
+      - key: USPTO_ODP_ANNUAL_PRODUCT
+        value: TRTYRAP
+      - key: USPTO_ODP_DAILY_PRODUCT
         value: TRTDXFAP
       - key: USPTO_LISTING_BASELINE_DAYS
         value: "7"
@@ -188,8 +192,8 @@ services:
     ipAllowList: []
     maxmemoryPolicy: allkeys-lru
 
-  # Optional upstream ingestion process. Keep disabled while production is
-  # intentionally operating from the already-persisted Supabase corpus.
+  # Optional upstream ingestion process. ODP is the current USPTO bulk source;
+  # provisioning requires the server-only USPTO_ODP_API_KEY.
   - type: cron
     name: iprp-uspto-ingestion
     runtime: node
@@ -220,10 +224,14 @@ services:
       - key: ELASTICSEARCH_INDEX
         value: trademarks_composite
       - key: USPTO_BULK_SOURCE
-        value: bdss
-      - key: USPTO_BDSS_API_BASE_URL
-        value: "https://bulkdata.uspto.gov/BDSS-API/products"
-      - key: USPTO_BDSS_DAILY_PRODUCT
+        value: odp
+      - key: USPTO_ODP_API_KEY
+        sync: false
+      - key: USPTO_ODP_API_BASE_URL
+        value: "https://api.uspto.gov/api/v1/datasets/products"
+      - key: USPTO_ODP_ANNUAL_PRODUCT
+        value: TRTYRAP
+      - key: USPTO_ODP_DAILY_PRODUCT
         value: TRTDXFAP
       - key: USPTO_LISTING_BASELINE_DAYS
         value: "7"
