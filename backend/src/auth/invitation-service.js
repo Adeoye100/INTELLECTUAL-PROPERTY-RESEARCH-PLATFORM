@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { AppError, badRequest, conflict, forbidden, gone } from '../errors.js';
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../audit/audit-taxonomy.js';
-import { invitationAuditSnapshot } from '../audit/audit-snapshots.js';
+import { invitationAuditSnapshot, userRoleAuditSnapshot } from '../audit/audit-snapshots.js';
 import { createOpaqueInvitationToken, hashInvitationToken } from './invitation-token.js';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -166,6 +166,21 @@ export class InvitationService {
           transaction, invitationId: resolved.invitation.id, tokenHash: resolved.tokenHash,
           legacyClaims: resolved.legacyClaims, supabaseUserId: auth.userId, email,
         });
+        if (result.reactivated && result.membershipBefore) {
+          await this.auditService.record({
+            transaction,
+            requireTransaction: true,
+            firmId: result.invitation.firmId,
+            actorUserId: auth.userId,
+            action: AUDIT_ACTIONS.USER_REACTIVATED,
+            entityType: AUDIT_ENTITY_TYPES.USER,
+            entityId: result.user.id,
+            beforeState: userRoleAuditSnapshot(result.membershipBefore),
+            afterState: userRoleAuditSnapshot(result.user),
+            metadata: { changedFields: ['active', 'role'] },
+            requestContext,
+          });
+        }
         await this.record(transaction, { ...auth, firmId: result.invitation.firmId }, AUDIT_ACTIONS.INVITATION_ACCEPTED, result.invitation, null, result.invitation, requestContext);
         return result;
       });
