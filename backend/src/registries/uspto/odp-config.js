@@ -28,7 +28,7 @@ function baseUrl(value, fallback, name) {
 }
 
 export function loadUsptoBulkSourceConfig(env = process.env) {
-  const source = (env.USPTO_BULK_SOURCE?.trim() || (env.USPTO_ODP_API_KEY?.trim() ? 'odp' : 'bdss')).toLowerCase();
+  const source = (env.USPTO_BULK_SOURCE?.trim() || 'odp').toLowerCase();
   if (!['odp', 'listing', 'bdss'].includes(source)) throw new Error('USPTO_BULK_SOURCE must be odp, bdss, or listing.');
 
   if (source === 'listing') return { usptoBulkSource: 'listing' };
