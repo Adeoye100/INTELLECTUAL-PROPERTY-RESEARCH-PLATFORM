@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { authRedirectUrl, roleHomePath, safeAppRedirect } from './roleRouting';
+import {
+  authRedirectUrl,
+  PRODUCTION_AUTH_ORIGIN,
+  resolveAuthOrigin,
+  roleHomePath,
+  safeAppRedirect,
+} from './roleRouting';
 
 describe('authentication redirect boundaries', () => {
   it('segregates the default destination by server-authorized application role', () => {
@@ -13,6 +19,22 @@ describe('authentication redirect boundaries', () => {
     expect(safeAppRedirect('//unapproved.example.test/account', '/dashboard')).toBe('/dashboard');
     expect(safeAppRedirect('/\\unapproved.example.test', '/dashboard')).toBe('/dashboard');
     expect(safeAppRedirect('javascript:untrusted', '/dashboard')).toBe('/dashboard');
+  });
+
+  it('pins production OAuth to the canonical domain instead of the current Vercel hostname', () => {
+    expect(resolveAuthOrigin({
+      isDevelopment: false,
+      currentOrigin: 'https://intellectual-property-research-plat.vercel.app',
+    })).toBe(PRODUCTION_AUTH_ORIGIN);
+    expect(resolveAuthOrigin({
+      isDevelopment: false,
+      currentOrigin: 'https://preview.example.test',
+      configuredOrigin: 'https://approved-preview.example.test/',
+    })).toBe('https://approved-preview.example.test');
+    expect(resolveAuthOrigin({
+      isDevelopment: true,
+      currentOrigin: 'http://localhost:5173',
+    })).toBe('http://localhost:5173');
   });
 
   it('permits Supabase redirects only to explicit callback paths', () => {
