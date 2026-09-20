@@ -34,12 +34,15 @@ Production; never promote a preview URL automatically into production settings.
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Matching browser publishable key | Matching browser publishable key | Yes |
 | `VITE_API_BASE_URL` | Exact approved Render preview/staging HTTPS origin ending `/api/v1` | Exact Render production HTTPS origin ending `/api/v1` | Yes |
 | `VITE_API_MODE` | `live` | `live` | Yes |
+| `VITE_AUTH_REDIRECT_ORIGIN` | Exact explicitly approved preview origin, or omit to fall back to the canonical production origin | `https://fgiprp.com` | Yes |
 
 Do not add `DATABASE_URL`, Supabase secret/service-role keys, JWT/rate-limit
 secrets, Redis/Elasticsearch/storage URLs or credentials, registry/provider
-keys, or internal storage paths to Vercel. `VITE_APP_URL` is not an active
-repository variable: callbacks use the current browser origin so each approved
-preview uses its exact origin.
+keys, or internal storage paths to Vercel. Production OAuth callbacks are pinned to `https://fgiprp.com` by default.
+`VITE_AUTH_REDIRECT_ORIGIN` is an optional browser-safe override for an
+explicitly approved preview origin; never point production at a `.vercel.app`
+hostname. Repo-root Vercel deployments are non-canonical and must redirect to
+`https://fgiprp.com` instead of serving repository files.
 
 Before assigning a preview, choose its exact Vercel deployment URL and add the
 same exact origin to Render `CORS_ALLOWED_ORIGINS` and the three Supabase Auth
