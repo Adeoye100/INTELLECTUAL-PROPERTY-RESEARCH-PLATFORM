@@ -62,6 +62,8 @@ redirect entries. No broad `*.vercel.app` redirect or CORS rule is permitted.
 - HSTS, `nosniff`, referrer policy, permissions policy, and frame denial are
   also sent. `frame-ancestors 'none'` is the CSP source of truth.
 
+Production requests to `fgiprp.com` receive the strict exact-origin `connect-src` policy above. Vercel preview hosts receive the same defensive baseline but allow HTTPS connections so their environment-specific Supabase and API origins remain usable. Preview deployment protection, exact Render CORS entries, and exact Supabase redirect allowlists remain mandatory; do not treat the broader preview `connect-src` as production policy.
+
 In preview, verify login/signup/recovery callback flows, Recharts/SVG screens,
 static assets, downloadable PDFs when that later feature is enabled, and browser
 console CSP reports. Only add a directive after naming the exact source and
