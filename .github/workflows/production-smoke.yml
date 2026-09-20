@@ -22,9 +22,9 @@ jobs:
     env:
       IPRP_APP_ORIGIN: https://fgiprp.com
       IPRP_API_BASE_URL: https://iprp-api.onrender.com/api/v1
-      IPRP_ADMIN_TOKEN: ${{ secrets.IPRP_PRODUCTION_ADMIN_TOKEN }}
-      IPRP_ATTORNEY_TOKEN: ${{ secrets.IPRP_PRODUCTION_ATTORNEY_TOKEN }}
-      IPRP_VIEWER_TOKEN: ${{ secrets.IPRP_PRODUCTION_VIEWER_TOKEN }}
+      IPRP_ADMIN_TOKEN: ${{ github.event_name == 'workflow_dispatch' && secrets.IPRP_PRODUCTION_ADMIN_TOKEN || '' }}
+      IPRP_ATTORNEY_TOKEN: ${{ github.event_name == 'workflow_dispatch' && secrets.IPRP_PRODUCTION_ATTORNEY_TOKEN || '' }}
+      IPRP_VIEWER_TOKEN: ${{ github.event_name == 'workflow_dispatch' && secrets.IPRP_PRODUCTION_VIEWER_TOKEN || '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,7 +36,7 @@ jobs:
         if: always()
         run: |
           echo '## Production smoke evidence' >> "$GITHUB_STEP_SUMMARY"
-          if [ -f production-smoke.json ]; then
+          if [ -s production-smoke.json ]; then
             echo '```json' >> "$GITHUB_STEP_SUMMARY"
             cat production-smoke.json >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
