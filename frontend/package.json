@@ -11,7 +11,8 @@
     "test": "vitest run",
     "preview": "vite preview",
     "security:bundle": "node ../backend/scripts/check-frontend-secrets.js --require-dist",
-    "verify:supabase-staging-auth": "node scripts/verify-supabase-live-auth.mjs"
+    "verify:supabase-staging-auth": "node scripts/verify-supabase-live-auth.mjs",
+    "verify:production": "node scripts/verify-production.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

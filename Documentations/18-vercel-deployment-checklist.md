@@ -2,18 +2,18 @@
 
 ## Project configuration
 
-The single authoritative frontend configuration is root [`vercel.ts`](../vercel.ts).
-The prior root `vercel.json` was removed to avoid conflicting headers/rewrites.
-Vercel must use the **repository root** so this file can install/build the
-`frontend` subproject:
+The single authoritative frontend configuration is
+[`frontend/vercel.json`](../frontend/vercel.json), the configuration filename
+Vercel consumes for this project. Vercel must use `frontend` as its **Root
+Directory**. Do not duplicate rewrites or headers in the Vercel dashboard.
 
 | Setting | Value |
 | --- | --- |
-| Root Directory | Repository root (leave Vercel’s project root at the repository, not `frontend`). |
+| Root Directory | `frontend` |
 | Node runtime | Select the currently supported **22.x** line in **Project Settings → Build and Deployment → Node.js Version**. The repository’s `.node-version` and Render target are 22.14.0; Vercel manages minor/patch updates, so record the selected major and build evidence. |
-| Install Command | `corepack enable && cd frontend && pnpm install --frozen-lockfile` |
-| Build Command | `cd frontend && pnpm run build` |
-| Output Directory | `frontend/dist` |
+| Install Command | `corepack enable && pnpm install --frozen-lockfile` |
+| Build Command | `pnpm run build` |
+| Output Directory | `dist` |
 | Framework | Vite |
 | SPA routing | Root rewrite to `/index.html`; verify static JS/CSS/image requests remain served as static assets in preview. |
 
@@ -47,7 +47,7 @@ redirect entries. No broad `*.vercel.app` redirect or CORS rule is permitted.
 
 ## Security headers and CSP
 
-`vercel.ts` adds the headers from one location:
+`frontend/vercel.json` adds the production headers from one location:
 
 - `Content-Security-Policy` starts with `default-src 'self'`, blocks objects,
   framing, foreign scripts, and `unsafe-eval`; it limits `connect-src` to the
@@ -85,3 +85,7 @@ or a framework config.
   other than the configured API base. The centralized client accepts only
   root-relative paths below that base, uses `credentials: 'omit'`, and bounds
   timeouts/retries.
+- [ ] Run `pnpm verify:production` from `frontend`. Configure the optional
+  `IPRP_ADMIN_TOKEN`, `IPRP_ATTORNEY_TOKEN`, and `IPRP_VIEWER_TOKEN` only as
+  short-lived GitHub Actions secrets for authenticated role evidence; never
+  commit or print them. The anonymous SPA/header/CORS/API checks always run.

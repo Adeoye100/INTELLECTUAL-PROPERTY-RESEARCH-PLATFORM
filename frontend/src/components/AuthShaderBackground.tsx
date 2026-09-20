@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react';
+import { canCreateWebGLContext } from '../lib/webgl';
 
 const ShaderGradientScene = lazy(async () => {
   const { ShaderGradient, ShaderGradientCanvas } = await import('@shadergradient/react');
@@ -57,8 +58,7 @@ const ShaderGradientScene = lazy(async () => {
 /** A decorative sign-in backdrop with a CSS fallback for reduced-motion and non-WebGL devices. */
 export function AuthShaderBackground() {
   const reducedMotion = typeof window !== 'undefined' && (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
-  const supportsWebGL = typeof WebGLRenderingContext !== 'undefined' || typeof WebGL2RenderingContext !== 'undefined';
-  const canRenderShader = !reducedMotion && supportsWebGL;
+  const canRenderShader = !reducedMotion && canCreateWebGLContext();
 
   return (
     <div className="auth-shader-background" aria-hidden="true">
