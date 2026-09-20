@@ -1,94 +1,65 @@
-import { afterAll, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import configurationJson from '../../vercel.json';
 
-const originalEnvironment = vi.hoisted(() => {
-  const keys = ['VITE_SUPABASE_URL', 'VITE_API_BASE_URL'] as const;
-  const environment = (globalThis as unknown as { process: { env: Record<string, string | undefined> } }).process.env;
-  const original = Object.fromEntries(keys.map((key) => [key, environment[key]]));
-  environment.VITE_SUPABASE_URL = 'https://ccslkfqnziikcsgbrwfd.supabase.co';
-  environment.VITE_API_BASE_URL = 'https://iprp-api.onrender.com/api/v1';
-  return original;
-});
+interface VercelHeader { key: string; value: string }
+interface VercelHeaderRule {
+  source: string;
+  has?: Array<{ type: string; value: string }>;
+  headers: VercelHeader[];
+}
+interface VercelConfig {
+  framework: string;
+  installCommand: string;
+  buildCommand: string;
+  outputDirectory: string;
+  headers: VercelHeaderRule[];
+  rewrites: Array<{ source: string; destination: string }>;
+}
 
-import { createVercelConfig } from '../../../vercel.ts';
-import { createFrontendRootVercelConfig } from '../../vercel.ts';
+const configuration = configurationJson as VercelConfig;
+const headerMap = (rule: VercelHeaderRule | undefined) =>
+  Object.fromEntries(rule?.headers.map(({ key, value }) => [key, value]) ?? []);
+const ruleForHost = (host: string) =>
+  configuration.headers.find((rule) => rule.has?.some((condition) => condition.type === 'host' && condition.value === host));
 
-const productionEnvironment = {
-  VITE_SUPABASE_URL: 'https://ccslkfqnziikcsgbrwfd.supabase.co',
-  VITE_API_BASE_URL: 'https://iprp-api.onrender.com/api/v1',
-};
-
-describe('Vercel response-header configuration', () => {
-  it('serializes complete security headers for the production origins', () => {
-    const configuration = createVercelConfig(productionEnvironment);
-
-    expect(Array.isArray(configuration.headers)).toBe(true);
-    for (const route of configuration.headers) {
-      expect(route.source).toEqual(expect.any(String));
-      expect(route.source.trim()).not.toBe('');
-      for (const header of route.headers) {
-        expect(header.key).toEqual(expect.any(String));
-        expect(header.key.trim()).not.toBe('');
-        expect(header.value).toEqual(expect.any(String));
-        expect(header.value.trim()).not.toBe('');
-      }
-    }
-
-    const serialized = JSON.parse(JSON.stringify(configuration)) as typeof configuration;
-    expect(serialized.headers[0]?.headers).toEqual(configuration.headers[0]?.headers);
-
-    const csp = configuration.headers[0]?.headers[0];
-    expect(csp).toEqual(expect.objectContaining({ key: 'Content-Security-Policy' }));
-    expect(csp?.value).toContain("default-src 'self'");
-    expect(csp?.value).toContain("frame-ancestors 'none'");
-    expect(csp?.value).toContain('https://ccslkfqnziikcsgbrwfd.supabase.co');
-    expect(csp?.value).toContain('https://iprp-api.onrender.com');
-    expect(csp?.value).not.toContain("'unsafe-eval'");
-    expect(csp?.value).not.toMatch(/\*|localhost/i);
+describe('Vercel production configuration', () => {
+  it('uses the Vercel-recognized frontend-root deployment contract', () => {
+    expect(configuration.framework).toBe('vite');
+    expect(configuration.installCommand).toBe('corepack enable && pnpm install --frozen-lockfile');
+    expect(configuration.buildCommand).toBe('pnpm run build');
+    expect(configuration.outputDirectory).toBe('dist');
+    expect(configuration.rewrites).toContainEqual({ source: '/(.*)', destination: '/index.html' });
   });
 
-  it('keeps frontend-root routing and security policy aligned with repo-root deployments', () => {
-    const repoRoot = createVercelConfig(productionEnvironment);
-    const frontendRoot = createFrontendRootVercelConfig(productionEnvironment);
+  it('defines a complete production security-header policy', () => {
+    const commonHeaders = headerMap(configuration.headers.find((rule) => !rule.has));
+    const productionHeaders = headerMap(ruleForHost('fgiprp.com'));
+    const csp = productionHeaders['Content-Security-Policy'];
 
-    expect(frontendRoot.rewrites).toEqual(repoRoot.rewrites);
-    expect(frontendRoot.headers).toEqual(repoRoot.headers);
-    expect(frontendRoot.framework).toBe('vite');
-    expect(frontendRoot.installCommand).toBe('corepack enable && pnpm install --frozen-lockfile');
-    expect(frontendRoot.buildCommand).toBe('pnpm run build');
-    expect(frontendRoot.outputDirectory).toBe('dist');
+    expect(csp).toContain("default-src 'self'");
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).toContain('https://ccslkfqnziikcsgbrwfd.supabase.co');
+    expect(csp).toContain('https://iprp-api.onrender.com');
+    expect(csp).not.toContain("'unsafe-eval'");
+    expect(csp).not.toMatch(/\*|localhost/i);
+    expect(commonHeaders['Strict-Transport-Security']).toContain('max-age=31536000');
+    expect(commonHeaders['X-Content-Type-Options']).toBe('nosniff');
+    expect(commonHeaders['X-Frame-Options']).toBe('DENY');
+    expect(commonHeaders['Referrer-Policy']).toBe('strict-origin-when-cross-origin');
+    expect(commonHeaders['Permissions-Policy']).toContain('camera=()');
   });
 
-  it('fails with a controlled error before constructing a malformed header', () => {
-    expect(() => createVercelConfig({
-      VITE_API_BASE_URL: productionEnvironment.VITE_API_BASE_URL,
-    })).toThrow('VITE_SUPABASE_URL');
-    expect(() => createVercelConfig({
-      VITE_SUPABASE_URL: productionEnvironment.VITE_SUPABASE_URL,
-    })).toThrow('VITE_API_BASE_URL');
-    expect(() => createFrontendRootVercelConfig({
-      VITE_API_BASE_URL: productionEnvironment.VITE_API_BASE_URL,
-    })).toThrow('VITE_SUPABASE_URL');
-    expect(() => createFrontendRootVercelConfig({
-      VITE_SUPABASE_URL: productionEnvironment.VITE_SUPABASE_URL,
-    })).toThrow('VITE_API_BASE_URL');
+  it('allows environment-specific HTTPS connections only on protected previews', () => {
+    const previewHeaders = headerMap(ruleForHost('.*\\.vercel\\.app'));
+    const previewCsp = previewHeaders['Content-Security-Policy'];
+
+    expect(previewCsp).toContain("default-src 'self'");
+    expect(previewCsp).toContain("frame-ancestors 'none'");
+    expect(previewCsp).toContain("connect-src 'self' https:");
+    expect(previewCsp).not.toContain("'unsafe-eval'");
   });
 
-  it('does not serialize backend-only secret references into frontend configuration', () => {
-    const serialized = JSON.stringify(createVercelConfig(productionEnvironment));
-    const frontendSerialized = JSON.stringify(createFrontendRootVercelConfig(productionEnvironment));
-
-    expect(serialized).not.toMatch(/secret|service.*role|database/i);
-    expect(frontendSerialized).not.toMatch(/secret|service.*role|database/i);
+  it('does not reference backend-only configuration or secrets', () => {
+    expect(JSON.stringify(configuration)).not.toMatch(/service.*role|database|redis|elastic|paystack|secret/i);
   });
-});
-
-afterAll(() => {
-  const environment = (globalThis as unknown as { process: { env: Record<string, string | undefined> } }).process.env;
-  for (const [key, value] of Object.entries(originalEnvironment)) {
-    if (value === undefined) {
-      delete environment[key];
-    } else {
-      environment[key] = value;
-    }
-  }
 });

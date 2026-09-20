@@ -1,0 +1,45 @@
+name: Production smoke and security headers
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 6 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-smoke
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      IPRP_APP_ORIGIN: https://fgiprp.com
+      IPRP_API_BASE_URL: https://iprp-api.onrender.com/api/v1
+      IPRP_ADMIN_TOKEN: ${{ github.event_name == 'workflow_dispatch' && secrets.IPRP_PRODUCTION_ADMIN_TOKEN || '' }}
+      IPRP_ATTORNEY_TOKEN: ${{ github.event_name == 'workflow_dispatch' && secrets.IPRP_PRODUCTION_ATTORNEY_TOKEN || '' }}
+      IPRP_VIEWER_TOKEN: ${{ github.event_name == 'workflow_dispatch' && secrets.IPRP_PRODUCTION_VIEWER_TOKEN || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify SPA, headers, API boundary, and configured roles
+        run: node scripts/verify-production.mjs | tee production-smoke.json
+      - name: Publish verification summary
+        if: always()
+        run: |
+          echo '## Production smoke evidence' >> "$GITHUB_STEP_SUMMARY"
+          if [ -s production-smoke.json ]; then
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat production-smoke.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'The verifier failed before producing its evidence document.' >> "$GITHUB_STEP_SUMMARY"
+          fi
