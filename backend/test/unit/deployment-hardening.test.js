@@ -31,6 +31,14 @@ describe('ongoing Supabase Data API boundary', () => {
   });
 });
 
+describe('canonical Vercel frontend boundary', () => {
+  it('redirects repo-root deployments to fgiprp.com instead of exposing repository contents', async () => {
+    const rootVercel = await readFile(new URL('../../../vercel.json', import.meta.url), 'utf8');
+    assert.ok(rootVercel.includes('"source": "/:path*"'));
+    assert.ok(rootVercel.includes('"destination": "https://fgiprp.com/:path*"'));
+    assert.ok(rootVercel.includes('"permanent": true'));
+  });
+});
 describe('Render blueprint configuration contracts', () => {
   it('activates database-backed research, in-process Watch automation, and server reports while upstream refresh and billing stay fail-closed', async () => {
     const renderYaml = await readFile(new URL('../../../render.yaml', import.meta.url), 'utf8');
