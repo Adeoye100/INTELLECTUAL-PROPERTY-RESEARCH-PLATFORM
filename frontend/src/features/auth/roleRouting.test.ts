@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   authRedirectUrl,
+  canonicalFrontendUrl,
   PRODUCTION_AUTH_ORIGIN,
   resolveAuthOrigin,
   roleHomePath,
@@ -35,6 +36,24 @@ describe('authentication redirect boundaries', () => {
       isDevelopment: true,
       currentOrigin: 'http://localhost:5173',
     })).toBe('http://localhost:5173');
+  });
+
+  it('redirects noncanonical production hosts before session restoration', () => {
+    expect(canonicalFrontendUrl({
+      isDevelopment: false,
+      currentOrigin: 'https://preview.example.test',
+      currentHref: 'https://preview.example.test/watches?status=active#top',
+    })).toBe('https://fgiprp.com/watches?status=active#top');
+    expect(canonicalFrontendUrl({
+      isDevelopment: false,
+      currentOrigin: PRODUCTION_AUTH_ORIGIN,
+      currentHref: 'https://fgiprp.com/dashboard',
+    })).toBeNull();
+    expect(canonicalFrontendUrl({
+      isDevelopment: true,
+      currentOrigin: 'http://localhost:5173',
+      currentHref: 'http://localhost:5173/auth/login',
+    })).toBeNull();
   });
 
   it('permits Supabase redirects only to explicit callback paths', () => {

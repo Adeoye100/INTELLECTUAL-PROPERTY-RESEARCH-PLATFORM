@@ -47,6 +47,28 @@ export const resolveAuthOrigin = ({
   return url.origin;
 };
 
+export interface CanonicalFrontendRuntime extends AuthOriginRuntime {
+  currentHref: string;
+}
+
+export const canonicalFrontendUrl = ({
+  isDevelopment,
+  currentOrigin,
+  currentHref,
+  configuredOrigin,
+}: CanonicalFrontendRuntime) => {
+  if (isDevelopment) return null;
+  const canonicalOrigin = resolveAuthOrigin({
+    isDevelopment,
+    currentOrigin,
+    configuredOrigin,
+  });
+  if (currentOrigin === canonicalOrigin) return null;
+
+  const current = new URL(currentHref);
+  return new URL(`${current.pathname}${current.search}${current.hash}`, canonicalOrigin).toString();
+};
+
 export const safeAppRedirect = (path: unknown, fallback: string) => {
   if (typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//')) return fallback;
   try {

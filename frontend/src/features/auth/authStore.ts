@@ -6,6 +6,7 @@ import { getApiClient } from '../../lib/api/client';
 import {
   AuthSynchronizationError,
   type AuthSynchronizationDiagnostic,
+  shouldDiscardSupabaseSession,
   toAuthSynchronizationError,
 } from './authApi';
 
@@ -145,10 +146,6 @@ async function synchronizeSupabaseSession(session: Session): Promise<Authenticat
   }
 }
 
-function isMissingMembershipError(error: unknown) {
-  return error instanceof AuthSynchronizationError && error.diagnostic.responseCode === 'FIRM_MEMBERSHIP_MISSING';
-}
-
 export function syncSupabaseSession(session: Session): Promise<AuthenticatedUser> {
   const existing = sessionSynchronizations.get(session.access_token);
   if (existing) return existing;
@@ -176,8 +173,8 @@ export function initializeAuth(): Promise<void> {
         return;
       }
       if (event === 'INITIAL_SESSION') return;
-      void syncSupabaseSession(session).catch((error) => {
-        if (!isMissingMembershipError(error)) useAuthStore.getState().clearSession();
+      void syncSupabaseSession(session).catch(() => {
+        useAuthStore.getState().clearSession();
       });
     });
   }
@@ -188,7 +185,10 @@ export function initializeAuth(): Promise<void> {
       return;
     }
     await syncSupabaseSession(data.session);
-  }).catch(() => {
+  }).catch(async (error) => {
+    if (shouldDiscardSupabaseSession(error)) {
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
+    }
     useAuthStore.getState().clearSession();
   });
   return initialization;

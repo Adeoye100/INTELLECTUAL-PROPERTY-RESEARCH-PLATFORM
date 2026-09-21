@@ -96,6 +96,14 @@ export async function authRequest<T>(input: RequestInfo | URL, init?: RequestIni
 const sessionErrorCode = (path: string): AuthErrorCode =>
   path === '/auth/login' ? 'INVALID_CREDENTIALS' : 'SESSION_EXPIRED';
 
+export const shouldDiscardSupabaseSession = (error: unknown) =>
+  error instanceof AuthApiError
+  && (
+    error.code === 'APPLICATION_USER_MISSING'
+    || error.code === 'FIRM_MEMBERSHIP_MISSING'
+    || error.code === 'SESSION_EXPIRED'
+  );
+
 export const authErrorMessage = (error: unknown): string => {
   if (!(error instanceof AuthApiError)) return 'Something went wrong. Please try again.';
   const messages: Record<AuthErrorCode, string> = {

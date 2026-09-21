@@ -119,7 +119,7 @@ describe('OAuthCallbackScreen', () => {
     expect(getLastAuthSynchronizationDiagnostic()).toEqual(expect.objectContaining({
       stage: 'resolve-current-user', status: 404, responseCode: 'NOT_FOUND', requestOrigin: expect.any(String),
     }));
-    expect(auth.signOut).not.toHaveBeenCalled();
+    expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
   });
 
   it('reports a missing role or firm without rendering server details', async () => {
@@ -138,6 +138,7 @@ describe('OAuthCallbackScreen', () => {
     expect(getLastAuthSynchronizationDiagnostic()).toEqual({
       stage: 'role-routing', responseCode: 'FIRM_MEMBERSHIP_MISSING',
     });
+    await waitFor(() => expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' }));
   });
 
   it('deduplicates a PKCE exchange across Strict Mode callback execution', async () => {

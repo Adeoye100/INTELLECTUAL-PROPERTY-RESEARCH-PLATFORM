@@ -33,7 +33,7 @@ For production, set **Site URL** exactly to `https://fgiprp.com` and allow these
 - `https://fgiprp.com/auth/verify-email`
 - `https://fgiprp.com/auth/reset-password`
 
-Remove the obsolete `https://intellectual-property-research-plat.vercel.app` redirects after the canonical deployment is verified. Keep the production **Site URL** on the canonical deployed frontend origin, never on a backend URL. Google Cloud's OAuth redirect URI remains the Supabase callback URL supplied by the provider configuration; the application redirect URLs above are passed to Supabase by the frontend.
+Remove every retired production `.vercel.app` redirect once the canonical deployment is verified; production authentication must return only to `https://fgiprp.com`. Keep the production **Site URL** on the canonical deployed frontend origin, never on a backend URL. Google Cloud's OAuth redirect URI remains the Supabase callback URL supplied by the provider configuration; the application redirect URLs above are passed to Supabase by the frontend.
 
 The frontend supplies these paths through `authRedirectUrl` for Google sign-in, sign-up confirmation, email verification, and password reset. Query parameters such as `/auth/callback?next=/dashboard` stay on the approved callback path.
 
