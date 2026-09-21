@@ -5,6 +5,7 @@ import { DatabasePdfStorage, FilePdfStorage } from './export-storage.js';
 import { PdfRenderer } from './pdf-renderer.js';
 import { RedisPdfExportQueue } from './pdf-export-queue.js';
 import { PdfExportProcessor } from './pdf-export-processor.js';
+import { PdfExportLifecycle } from './pdf-export-lifecycle.js';
 import { PdfExportWorker } from './pdf-export-worker.js';
 import { recoverQueuedPdfExports } from './pdf-export-recovery.js';
 
@@ -27,13 +28,15 @@ export function createPdfExportRuntime({
   const exportService = new ExportService({
     repository, queue, exportAuditService, storage: privateStorage, clock, maxAttempts: config.pdfExportMaxAttempts,
   });
+  const lifecycle = new PdfExportLifecycle({
+    repository, queue, exportAuditService, exportService, clock, maxAttempts: config.pdfExportMaxAttempts,
+  });
   const processor = new PdfExportProcessor({
-    repository, queue, sourceLoader, renderer, storage: privateStorage, exportAuditService, exportService,
-    clock, maxAttempts: config.pdfExportMaxAttempts,
+    lifecycle, queue, sourceLoader, renderer, storage: privateStorage,
   });
   const worker = new PdfExportWorker({
     queue, processor, intervalMs: config.pdfExportWorkerIntervalMs, maxJobsPerTick: config.pdfExportWorkerMaxJobs,
   });
   const recoverQueuedJobs = () => recoverQueuedPdfExports({ repository, queue, clock });
-  return { repository, queue, storage: privateStorage, sourceLoader, renderer, exportService, processor, worker, recoverQueuedJobs };
+  return { repository, queue, storage: privateStorage, sourceLoader, renderer, exportService, lifecycle, processor, worker, recoverQueuedJobs };
 }

@@ -104,6 +104,11 @@ export const shouldDiscardSupabaseSession = (error: unknown) =>
     || error.code === 'SESSION_EXPIRED'
   );
 
+export async function discardSupabaseSession(error: unknown) {
+  if (!shouldDiscardSupabaseSession(error)) return;
+  await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
+}
+
 export const authErrorMessage = (error: unknown): string => {
   if (!(error instanceof AuthApiError)) return 'Something went wrong. Please try again.';
   const messages: Record<AuthErrorCode, string> = {
