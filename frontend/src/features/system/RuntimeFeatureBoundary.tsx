@@ -12,6 +12,7 @@ interface RuntimeFeatureBoundaryProps {
   disabledTitle?: string;
   disabledDetail?: string;
   allowDegraded?: boolean;
+  inactiveFallback?: ReactNode;
 }
 
 export function RuntimeFeatureBoundary({
@@ -22,6 +23,7 @@ export function RuntimeFeatureBoundary({
   disabledTitle = blockedTitle,
   disabledDetail = blockedDetail,
   allowDegraded = false,
+  inactiveFallback,
 }: RuntimeFeatureBoundaryProps) {
   const runtime = useRuntimeCapabilities();
 
@@ -32,6 +34,14 @@ export function RuntimeFeatureBoundary({
   const capability = runtime.data?.features[feature];
   const status = capability?.status;
   if (status === 'available' || (allowDegraded && status === 'degraded')) return <>{children}</>;
+
+  // Some features have an honest, lower-capability workflow that remains
+  // useful while an external corpus or automation dependency is unavailable.
+  // Render it only for an authoritative disabled/blocked capability response;
+  // unresolved capability state still fails closed below.
+  if (inactiveFallback && (status === 'disabled' || status === 'blocked')) {
+    return <>{inactiveFallback}</>;
+  }
 
   if (status === 'disabled') {
     return <FeatureUnavailable title={disabledTitle} detail={disabledDetail} />;

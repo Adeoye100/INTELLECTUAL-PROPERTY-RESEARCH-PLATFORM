@@ -141,6 +141,7 @@ const router = createBrowserRouter([
                 blockedDetail="A genuine Office Action corpus must be loaded and verified before this research surface is enabled."
                 disabledTitle="Office Action research is disabled"
                 disabledDetail="Office Action search has not been enabled for this deployment."
+                inactiveFallback={<PreliminaryOfficeActionScreen />}
               >
                 <OfficeActionResearchScreen />
               </RuntimeFeatureBoundary>
