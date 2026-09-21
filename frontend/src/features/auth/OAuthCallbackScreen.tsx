@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { AlertTriangle } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { AuthApiError, authErrorMessage, toAuthApiError } from './authApi';
+import { AuthApiError, authErrorMessage, shouldDiscardSupabaseSession, toAuthApiError } from './authApi';
 import { authRedirectUrl, clearSensitiveAuthUrl, roleHomePath, safeAppRedirect } from './roleRouting';
 import { syncSupabaseSession } from './authStore';
 
@@ -92,7 +92,7 @@ export function OAuthCallbackScreen() {
     // `syncSupabaseSession` records a token-free diagnostic before this UI
     // receives a failure. Never render the original provider/API error.
     setError(authError);
-    if (authError.code === 'SESSION_EXPIRED') {
+    if (shouldDiscardSupabaseSession(authError)) {
       await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
     }
   }, []);
