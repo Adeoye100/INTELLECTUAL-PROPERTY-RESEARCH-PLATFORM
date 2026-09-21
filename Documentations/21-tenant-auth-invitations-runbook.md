@@ -36,7 +36,7 @@ Render/backend variables (backend-only unless labelled public):
 ```dotenv
 PUBLIC_FIRM_SIGNUP_ENABLED=false
 ORGANIZATION_INTENT_TTL_SECONDS=3600
-PUBLIC_APP_URL=https://intellectual-property-research-plat.vercel.app
+PUBLIC_APP_URL=https://fgiprp.com
 INVITATION_MAILER_PROVIDER=resend
 INVITATION_MAILER_API_KEY=...              # backend secret only
 INVITATION_MAILER_FROM=IPRP <no-reply@example.com>
@@ -55,9 +55,9 @@ The backend flag is authoritative. A frontend flag never grants firm creation.
 Supabase Auth must allow these exact redirect URLs (including configured preview/local URLs where appropriate):
 
 ```text
-https://intellectual-property-research-plat.vercel.app/auth/verify-email
-https://intellectual-property-research-plat.vercel.app/auth/callback
-https://intellectual-property-research-plat.vercel.app/auth/reset-password
+https://fgiprp.com/auth/verify-email
+https://fgiprp.com/auth/callback
+https://fgiprp.com/auth/reset-password
 ```
 
 ## Deployment and rollback
