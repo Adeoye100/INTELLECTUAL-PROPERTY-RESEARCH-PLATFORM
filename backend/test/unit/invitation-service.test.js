@@ -19,7 +19,7 @@ function pendingInvitation(overrides = {}) {
 
 function service({ invitation = pendingInvitation(), authoritative = { email: 'invitee@iprp.test', emailConfirmed: true } } = {}) {
   const calls = { issue: [], redeem: 0, invalidated: [] };
-  const mailer = new FakeInvitationMailer({ applicationUrl: 'https://intellectual-property-research-plat.vercel.app' });
+  const mailer = new FakeInvitationMailer({ applicationUrl: 'https://app.example.test' });
   const repository = {
     async withTransaction(work) { return work({}); },
     async issue(input) { calls.issue.push(input); return pendingInvitation({ role: input.role, email: input.email, intendedName: input.intendedName }); },
@@ -44,7 +44,7 @@ describe('InvitationService authenticated redemption', () => {
     }
     assert.deepEqual(fixture.calls.issue.map((entry) => entry.role), ['viewer', 'attorney', 'admin']);
     assert.equal(fixture.mailer.messages.length, 3);
-    assert.equal(fixture.mailer.messages[0].html.includes("https://intellectual-property-research-plat.vercel.app/auth/invite/"), true);
+    assert.equal(fixture.mailer.messages[0].html.includes("https://app.example.test/auth/invite/"), true);
     assert.equal(fixture.mailer.messages[0].html.includes('SUPABASE_SECRET_KEY'), false);
   });
 
