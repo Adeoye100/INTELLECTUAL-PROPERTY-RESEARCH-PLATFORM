@@ -11,7 +11,6 @@ const mapUser = (row) => ({
   firm: row.firm_name ? {
     id: row.firm_id,
     name: row.firm_name,
-    subscriptionTier: row.subscription_tier,
   } : undefined,
 });
 
@@ -97,7 +96,7 @@ export class UserRepository {
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [supabaseUserId]);
 
       const existingUser = await client.query(
-        `SELECT u.*, f.name AS firm_name, f.subscription_tier
+        `SELECT u.*, f.name AS firm_name
          FROM users u
          JOIN firms f ON f.id = u.firm_id
          WHERE u.supabase_user_id = $1 AND u.active = true`,
@@ -115,7 +114,7 @@ export class UserRepository {
            WHERE supabase_user_id IS NULL AND email = $2 AND active = true
            RETURNING *
          )
-         SELECT linked.*, f.name AS firm_name, f.subscription_tier
+         SELECT linked.*, f.name AS firm_name
          FROM linked
          JOIN firms f ON f.id = linked.firm_id`,
         [supabaseUserId, email],
@@ -128,16 +127,16 @@ export class UserRepository {
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [normalizedFirmName]);
 
       const firmResult = await client.query(
-        `SELECT id, name, subscription_tier FROM firms WHERE ${normalizedFirmSql} = $1`,
+        `SELECT id, name FROM firms WHERE ${normalizedFirmSql} = $1`,
         [normalizedFirmName],
       );
 
       if (firmResult.rowCount) throw invitationError('FIRM_NAME_EXISTS');
 
       const inserted = await client.query(
-        `INSERT INTO firms (name, subscription_tier)
-         VALUES ($1, 'free')
-         RETURNING id, name, subscription_tier`,
+        `INSERT INTO firms (name)
+         VALUES ($1)
+         RETURNING id, name`,
         [firmName],
       );
       const firm = inserted.rows[0];
@@ -153,7 +152,6 @@ export class UserRepository {
       return mapUser({
         ...userResult.rows[0],
         firm_name: firm.name,
-        subscription_tier: firm.subscription_tier,
       });
     } catch (error) {
       await client.query('ROLLBACK');
@@ -198,7 +196,7 @@ export class UserRepository {
     try {
       await client.query('BEGIN');
       const invitationResult = await client.query(
-        `SELECT i.*, f.name AS firm_name, f.subscription_tier
+        `SELECT i.*, f.name AS firm_name
          FROM firm_invitations i
          JOIN firms f ON f.id = i.firm_id
          WHERE i.id = $1
@@ -233,7 +231,6 @@ export class UserRepository {
       return mapUser({
         ...userResult.rows[0],
         firm_name: invitation.firm_name,
-        subscription_tier: invitation.subscription_tier,
       });
     } catch (error) {
       await client.query('ROLLBACK');
@@ -245,7 +242,7 @@ export class UserRepository {
 
   async findByEmail(email) {
     const result = await this.pool.query(
-      `SELECT u.*, f.name AS firm_name, f.subscription_tier
+      `SELECT u.*, f.name AS firm_name
        FROM users u
        JOIN firms f ON f.id = u.firm_id
        WHERE u.email = $1 AND u.active = true`,
@@ -256,7 +253,7 @@ export class UserRepository {
 
   async findById(id) {
     const result = await this.pool.query(
-      `SELECT u.*, f.name AS firm_name, f.subscription_tier
+      `SELECT u.*, f.name AS firm_name
        FROM users u
        JOIN firms f ON f.id = u.firm_id
        WHERE u.id = $1 AND u.active = true`,

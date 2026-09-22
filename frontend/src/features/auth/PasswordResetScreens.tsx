@@ -7,24 +7,31 @@ import * as z from 'zod';
 import { Button } from '../../components/Button';
 import { supabase } from '../../lib/supabase';
 import { AuthApiError, authErrorMessage, toAuthApiError } from './authApi';
-import { authRedirectUrl, clearSensitiveAuthUrl } from './roleRouting';
+import { authRedirectUrl, clearSensitiveAuthUrl, roleHomePath } from './roleRouting';
+import { redeemInvitationForSession } from './invitationRedemption';
+import { syncSupabaseSession } from './authStore';
 
 const emailSchema = z.object({ email: z.string().trim().email('Enter a valid email address.') });
 type EmailValues = z.infer<typeof emailSchema>;
 
 export function PasswordResetRequestScreen() {
+  const [searchParams] = useSearchParams();
+  const invitationToken = searchParams.get('invitation');
+  const invitedEmail = searchParams.get('email') ?? '';
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const statusRef = useRef<HTMLDivElement>(null);
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<EmailValues>({ resolver: zodResolver(emailSchema) });
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<EmailValues>({ resolver: zodResolver(emailSchema), defaultValues: { email: invitedEmail } });
 
   useEffect(() => { if (sentTo || submitError) statusRef.current?.focus(); }, [sentTo, submitError]);
 
   const submit = async ({ email }: EmailValues) => {
     setSubmitError(null);
     try {
+      const callback = new URL(authRedirectUrl('/auth/reset-password'));
+      if (invitationToken) callback.searchParams.set('invitation', invitationToken);
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: authRedirectUrl('/auth/reset-password'),
+        redirectTo: callback.toString(),
       });
       if (error) throw error;
       setSentTo(email);
@@ -69,6 +76,7 @@ export function PasswordUpdateScreen() {
   const { token } = useParams<{ token: string }>();
   const [searchParams] = useSearchParams();
   const recoveryCode = searchParams.get('code') ?? token;
+  const invitationToken = searchParams.get('invitation');
   const navigate = useNavigate();
   const [validating, setValidating] = useState(true);
   const [validationError, setValidationError] = useState<AuthApiError | null>(null);
@@ -125,6 +133,15 @@ export function PasswordUpdateScreen() {
     try {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
+      if (invitationToken) {
+        const { data, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (!data.session) throw new AuthApiError('SESSION_EXPIRED', 'No password-recovery session was found.');
+        await redeemInvitationForSession(data.session, invitationToken);
+        const user = await syncSupabaseSession(data.session);
+        navigate(roleHomePath(user.role), { replace: true });
+        return;
+      }
       const { error: signOutError } = await supabase.auth.signOut();
       if (signOutError) throw signOutError;
       navigate('/auth/login', { replace: true, state: { reason: 'password-updated' } });

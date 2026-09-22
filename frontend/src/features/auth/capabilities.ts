@@ -12,7 +12,6 @@ export type Capability =
   | "invitations:manage"
   | "firm:write"
   | "firm:read"
-  | "billing:manage"
   | "reports:export";
 
 const capabilities: Record<UserRole, ReadonlySet<Capability>> = {
@@ -28,7 +27,6 @@ const capabilities: Record<UserRole, ReadonlySet<Capability>> = {
     "invitations:manage",
     "firm:write",
     "firm:read",
-    "billing:manage",
     "reports:export",
   ]),
   attorney: new Set([
@@ -77,7 +75,6 @@ const functionalNavigation: readonly NavigationItem[] = [
   { to: "/watches", label: "Watches", capability: "watches:view" },
   { to: "/reports", label: "Reports", capability: "reports:export" },
   { to: "/admin/users", label: "Users & Invitations", capability: "members:manage" },
-  { to: "/admin/billing", label: "Billing", capability: "billing:manage" },
 ];
 
 export function navigationForRole(role: UserRole | null | undefined) {

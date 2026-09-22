@@ -40,7 +40,6 @@ describe('runtime capability provider', () => {
       officeActionSearchService: { searchOfficeActions() {} },
       watchService: {},
       exportService: {},
-      billingService: null,
       userRoleService: {},
     });
 
@@ -55,7 +54,7 @@ describe('runtime capability provider', () => {
     assert.equal(capabilities.features.watches.automationStatus, 'disabled');
     assert.equal(capabilities.features.officeActions.status, 'blocked');
     assert.equal(capabilities.features.reports.status, 'blocked');
-    assert.equal(capabilities.features.billing.status, 'disabled');
+    assert.equal('billing' in capabilities.features, false);
   });
 
   it('reports mounted standard services as available only when their activation evidence is explicit', async () => {
@@ -71,7 +70,6 @@ describe('runtime capability provider', () => {
       officeActionSearchService: { searchOfficeActions() {} },
       watchService: {},
       exportService: {},
-      billingService: {},
       userRoleService: {},
     });
 
@@ -82,6 +80,6 @@ describe('runtime capability provider', () => {
     assert.equal(capabilities.features.watches.writeStatus, 'available');
     assert.equal(capabilities.features.watches.automationStatus, 'available');
     assert.equal(capabilities.features.reports.status, 'available');
-    assert.equal(capabilities.features.billing.status, 'available');
+    assert.equal('billing' in capabilities.features, false);
   });
 });

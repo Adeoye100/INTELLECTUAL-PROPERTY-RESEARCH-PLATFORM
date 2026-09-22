@@ -27,7 +27,7 @@ describe('EmailVerificationScreen', () => {
     vi.stubGlobal('fetch', vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({
         user: { id: 'local-user', firmId: 'firm-1', email: 'confirmed@example.test', role: 'admin' },
-        firm: { id: 'firm-1', name: 'Forge Legal', subscriptionTier: 'free' },
+        firm: { id: 'firm-1', name: 'Forge Legal' },
       }), { status: 201, headers: { 'Content-Type': 'application/json' } }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         userId: 'u1', email: 'confirmed@example.test', role: 'admin', firmId: 'firm-1',

@@ -370,7 +370,7 @@ export const handlers = [
     await delay(400);
     return HttpResponse.json({
       user: { id: 'mock-user', firmId: 'mock-firm', email: 'mock@example.test', role: 'admin' },
-      firm: { id: 'mock-firm', name: 'Mock Firm', subscriptionTier: 'free' },
+      firm: { id: 'mock-firm', name: 'Mock Firm' },
       mocked: true,
     }, { status: 201 });
   }),

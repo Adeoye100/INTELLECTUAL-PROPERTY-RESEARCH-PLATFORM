@@ -18,7 +18,6 @@ import { createAuditRequestContextMiddleware } from './audit/request-context.js'
 import { createExportRouter } from './routes/export-routes.js';
 import { createHealthRouter } from './routes/health-routes.js';
 import { createDashboardRouter } from './routes/dashboard-routes.js';
-import { createBillingRouter } from './routes/billing-routes.js';
 import { createRuntimeCapabilityProvider } from './runtime-capability-provider.js';
 import {
   createRequestBoundsMiddleware,
@@ -45,7 +44,6 @@ export function createApp({
   includeDiagnosticRoutes = false,
   readinessChecks = [],
   dashboardAnalyticsService = null,
-  billingService = null,
   matterService = null,
   capabilityProvider = null,
 }) {
@@ -62,17 +60,8 @@ export function createApp({
   app.use(rejectUnsupportedRequestContent());
   app.use(express.json({
     limit: MAX_JSON_BODY_BYTES,
-    verify: (request, _response, buffer) => {
-      if (request.originalUrl?.split('?', 1)[0] === '/api/v1/billing/webhook') {
-        request.rawBody = Buffer.from(buffer);
-      }
-    },
   }));
   app.use(createHealthRouter({ readinessChecks }));
-
-  // Keep the billing management surface present even when Paystack is fail-closed.
-  // The router returns a controlled disabled state instead of a misleading 404.
-  app.use('/api/v1', createBillingRouter(authenticate, billingService));
 
   app.use('/api/v1/auth', createAuthRouter(invitationService, authenticateIdentity, { authRateLimiter }));
   app.use(
@@ -88,7 +77,6 @@ export function createApp({
     officeActionSearchService,
     watchService,
     exportService,
-    billingService,
     userRoleService,
   });
   app.use('/api/v1', createProtectedRouter(authenticate, {

@@ -19,7 +19,7 @@ function LoginDestination() {
   return <p>Login destination: {(location.state as { reason?: string } | null)?.reason}</p>;
 }
 
-const renderResetRequest = () => render(<MemoryRouter><PasswordResetRequestScreen /></MemoryRouter>);
+const renderResetRequest = (entry = '/auth/forgot-password') => render(<MemoryRouter initialEntries={[entry]}><PasswordResetRequestScreen /></MemoryRouter>);
 const renderPasswordUpdate = (entry = '/auth/reset-password?code=valid-code') => render(
   <MemoryRouter initialEntries={[entry]}>
     <Routes>
@@ -65,6 +65,18 @@ describe('PasswordResetScreens', () => {
     expect(await screen.findByText('Login destination: password-updated')).toBeVisible();
     expect(auth.exchangeCodeForSession).toHaveBeenCalledWith('valid-code');
     expect(auth.updateUser).toHaveBeenCalledWith({ password: 'updated-password' });
+  });
+
+  it('preserves an invitation through password recovery and redeems it after the update', async () => {
+    auth.resetPasswordForEmail.mockResolvedValue({ data: {}, error: null });
+    const user = userEvent.setup();
+    renderResetRequest('/auth/forgot-password?email=invitee%40example.test&invitation=invite-token');
+
+    expect(screen.getByRole('textbox', { name: 'Email address' })).toHaveValue('invitee@example.test');
+    await user.click(screen.getByRole('button', { name: 'Send reset link' }));
+    expect(auth.resetPasswordForEmail).toHaveBeenCalledWith('invitee@example.test', {
+      redirectTo: expect.stringMatching(/\/auth\/reset-password\?invitation=invite-token$/),
+    });
   });
 
   it('reports password validation failures accessibly without updating', async () => {
