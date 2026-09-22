@@ -108,4 +108,22 @@ describe('InviteAcceptanceScreen', () => {
     expect(String(fetchMock.mock.calls[1][0])).toContain('/auth/invitations/viewer-invite/redeem');
     expect(new Headers(fetchMock.mock.calls[1][1]?.headers).get('Authorization')).toBe('Bearer supabase-access-token');
   }, 20_000);
+
+  it('offers password recovery that preserves the invitation when the account already exists', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      email: 'existing@example.test', firmName: 'Forge Legal Partners', role: 'viewer', expiresAt: '2026-12-31T23:59:59.000Z',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+    auth.signUp.mockResolvedValue({ data: { user: { identities: [] }, session: null }, error: null });
+    const user = userEvent.setup();
+    renderInvitation('existing-invite');
+
+    await user.type(await screen.findByRole('textbox', { name: 'Full name' }), 'Existing User');
+    await user.type(screen.getByLabelText('Create password'), 'new-password');
+    await user.type(screen.getByLabelText('Confirm password'), 'new-password');
+    await user.click(screen.getByRole('button', { name: 'Create account and accept invitation' }));
+
+    expect(await screen.findByRole('link', { name: 'Set or reset password' })).toHaveAttribute(
+      'href', '/auth/forgot-password?email=existing%40example.test&invitation=existing-invite',
+    );
+  });
 });
