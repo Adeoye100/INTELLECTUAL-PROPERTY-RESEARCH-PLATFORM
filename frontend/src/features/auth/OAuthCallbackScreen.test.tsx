@@ -119,7 +119,7 @@ describe('OAuthCallbackScreen', () => {
     expect(getLastAuthSynchronizationDiagnostic()).toEqual(expect.objectContaining({
       stage: 'resolve-current-user', status: 404, responseCode: 'NOT_FOUND', requestOrigin: expect.any(String),
     }));
-    expect(auth.signOut).not.toHaveBeenCalled();
+    expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
   });
 
   it('reports a missing role or firm without rendering server details', async () => {
@@ -138,6 +138,7 @@ describe('OAuthCallbackScreen', () => {
     expect(getLastAuthSynchronizationDiagnostic()).toEqual({
       stage: 'role-routing', responseCode: 'FIRM_MEMBERSHIP_MISSING',
     });
+    await waitFor(() => expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' }));
   });
 
   it('deduplicates a PKCE exchange across Strict Mode callback execution', async () => {
@@ -185,6 +186,27 @@ describe('OAuthCallbackScreen', () => {
 
     expect(await screen.findByRole('heading', { name: 'Admin users destination' })).toBeVisible();
     expect(auth.getSession).toHaveBeenCalledOnce();
+  });
+
+  it('recovers a direct flow_state_already_used callback when a session was already established', async () => {
+    auth.getSession.mockResolvedValue({
+      data: { session: {
+        access_token: 'oauth-token', user: { id: 'u1', email: 'admin@example.test', user_metadata: {} },
+      } }, error: null,
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      userId: 'u1', email: 'admin@example.test', role: 'admin', firmId: 'firm-1',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+
+    render(
+      <MemoryRouter initialEntries={['/auth/callback?error=invalid_request&error_code=flow_state_already_used&error_description=State+has+already+been+used']}>
+        <Routes><Route path="/auth/callback" element={<OAuthCallbackScreen />} /><Route path="/admin/users" element={<h1>Admin users destination</h1>} /></Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Admin users destination' })).toBeVisible();
+    expect(auth.getSession).toHaveBeenCalledOnce();
+    expect(auth.exchangeCodeForSession).not.toHaveBeenCalled();
   });
 
   it('starts a fresh OAuth flow from Try again instead of reusing the callback code', async () => {

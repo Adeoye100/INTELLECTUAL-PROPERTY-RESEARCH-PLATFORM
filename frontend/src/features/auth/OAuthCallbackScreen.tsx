@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { AlertTriangle } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { AuthApiError, authErrorMessage, toAuthApiError } from './authApi';
+import { AuthApiError, authErrorMessage, discardSupabaseSession, toAuthApiError } from './authApi';
 import { authRedirectUrl, clearSensitiveAuthUrl, roleHomePath, safeAppRedirect } from './roleRouting';
 import { syncSupabaseSession } from './authStore';
 
@@ -50,17 +50,28 @@ export function OAuthCallbackScreen() {
   const exchangeStarted = useRef(false);
 
   const completeSignIn = useCallback(async () => {
-    if (searchParams.get('error_description')) {
-      throw new Error('Authentication provider rejected the sign-in request.');
-    }
-
+    const providerErrorCode = searchParams.get('error_code');
+    const providerErrorDescription = searchParams.get('error_description');
     const code = searchParams.get('code');
     const requestedDestination = searchParams.get('next');
-    let session: Session | null;
+    let session: Session | null = null;
 
-    if (code) {
+    if (providerErrorDescription) {
+      if (consumedCodeError({ code: providerErrorCode ?? undefined, message: providerErrorDescription })) {
+        const existing = await supabase.auth.getSession();
+        if (existing.error) throw existing.error;
+        session = existing.data.session;
+        if (!session) {
+          throw new Error('Authentication state expired. Start a new sign-in attempt.');
+        }
+      } else {
+        throw new Error('Authentication provider rejected the sign-in request.');
+      }
+    }
+
+    if (!session && code) {
       session = await exchangeCodeOnce(code);
-    } else {
+    } else if (!session) {
       const result = await supabase.auth.getSession();
       if (result.error) throw result.error;
       session = result.data.session;
@@ -81,9 +92,7 @@ export function OAuthCallbackScreen() {
     // `syncSupabaseSession` records a token-free diagnostic before this UI
     // receives a failure. Never render the original provider/API error.
     setError(authError);
-    if (authError.code === 'SESSION_EXPIRED') {
-      await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
-    }
+    await discardSupabaseSession(authError);
   }, []);
 
   const retry = useCallback(async () => {

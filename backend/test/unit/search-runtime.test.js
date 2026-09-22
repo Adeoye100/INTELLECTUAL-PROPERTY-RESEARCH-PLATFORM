@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { RiskEnrichedSearchService } from '../../src/risk/risk-enriched-search-service.js';
 import { createSearchRuntime } from '../../src/search/search-runtime.js';
+import { TrademarkSearchService } from '../../src/search/trademark-search-service.js';
 
 const enabledConfig = {
   searchEnabled: true,
@@ -20,8 +20,8 @@ describe('search runtime', () => {
     });
 
     assert.equal(calls, 0);
-    assert.ok(searchService instanceof RiskEnrichedSearchService);
-    assert.strictEqual(searchService.searchService, federatedSearchService);
+    assert.ok(searchService instanceof TrademarkSearchService);
+    assert.strictEqual(searchService.federatedSearchService, federatedSearchService);
     assert.equal(federatedSearchService.sources.length, 2);
     assert.deepEqual(searchSources.map((source) => ({
       sourceName: source.sourceName,

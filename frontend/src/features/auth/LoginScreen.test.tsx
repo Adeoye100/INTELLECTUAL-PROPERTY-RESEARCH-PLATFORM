@@ -8,6 +8,7 @@ import { LoginScreen } from './LoginScreen';
 const auth = vi.hoisted(() => ({
   signInWithOAuth: vi.fn(),
   signInWithPassword: vi.fn(),
+  signOut: vi.fn(),
 }));
 
 vi.mock('../../lib/supabase', () => ({ supabase: { auth } }));
@@ -54,6 +55,23 @@ describe('LoginScreen', () => {
     expect(await screen.findByRole('heading', { name: 'Attorney portfolio' })).toBeVisible();
     expect(auth.signInWithPassword).toHaveBeenCalledWith({ email: 'attorney@example.test', password: 'safe-password' });
   }, 20_000);
+
+  it('locally signs out an authenticated identity that has no firm membership', async () => {
+    auth.signInWithPassword.mockResolvedValue({ data: { session, user: session.user }, error: null });
+    auth.signOut.mockResolvedValue({ error: null });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      userId: 'u1', email: 'attorney@example.test', role: null, firmId: null,
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+    const user = userEvent.setup();
+    render(<MemoryRouter initialEntries={['/auth/login']}><LoginScreen /></MemoryRouter>);
+
+    await user.type(screen.getByRole('textbox', { name: 'Email address' }), 'attorney@example.test');
+    await user.type(screen.getByLabelText('Password'), 'safe-password');
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    expect(await screen.findByText(/does not have an application role and firm membership/i)).toBeVisible();
+    expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
+  });
 
   it('starts Google OAuth with the callback route', async () => {
     auth.signInWithOAuth.mockResolvedValue({ data: { provider: 'google', url: 'https://provider.test' }, error: null });

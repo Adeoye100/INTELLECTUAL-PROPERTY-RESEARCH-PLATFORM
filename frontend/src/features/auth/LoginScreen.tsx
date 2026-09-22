@@ -6,7 +6,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/Button';
 import { HourglassLoader } from '../../components/HourglassLoader';
 import { supabase } from '../../lib/supabase';
-import { AuthApiError, authErrorMessage, toAuthApiError } from './authApi';
+import { AuthApiError, authErrorMessage, discardSupabaseSession, toAuthApiError } from './authApi';
 import { authRedirectUrl, roleHomePath, safeAppRedirect } from './roleRouting';
 import { syncSupabaseSession } from './authStore';
 
@@ -64,6 +64,7 @@ export const LoginScreen: React.FC = () => {
       navigate(destination, { replace: true });
     } catch (error) {
       const authError = toAuthApiError(error);
+      await discardSupabaseSession(authError);
       setSubmitError(authErrorMessage(authError));
       setErrorCode(authError.code);
     }
