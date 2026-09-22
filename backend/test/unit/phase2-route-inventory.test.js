@@ -135,6 +135,20 @@ function authenticated(testRequest, token = 'admin-token') {
 }
 
 describe('Phase 2 mounted route inventory', () => {
+  it('keeps every retired financial endpoint outside the application route surface', async () => {
+    const app = createTestApp();
+    for (const [method, path] of [
+      ['get', '/api/v1/billing'],
+      ['post', '/api/v1/billing/checkout'],
+      ['post', '/api/v1/billing/verify'],
+      ['post', '/api/v1/billing/webhook'],
+    ]) {
+      const response = await request(app)[method](path).set('Authorization', 'Bearer admin-token').send({});
+      assert.equal(response.status, 404, `${method.toUpperCase()} ${path} must remain unmounted`);
+      assert.equal(response.body.code, 'NOT_FOUND');
+    }
+  });
+
   it('serves every required non-deferred Phase 2 method before the terminal 404 handler when search is enabled', async () => {
     const app = createTestApp();
     const routes = [

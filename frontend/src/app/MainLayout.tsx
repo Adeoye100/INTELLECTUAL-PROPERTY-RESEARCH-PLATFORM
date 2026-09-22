@@ -6,7 +6,6 @@ import {
   LogOut,
   Users,
   BriefcaseBusiness,
-  CreditCard,
   Search as SearchIcon,
   FileText,
   Eye,
@@ -42,8 +41,6 @@ function getNavIcon(path: string) {
       return <Eye size={20} />;
     case '/reports':
       return <BarChart3 size={20} />;
-    case '/admin/billing':
-      return <CreditCard size={20} />;
     default:
       return <Users size={20} />;
   }
@@ -176,7 +173,7 @@ export const MainLayout: React.FC = () => {
             <div className="flex items-start gap-2 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm md:px-6 xl:px-8" role="status">
               <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
               <p>
-                <strong>Research demo mode:</strong> Search and read-only research remain available. Changes to portfolio, watches, invitations, reports and billing are paused until the production database is writable.
+                <strong>Research demo mode:</strong> Search and read-only research remain available. Changes to portfolio, watches, invitations and reports are paused until the production database is writable.
               </p>
             </div>
           )}

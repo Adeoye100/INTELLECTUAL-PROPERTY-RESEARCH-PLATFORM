@@ -175,38 +175,6 @@ function strictBoolean(env, name, fallback) {
   return value === 'true';
 }
 
-function loadPaystackConfig(env, environment, publicApplicationUrl) {
-  const paystackEnabled = strictBoolean(env, 'PAYSTACK_ENABLED', false);
-  if (!paystackEnabled) return { paystackEnabled: false, paystackPlans: {} };
-  const paystackMode = required(env, 'PAYSTACK_MODE');
-  if (!['test', 'live'].includes(paystackMode)) throw new Error('PAYSTACK_MODE must be test or live.');
-  const paystackSecretKey = required(env, 'PAYSTACK_SECRET_KEY');
-  if (!paystackSecretKey.startsWith(`sk_${paystackMode}_`)) {
-    throw new Error('PAYSTACK_SECRET_KEY must match PAYSTACK_MODE and remain server-side.');
-  }
-  if (environment === 'production' && paystackMode !== 'live') {
-    throw new Error('PAYSTACK_MODE must be live in production.');
-  }
-  const plan = (tier, prefix) => {
-    const planCode = required(env, `PAYSTACK_${prefix}_PLAN_CODE`);
-    if (!/^PLN_[A-Za-z0-9]+$/.test(planCode)) throw new Error(`PAYSTACK_${prefix}_PLAN_CODE is invalid.`);
-    const amountSubunit = boundedPositiveInteger(env, `PAYSTACK_${prefix}_AMOUNT_SUBUNIT`, 0, 1, 1_000_000_000);
-    const currency = required(env, `PAYSTACK_${prefix}_CURRENCY`).toUpperCase();
-    if (!/^[A-Z]{3}$/.test(currency)) throw new Error(`PAYSTACK_${prefix}_CURRENCY must be a three-letter currency code.`);
-    return Object.freeze({ tier, planCode, amountSubunit, currency });
-  };
-  return {
-    paystackEnabled: true,
-    paystackMode,
-    paystackSecretKey,
-    paystackCallbackUrl: `${publicApplicationUrl}/admin/billing`,
-    paystackPlans: Object.freeze({
-      starter: plan('starter', 'STARTER'),
-      professional: plan('professional', 'PROFESSIONAL'),
-    }),
-  };
-}
-
 /** Worker entrypoints read this narrow gate before constructing their complete
  * runtime. A disabled worker must not require database, Redis, Auth, search,
  * or storage credentials simply to report that it is disabled. */
@@ -527,7 +495,6 @@ export function loadConfig(env = process.env) {
   const database = databaseConfig(env, environment);
   const httpServer = loadHttpServerConfig(env);
   const configuredRedisUrl = redisUrl(env, environment);
-  const paystackConfig = loadPaystackConfig(env, environment, invitationConfig.publicApplicationUrl);
   if (environment === 'production') {
     rejectProductionPlaceholder(jwtAccessSecret, 'JWT_ACCESS_SECRET', environment);
     rejectProductionPlaceholder(supabaseConfig.supabaseSecretKey, 'SUPABASE_SECRET_KEY', environment);
@@ -552,7 +519,6 @@ export function loadConfig(env = process.env) {
     ...pdfExportConfig,
     ...watchConfig,
     ...authRateLimitConfig,
-    ...paystackConfig,
   };
 }
 

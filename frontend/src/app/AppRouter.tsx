@@ -9,8 +9,6 @@ import { AdminUsersScreen } from '../features/admin/AdminUsersScreen';
 import { RuntimeFeatureBoundary } from '../features/system/RuntimeFeatureBoundary';
 import { features } from '../config/features';
 
-const BillingScreen = lazy(() => import('../features/billing/AdminScreen').then(({ AdminScreen }) => ({ default: AdminScreen })));
-
 type RouteModule = Record<string, ComponentType>;
 
 function lazyComponent(loader: () => Promise<RouteModule>, exportName: string) {
@@ -192,24 +190,6 @@ const router = createBrowserRouter([
       { path: 'permission-denied', lazy: lazyComponent(() => import('../features/auth/PermissionDeniedScreen'), 'PermissionDeniedScreen') },
       { path: 'admin', element: <RequireAdmin><Navigate to="/admin/users" replace /></RequireAdmin> },
       { path: 'admin/users', element: <RequireAdmin><AdminUsersScreen /></RequireAdmin> },
-      {
-        path: 'admin/billing',
-        element: (
-          <RequireAdmin>
-            <Suspense fallback={<RouteLoading />}>
-              <RuntimeFeatureBoundary
-                feature="billing"
-                blockedTitle="Billing is unavailable"
-                blockedDetail="Billing is not active for this deployment."
-                disabledTitle="Billing is disabled"
-                disabledDetail="Paystack billing has not been activated."
-              >
-                <BillingScreen />
-              </RuntimeFeatureBoundary>
-            </Suspense>
-          </RequireAdmin>
-        ),
-      },
     ],
   },
 ]);

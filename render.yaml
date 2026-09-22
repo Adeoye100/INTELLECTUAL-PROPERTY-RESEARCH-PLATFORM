@@ -162,26 +162,6 @@ services:
       - key: PDF_EXPORT_QUEUE_KEY
         value: queue:pdf_export
 
-      # Billing remains intentionally unchanged for this release.
-      - key: PAYSTACK_ENABLED
-        value: "false"
-      - key: PAYSTACK_MODE
-        value: live
-      - key: PAYSTACK_SECRET_KEY
-        sync: false
-      - key: PAYSTACK_STARTER_PLAN_CODE
-        sync: false
-      - key: PAYSTACK_STARTER_AMOUNT_SUBUNIT
-        sync: false
-      - key: PAYSTACK_STARTER_CURRENCY
-        value: NGN
-      - key: PAYSTACK_PROFESSIONAL_PLAN_CODE
-        sync: false
-      - key: PAYSTACK_PROFESSIONAL_AMOUNT_SUBUNIT
-        sync: false
-      - key: PAYSTACK_PROFESSIONAL_CURRENCY
-        value: NGN
-
   # Shared private queue/cache. This declaration binds the existing Frankfurt
   # Render Key Value instance into the Blueprint so fromService REDIS_URL
   # references resolve deterministically.

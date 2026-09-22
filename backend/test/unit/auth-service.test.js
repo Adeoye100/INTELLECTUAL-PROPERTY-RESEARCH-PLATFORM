@@ -19,7 +19,7 @@ function createService(overrides = {}) {
       async acceptInvitation(input) {
         return {
           id: 'user-1', firmId: input.firmId, email: input.email, role: input.role,
-          firm: { id: input.firmId, name: invitation.firmName, subscriptionTier: 'free' },
+          firm: { id: input.firmId, name: invitation.firmName },
         };
       },
     },
@@ -49,7 +49,7 @@ describe('AuthService invitation provisioning', () => {
           persisted = input;
           return {
             id: 'user-1', firmId: input.firmId, email: input.email, role: input.role,
-            firm: { id: input.firmId, name: invitation.firmName, subscriptionTier: 'free' },
+            firm: { id: input.firmId, name: invitation.firmName },
           };
         },
       },

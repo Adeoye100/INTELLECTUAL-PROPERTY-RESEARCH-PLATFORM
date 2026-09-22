@@ -25,7 +25,7 @@ describe('firm provisioning route', () => {
         call = { auth, body };
         return {
           user: { id: 'local-user', firmId: 'firm-1', email: auth.email, role: 'admin' },
-          firm: { id: 'firm-1', name: body.intentToken, subscriptionTier: 'free' },
+          firm: { id: 'firm-1', name: body.intentToken },
         };
       },
     }));

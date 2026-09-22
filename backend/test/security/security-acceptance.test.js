@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { randomUUID, createHmac } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { after, before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import request from 'supertest';
@@ -30,8 +30,6 @@ const attorneyA_Email = `attorney-a-${suffix}@security.test`;
 const viewerA_Email = `viewer-a-${suffix}@security.test`;
 const adminB_Email = `admin-b-${suffix}@security.test`;
 
-const paystackSecretKey = 'sk_test_integration_secret_key_at_least_32_bytes';
-
 let system;
 let firmAId;
 let firmBId;
@@ -58,16 +56,6 @@ const config = loadConfig({
   SEARCH_ENABLED: 'true',
   WATCH_ENABLED: 'true',
   PDF_EXPORT_ENABLED: 'true',
-  PAYSTACK_ENABLED: 'true',
-  PAYSTACK_MODE: 'test',
-  PAYSTACK_SECRET_KEY: paystackSecretKey,
-  PAYSTACK_WEBHOOK_SECRET: paystackSecretKey,
-  PAYSTACK_STARTER_PLAN_CODE: 'PLN_starter1',
-  PAYSTACK_STARTER_AMOUNT_SUBUNIT: '250000',
-  PAYSTACK_STARTER_CURRENCY: 'NGN',
-  PAYSTACK_PROFESSIONAL_PLAN_CODE: 'PLN_professional1',
-  PAYSTACK_PROFESSIONAL_AMOUNT_SUBUNIT: '750000',
-  PAYSTACK_PROFESSIONAL_CURRENCY: 'NGN',
   PDF_EXPORT_STORAGE_PROVIDER: 'database',
   PDF_EXPORT_QUEUE_KEY: `queue:p5_sec_pdf_${suffix.slice(0, 8)}`,
   WATCH_QUEUE_KEY: `queue:p5_sec_watch_${suffix.slice(0, 8)}`,
@@ -456,58 +444,6 @@ describe('P5-04 / P5-05 — Injection & Input Sanitization Acceptance', () => {
       .set('Authorization', 'Bearer token-admin-a');
     assert.equal(listRes.status, 200);
     assert.ok(Array.isArray(listRes.body.items));
-  });
-});
-
-describe('P5-06 — Payment Modification & Webhook Signature Acceptance', () => {
-  it('rejects unauthenticated or forged Paystack webhooks with invalid signatures', async () => {
-    const webhookPayload = JSON.stringify({
-      event: 'charge.success',
-      data: {
-        reference: `PAY-${suffix.slice(0, 8)}`,
-        status: 'success',
-        amount: 29900,
-        currency: 'USD',
-        metadata: { firmId: firmAId },
-      },
-    });
-
-    const invalidRes = await request(system.app)
-      .post('/api/v1/billing/webhook')
-      .set('x-paystack-signature', 'forged-invalid-signature-hash')
-      .set('Content-Type', 'application/json')
-      .send(webhookPayload);
-    assert.equal(invalidRes.status, 401);
-  });
-
-  it('accepts and idempotently processes valid signed Paystack webhooks', async () => {
-    const payloadObject = {
-      event: 'charge.success',
-      data: {
-        reference: `PAY-VALID-${suffix.slice(0, 8)}`,
-        status: 'success',
-        amount: 29900,
-        currency: 'USD',
-        metadata: { firmId: firmAId, planId: 'growth' },
-      },
-    };
-    const webhookPayload = JSON.stringify(payloadObject);
-    const validSignature = createHmac('sha512', paystackSecretKey).update(webhookPayload).digest('hex');
-
-    const validRes = await request(system.app)
-      .post('/api/v1/billing/webhook')
-      .set('x-paystack-signature', validSignature)
-      .set('Content-Type', 'application/json')
-      .send(webhookPayload);
-    assert.equal(validRes.status, 200);
-
-    // Replaying identical webhook returns 200 OK idempotently
-    const replayRes = await request(system.app)
-      .post('/api/v1/billing/webhook')
-      .set('x-paystack-signature', validSignature)
-      .set('Content-Type', 'application/json')
-      .send(webhookPayload);
-    assert.equal(replayRes.status, 200);
   });
 });
 

@@ -22,7 +22,6 @@ describe('capabilities and navigation', () => {
       '/watches',
       '/reports',
       '/admin/users',
-      '/admin/billing',
     ]);
 
     expect(navigationForRole('attorney').map((n) => n.to)).toEqual([

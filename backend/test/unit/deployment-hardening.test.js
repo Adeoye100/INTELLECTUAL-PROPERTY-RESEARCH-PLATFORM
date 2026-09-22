@@ -31,8 +31,21 @@ describe('ongoing Supabase Data API boundary', () => {
   });
 });
 
+describe('retired financial data boundary', () => {
+  it('drops provider tables and firm subscription state in the forward-only cleanup migration', async () => {
+    const migration = await readFile(new URL('../../migrations/031_remove_billing_and_payment_data.sql', import.meta.url), 'utf8');
+    assert.match(migration, /DROP TABLE IF EXISTS billing_webhook_events/);
+    assert.match(migration, /DROP TABLE IF EXISTS billing_transactions/);
+    for (const column of [
+      'subscription_tier', 'subscription_status', 'subscription_provider',
+      'subscription_code', 'subscription_customer_code', 'subscription_renews_at',
+    ]) assert.match(migration, new RegExp(`DROP COLUMN IF EXISTS ${column}`));
+    assert.match(migration, /DELETE FROM audit_logs/);
+  });
+});
+
 describe('Render blueprint configuration contracts', () => {
-  it('activates database-backed research, in-process Watch automation, and server reports while upstream refresh and billing stay fail-closed', async () => {
+  it('activates database-backed research, in-process Watch automation, and server reports', async () => {
     const renderYaml = await readFile(new URL('../../../render.yaml', import.meta.url), 'utf8');
     const apiBlock = renderYaml.split('- type: web')[1]?.split('- type:')[0] || '';
 
@@ -62,7 +75,6 @@ describe('Render blueprint configuration contracts', () => {
       'WATCH_IN_PROCESS_ENABLED',
       'PDF_EXPORT_ENABLED',
       'PDF_EXPORT_IN_PROCESS_ENABLED',
-      'PAYSTACK_ENABLED',
     ];
 
     for (const key of requiredKeys) {
@@ -88,7 +100,7 @@ describe('Render blueprint configuration contracts', () => {
 
     assert.ok(apiBlock.includes('key: WATCH_ENABLED\n        value: "true"'));
     assert.ok(apiBlock.includes('key: WATCH_IN_PROCESS_ENABLED\n        value: "true"'));
-    assert.ok(apiBlock.includes('key: PAYSTACK_ENABLED\n        value: "false"'));
+    assert.equal(/PAYSTACK_|BILLING_/i.test(apiBlock), false);
     assert.ok(apiBlock.includes(
       'key: REDIS_URL\n        fromService:\n          name: iprp-redis\n          type: keyvalue\n          property: connectionString',
     ));

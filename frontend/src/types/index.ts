@@ -13,7 +13,6 @@ export type WatchAlertMode = 'real-time' | 'digest';
 export interface Firm {
   id: string;
   name: string;
-  subscriptionTier: string;
   createdAt: string;
 }
 
@@ -320,15 +319,6 @@ export interface OfficeActionSearchResponse {
   sourceStatuses: SourceStatusEntry[];
   partial?: boolean;
   requestId?: string;
-}
-
-export interface Subscription {
-  id: string;
-  firmId: string;
-  seatsLicensed: number;
-  billingProvider: string;
-  status: string;
-  renewalDate: string;
 }
 
 export interface AuditLog {

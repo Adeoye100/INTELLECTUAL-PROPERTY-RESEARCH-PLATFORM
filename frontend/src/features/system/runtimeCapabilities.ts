@@ -29,7 +29,6 @@ export interface RuntimeCapabilities {
     watches: { status: RuntimeFeatureStatus; writeStatus: RuntimeWriteStatus; automationStatus: RuntimeFeatureStatus };
     reports: { status: RuntimeFeatureStatus };
     usersInvitations: { status: RuntimeFeatureStatus; writeStatus: RuntimeWriteStatus };
-    billing: { status: RuntimeFeatureStatus };
   };
 }
 

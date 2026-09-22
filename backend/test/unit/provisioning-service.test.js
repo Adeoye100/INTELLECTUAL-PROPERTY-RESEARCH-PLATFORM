@@ -17,7 +17,7 @@ describe('ProvisioningService', () => {
       organizationProvisioningRepository: {
         async createFirmFromIntent(input) {
           persisted = input;
-          return { id: 'local-user', firmId: 'firm-1', email: input.email, role: 'admin', firm: { id: 'firm-1', name: 'Forge Legal', subscriptionTier: 'free' } };
+          return { id: 'local-user', firmId: 'firm-1', email: input.email, role: 'admin', firm: { id: 'firm-1', name: 'Forge Legal' } };
         },
       },
       roleFirmResolver: { async invalidate(userId) { invalidated = userId; } },

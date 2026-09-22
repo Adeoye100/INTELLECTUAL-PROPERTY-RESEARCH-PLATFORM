@@ -88,7 +88,7 @@ describe('SignupScreen', () => {
       .mockResolvedValueOnce(jsonResponse({ intentToken: 'intent-token', expiresAt: '2026-12-31T23:59:59.000Z' }))
       .mockResolvedValueOnce(jsonResponse({
         user: { id: 'local-user', firmId: 'firm-1', email: 'ada@example.test', role: 'admin' },
-        firm: { id: 'firm-1', name: 'Forge Legal', subscriptionTier: 'free' },
+        firm: { id: 'firm-1', name: 'Forge Legal' },
       }, 201))
       .mockResolvedValueOnce(jsonResponse({
         userId: '11111111-1111-4111-8111-111111111111', email: 'ada@example.test', role: 'admin', firmId: 'firm-1',

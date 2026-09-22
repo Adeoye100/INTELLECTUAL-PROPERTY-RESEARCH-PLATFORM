@@ -32,7 +32,6 @@ export function createRuntimeCapabilityProvider({
   officeActionSearchService = null,
   watchService = null,
   exportService = null,
-  billingService = null,
   userRoleService = null,
 } = {}) {
   return async function runtimeCapabilities() {
@@ -89,9 +88,6 @@ export function createRuntimeCapabilityProvider({
         usersInvitations: {
           status: userRoleService ? 'available' : 'disabled',
           writeStatus: userRoleService ? writeStatus : 'disabled',
-        },
-        billing: {
-          status: !billingService ? 'disabled' : readOnly ? 'blocked' : 'available',
         },
       },
     };
