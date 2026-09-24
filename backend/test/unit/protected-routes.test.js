@@ -56,6 +56,25 @@ describe('protected routes', () => {
     });
   });
 
+  it('returns the same identity from the browser-safe GET /session-context alias', async () => {
+    const response = await request(testApp())
+      .get('/api/v1/session-context')
+      .set('Authorization', 'Bearer admin-token');
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, {
+      userId: admin.userId,
+      email: admin.email,
+      role: admin.role,
+      firmId: admin.firmId,
+    });
+  });
+
+  it('requires bearer authentication for GET /session-context', async () => {
+    const response = await request(testApp()).get('/api/v1/session-context');
+    assert.equal(response.status, 401);
+    assert.equal(response.body.code, 'UNAUTHORIZED');
+  });
+
   it('requires bearer authentication for GET /me', async () => {
     const response = await request(testApp()).get('/api/v1/me');
     assert.equal(response.status, 401);

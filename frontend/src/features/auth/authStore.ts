@@ -26,7 +26,7 @@ interface CurrentUserResponse {
 }
 
 async function resolveCurrentUser(accessToken: string): Promise<CurrentUserResponse> {
-  return getApiClient().requestJson<CurrentUserResponse>('/me', {
+  return getApiClient().requestJson<CurrentUserResponse>('/session-context', {
     headers: { Authorization: `Bearer ${accessToken}` },
     suppressUnauthorizedHandler: true,
   });

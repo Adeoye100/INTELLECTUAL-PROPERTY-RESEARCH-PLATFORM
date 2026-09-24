@@ -131,7 +131,7 @@ export async function runStagingSmoke({ config, fetchImplementation = globalThis
   if (typeof fetchImplementation !== 'function') throw new TypeError('runStagingSmoke requires fetch.');
   const results = [];
   const readChecks = [
-    ['authenticated identity', '/me', config.accessToken],
+    ['authenticated identity', '/session-context', config.accessToken],
     ['portfolio marks', '/portfolio-marks?pageSize=1', config.accessToken],
     ['watches', '/watches?pageSize=1', config.accessToken],
     ['alerts', '/alerts?pageSize=1', config.accessToken],

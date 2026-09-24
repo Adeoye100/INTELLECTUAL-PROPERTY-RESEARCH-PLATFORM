@@ -15,7 +15,7 @@ export function createProtectedRouter(authenticate, {
     limiter: authRateLimiter, policyName: 'recoveryIp', failClosed: true,
   });
 
-  router.get('/me', authenticate, async (request, response) => {
+  const currentMembership = async (request, response) => {
     const { userId, email, role, firmId } = request.auth;
     const runtimeCapabilities = capabilityProvider
       ? await capabilityProvider({ userId, email, role, firmId })
@@ -27,7 +27,10 @@ export function createProtectedRouter(authenticate, {
       firmId: firmId ?? null,
       ...(runtimeCapabilities === undefined ? {} : { runtimeCapabilities }),
     });
-  });
+  };
+  // `/me` remains for API compatibility. The less-generic path is used by the
+  // browser because some privacy extensions block requests whose path is `/me`.
+  router.get(['/session-context', '/me'], authenticate, currentMembership);
 
   if (includeDiagnosticRoutes) {
     router.get('/admin/ping', authenticate, requireRole(['admin']), (_request, response) => {

@@ -16,7 +16,7 @@ afterEach(() => {
 });
 
 describe('OAuthCallbackScreen', () => {
-  it('does not apply the landing boot gate and exchanges the PKCE code before requesting /me', async () => {
+  it('does not apply the landing boot gate and exchanges the PKCE code before requesting session context', async () => {
     const replaceState = vi.spyOn(window.history, 'replaceState');
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       userId: 'u1', email: 'admin@example.test', role: 'admin', firmId: 'firm-1',
@@ -48,7 +48,7 @@ describe('OAuthCallbackScreen', () => {
     expect(screen.queryByText('Preparing Forge Global…')).toBeNull();
     expect(await screen.findByRole('heading', { name: 'Admin destination' })).toBeVisible();
     expect(auth.exchangeCodeForSession).toHaveBeenCalledWith('pkce-code');
-    expect(String(fetchMock.mock.calls[0][0])).toContain('/me');
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/session-context');
     expect(replaceState).toHaveBeenCalledWith(null, document.title, window.location.pathname);
     expect(String(replaceState.mock.calls.at(-1)?.[2])).not.toContain('code=');
   });
@@ -64,7 +64,7 @@ describe('OAuthCallbackScreen', () => {
     expect(screen.queryByText('OAuth code invalid')).toBeNull();
   });
 
-  it('classifies a /me CORS or network failure without clearing an established session', async () => {
+  it('classifies a session-context CORS or network failure without clearing an established session', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
     auth.exchangeCodeForSession.mockResolvedValue({
       data: { session: {

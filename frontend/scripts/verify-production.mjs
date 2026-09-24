@@ -48,8 +48,8 @@ async function verify() {
   assert.equal(readiness.response.headers.get('access-control-allow-origin'), appOrigin, 'Backend CORS does not allow the production app origin.');
   results.api.readiness = { status: readiness.response.status };
 
-  const anonymousMe = await request(`${apiBase}/me`, { headers: { origin: appOrigin } });
-  assert.equal(anonymousMe.response.status, 401, 'GET /me did not reject an anonymous request.');
+  const anonymousMe = await request(`${apiBase}/session-context`, { headers: { origin: appOrigin } });
+  assert.equal(anonymousMe.response.status, 401, 'GET /session-context did not reject an anonymous request.');
   results.api.anonymousMe = { status: anonymousMe.response.status };
 
   const roleTokens = [
@@ -65,8 +65,8 @@ async function verify() {
     }
 
     const headers = { origin: appOrigin, authorization: `Bearer ${token}` };
-    const me = await request(`${apiBase}/me`, { headers });
-    assert.equal(me.response.status, 200, `${role} token failed GET /me.`);
+    const me = await request(`${apiBase}/session-context`, { headers });
+    assert.equal(me.response.status, 200, `${role} token failed GET /session-context.`);
     const profile = JSON.parse(me.text);
     assert.equal(profile.role, role, `${role} token resolved to ${profile.role}.`);
 

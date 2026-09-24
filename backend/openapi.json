@@ -89,7 +89,7 @@
         }
       }
     },
-    "/api/v1/me": {
+    "/api/v1/session-context": {
       "get": {
         "operationId": "currentMembership",
         "x-roles": [
@@ -104,6 +104,17 @@
           "401": {
             "$ref": "#/components/responses/Error"
           }
+        }
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "operationId": "legacyCurrentMembership",
+        "deprecated": true,
+        "x-roles": ["admin", "attorney", "viewer"],
+        "responses": {
+          "200": { "$ref": "#/components/responses/Me" },
+          "401": { "$ref": "#/components/responses/Error" }
         }
       }
     },
