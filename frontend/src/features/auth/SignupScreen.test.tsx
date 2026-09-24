@@ -112,7 +112,7 @@ describe('SignupScreen', () => {
     expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/provisioning/firm');
     expect(new Headers(fetchMock.mock.calls[1][1]?.headers).get('Authorization')).toBe('Bearer verified-signup-token');
     expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual({ intentToken: 'intent-token' });
-    expect(String(fetchMock.mock.calls[2][0])).toContain('/me');
+    expect(String(fetchMock.mock.calls[2][0])).toContain('/session-context');
   }, 20_000);
 
   it('reports a conflicting firm without sending the password to the backend', async () => {

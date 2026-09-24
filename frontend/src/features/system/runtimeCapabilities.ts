@@ -37,7 +37,7 @@ interface MembershipCapabilityEnvelope {
 }
 
 export const loadRuntimeCapabilities = () =>
-  getApiClient().requestJson<MembershipCapabilityEnvelope>('/me')
+  getApiClient().requestJson<MembershipCapabilityEnvelope>('/session-context')
     .then((response) => response.runtimeCapabilities ?? null);
 
 export function useRuntimeCapabilities() {

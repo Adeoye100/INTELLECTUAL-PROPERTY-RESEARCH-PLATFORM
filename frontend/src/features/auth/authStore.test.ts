@@ -26,7 +26,7 @@ afterEach(() => {
 });
 
 describe('syncSupabaseSession', () => {
-  it('uses one centralized /me request to establish the authoritative role and firm', async () => {
+  it('uses one centralized session-context request to establish the authoritative role and firm', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       userId: session.user.id,
       email: session.user.email,
@@ -42,7 +42,7 @@ describe('syncSupabaseSession', () => {
     });
 
     expect(fetchMock).toHaveBeenCalledOnce();
-    expect(String(fetchMock.mock.calls[0][0])).toContain('/me');
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/session-context');
     expect(String(fetchMock.mock.calls[0][0])).not.toMatch(/\/(?:admin|attorney|viewer)\/ping/);
     expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('Authorization')).toBe('Bearer fresh-supabase-token');
   });
@@ -103,7 +103,7 @@ describe('syncSupabaseSession', () => {
     window.removeEventListener(AUTH_SYNCHRONIZATION_DIAGNOSTIC_EVENT, diagnosticListener);
   });
 
-  it('maps a /me service failure to a controlled safe code', async () => {
+  it('maps a session-context service failure to a controlled safe code', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
       code: 'DATABASE_UNAVAILABLE', message: 'secret connection string',
     }), { status: 503, headers: { 'Content-Type': 'application/json' } })));

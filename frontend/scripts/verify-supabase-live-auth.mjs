@@ -136,7 +136,7 @@ try {
   await startServer(system.app);
   const accessToken = refreshed.data.session.access_token;
 
-  const preflight = await api('/api/v1/me', {
+  const preflight = await api('/api/v1/session-context', {
     method: 'OPTIONS',
     headers: {
       origin: 'http://localhost:5173',
@@ -160,8 +160,8 @@ try {
   assert.equal(typeof firmId, 'string', 'Provisioning did not return a firm ID.');
   assert.equal(provisioned.user?.role, 'admin', 'Provisioning did not create an Admin membership.');
 
-  const currentUser = await api('/api/v1/me', { accessToken });
-  assert.equal(currentUser.status, 200, 'GET /api/v1/me failed for the real Supabase session.');
+  const currentUser = await api('/api/v1/session-context', { accessToken });
+  assert.equal(currentUser.status, 200, 'GET /api/v1/session-context failed for the real Supabase session.');
   assert.deepEqual(await currentUser.json(), {
     userId: supabaseUserId,
     email,
@@ -169,7 +169,7 @@ try {
     firmId,
   });
 
-  const unusableToken = await api('/api/v1/me', { accessToken: `${accessToken}.invalid` });
+  const unusableToken = await api('/api/v1/session-context', { accessToken: `${accessToken}.invalid` });
   assert.equal(unusableToken.status, 401, 'An unusable access token was not rejected with 401.');
 
   await system.pool.query("UPDATE users SET role = 'viewer' WHERE supabase_user_id = $1", [supabaseUserId]);

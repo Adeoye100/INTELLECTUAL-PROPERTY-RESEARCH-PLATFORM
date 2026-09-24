@@ -320,7 +320,7 @@ stack for firm membership and RBAC.
 | Method and path | Body | Result |
 |---|---|---|
 | `POST /api/v1/provisioning/firm` | `{ firmName }` plus verified Supabase Bearer token | `201` linked Admin user and firm info |
-| `GET /api/v1/me` | Verified Supabase Bearer token | `200` `{ userId, email, role, firmId }` |
+| `GET /api/v1/session-context` (`/me` compatibility alias) | Verified Supabase Bearer token | `200` `{ userId, email, role, firmId }` |
 | `POST /api/v1/admin/invitations` | `{ fullName, email, role }` plus Bearer token | `201` signed invitation token and info |
 | `GET /api/v1/auth/invitations/:token` | None | `200` invitation details |
 | `POST /api/v1/auth/invitations/:token/accept` | `{ fullName }` | `201` user/firm provisioning info |
@@ -656,7 +656,7 @@ firm ID, secret key, or complete claims payload.
 `auth-rate-limit-policy-v1` is a Redis-backed, atomic limiter shared by API
 instances. It applies to every backend-owned sensitive authentication flow:
 public invitation lookup/redemption, authenticated firm provisioning, and Admin
-invitation issuance. `GET /api/v1/me` and ordinary authenticated application
+invitation issuance. `GET /api/v1/session-context` and ordinary authenticated application
 routes are intentionally not limited by this policy. This backend does not own
 login, password recovery/resend, refresh-token, logout, or session-revocation
 endpoints: the browser calls Supabase directly for those flows. Express cannot
