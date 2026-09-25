@@ -10,6 +10,7 @@ export function createPool(connectionString, settings = {}) {
     databaseIdleTimeoutMs = 30_000,
     databaseConnectionTimeoutMs = 5_000,
     databaseStatementTimeoutMs = 15_000,
+    logger = console,
   } = normalized;
   const options = {
     connectionString,
@@ -29,5 +30,12 @@ export function createPool(connectionString, settings = {}) {
     };
   }
 
-  return new Pool(options);
+  const pool = new Pool(options);
+  pool.on('error', (error) => {
+    logger.error('Unexpected idle PostgreSQL client error.', {
+      name: error?.name ?? 'Error',
+      code: error?.code ?? 'POSTGRES_CLIENT_ERROR',
+    });
+  });
+  return pool;
 }

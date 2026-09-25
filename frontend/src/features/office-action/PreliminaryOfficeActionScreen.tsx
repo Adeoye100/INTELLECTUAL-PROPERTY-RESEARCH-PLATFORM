@@ -2,11 +2,13 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { FilePlus2, ShieldAlert } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
 import { listPortfolioMarks } from '../portfolio/portfolioApi';
 import { createOfficeActionRef } from './officeActionApi';
 import type { OfficeActionSearchResult } from '../../types';
+import { useAuthStore } from '../auth/authStore';
 
 type FormState = {
   portfolioMarkId: string;
@@ -26,7 +28,9 @@ const initialForm: FormState = {
 };
 
 export function PreliminaryOfficeActionScreen() {
-  const portfolio = useQuery({ queryKey: ['portfolio', 'office-action-intake'], queryFn: () => listPortfolioMarks({ pageSize: 100 }).then((response) => response.items), retry: false });
+  const role = useAuthStore((state) => state.user?.role);
+  const canWrite = role === 'admin' || role === 'attorney';
+  const portfolio = useQuery({ queryKey: ['portfolio', 'office-action-intake'], queryFn: () => listPortfolioMarks({ pageSize: 100 }).then((response) => response.items), enabled: canWrite, retry: false });
   const [form, setForm] = useState<FormState>(initialForm);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -71,7 +75,13 @@ export function PreliminaryOfficeActionScreen() {
       {notice && <p role="status" className="rounded border border-emerald-500/30 bg-emerald-500/10 p-4 text-foreground">{notice}</p>}
       {error && <p role="alert" className="rounded border border-risk-high/30 bg-risk-high/10 p-4 text-risk-high">{error}</p>}
 
-      <Card title="Add verified Office Action reference">
+      {!canWrite ? (
+        <div className="rounded-lg border border-border bg-card p-5 text-card-foreground" role="note">
+          <p className="font-semibold">View-only access</p>
+          <p className="mt-1 text-sm text-muted-foreground">An Attorney or Admin must add verified Office Action references. You can review saved references from their portfolio records.</p>
+          <Link to="/portfolio" className="mt-4 inline-flex text-sm font-semibold text-primary underline underline-offset-4">Open portfolio</Link>
+        </div>
+      ) : <Card title="Add verified Office Action reference">
         <form onSubmit={submit} className="grid gap-4 md:grid-cols-2">
           <label className="text-sm font-semibold text-foreground">Portfolio mark<select required value={form.portfolioMarkId} onChange={(event) => setForm((current) => ({ ...current, portfolioMarkId: event.target.value }))} className={inputClass}><option value="">Choose a saved mark</option>{portfolio.data?.map((mark) => <option key={mark.id} value={mark.id}>{mark.markText} · {mark.jurisdiction}</option>)}</select></label>
           <label className="text-sm font-semibold text-foreground">Source registry<input required value={form.sourceRegistry} onChange={(event) => setForm((current) => ({ ...current, sourceRegistry: event.target.value }))} className={inputClass} /></label>
@@ -84,7 +94,7 @@ export function PreliminaryOfficeActionScreen() {
           <label className="text-sm font-semibold text-foreground md:col-span-2">Examiner reasoning / research notes<textarea rows={6} value={form.examinerReasoningSummary} onChange={(event) => setForm((current) => ({ ...current, examinerReasoningSummary: event.target.value }))} className={inputClass} placeholder="Plain-text verified summary or notes" /></label>
           <div className="md:col-span-2"><Button type="submit" disabled={saving || portfolio.isLoading}><FilePlus2 className="mr-2 h-4 w-4" aria-hidden="true" />{saving ? 'Saving…' : 'Save reference'}</Button></div>
         </form>
-      </Card>
+      </Card>}
     </div>
   );
 }

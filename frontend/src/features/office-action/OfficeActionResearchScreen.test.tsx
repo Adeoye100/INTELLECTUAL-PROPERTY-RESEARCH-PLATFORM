@@ -2,7 +2,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useAuthStore } from '../auth/authStore';
 import { OfficeActionResearchScreen } from './OfficeActionResearchScreen';
 
 const mark = { id: 'p1', firmId: 'f1', ownerUserId: 'u1', markText: 'FORGE GLOBAL', jurisdiction: 'US', niceClasses: [9], status: 'registered', filingDate: '2020-01-01', renewalDate: '2030-01-01', sourceRegistry: 'USPTO', registryReference: 'TEST-1', registrationDate: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
@@ -24,7 +26,14 @@ function renderScreen(action = officeAction) {
   return fetchMock;
 }
 
+beforeEach(() => {
+  act(() => useAuthStore.getState().setSession('office-action-token', {
+    id: 'u1', email: 'attorney@example.test', fullName: 'Attorney', role: 'attorney', firmId: 'firm-1',
+  }));
+});
+
 afterEach(() => {
+  act(() => useAuthStore.getState().clearSession());
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -80,5 +89,19 @@ describe('OfficeActionResearchScreen', () => {
     expect(screen.getByText('<office-action-summary>')).toBeVisible();
     expect(document.querySelector('office-action-reference')).toBeNull();
     expect(document.querySelector('office-action-summary')).toBeNull();
+  });
+
+  it('allows a viewer to research precedents without exposing link mutations', async () => {
+    act(() => useAuthStore.getState().setSession('viewer-token', {
+      id: 'u2', email: 'viewer@example.test', fullName: 'Viewer', role: 'viewer', firmId: 'firm-1',
+    }));
+    const user = userEvent.setup();
+    renderScreen();
+
+    await user.type(screen.getByRole('textbox', { name: 'Mark Text' }), 'FORGE');
+    await user.click(screen.getByRole('button', { name: 'Apply Filters' }));
+
+    expect(await screen.findByText('USPTO OA-2025-10')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Link to Mark' })).not.toBeInTheDocument();
   });
 });
