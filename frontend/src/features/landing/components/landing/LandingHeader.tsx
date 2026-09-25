@@ -32,7 +32,7 @@ export function LandingHeader({ logoAvailable = true }: LandingHeaderProps) {
               Forge Global
             </span>
             <span className="hidden text-[9px] uppercase tracking-[0.24em] text-forge-silver-300 sm:block">
-              Intellectual property intelligence
+              Brand protection
             </span>
           </span>
         </Link>
@@ -42,19 +42,19 @@ export function LandingHeader({ logoAvailable = true }: LandingHeaderProps) {
             className="text-xs uppercase tracking-[0.16em] text-white/75 transition hover:text-white"
             href="#capabilities"
           >
-            Capabilities
+            Services
           </a>
           <a
             className="text-xs uppercase tracking-[0.16em] text-white/75 transition hover:text-white"
             href="#workflow"
           >
-            How it works
+            How we work
           </a>
           <a
             className="text-xs uppercase tracking-[0.16em] text-white/75 transition hover:text-white"
             href="#proof"
           >
-            Platform
+            Standards
           </a>
         </nav>
 
@@ -63,19 +63,19 @@ export function LandingHeader({ logoAvailable = true }: LandingHeaderProps) {
             to="/auth/login"
             className="hidden whitespace-nowrap text-xs font-medium text-white transition-colors hover:text-forge-silver-200 sm:inline-flex md:text-sm"
           >
-            Sign in
+            Client sign in
           </Link>
           <ThemeToggle />
-          <Link
-            to="/auth/create-organization"
+          <a
+            href="mailto:help@fgiprp.com?subject=Confidential%20brand%20protection%20consultation"
             className="inline-flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-full bg-white px-4 py-2 text-xs font-semibold text-forge-navy transition hover:bg-forge-teal-100 sm:px-5 sm:text-sm"
           >
             <span className="hidden min-[440px]:inline">
-              Create organization
+              Confidential consultation
             </span>
-            <span className="min-[440px]:hidden">Get started</span>
+            <span className="min-[440px]:hidden">Consult</span>
             <ArrowUpRightIcon className="h-4 w-4" aria-hidden="true" />
-          </Link>
+          </a>
         </div>
       </div>
     </header>
