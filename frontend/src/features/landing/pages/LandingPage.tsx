@@ -14,7 +14,7 @@ export function LandingPage(bootDependencies: LandingBootDependencies = {}) {
   const bootState = useLandingBootGate(bootDependencies);
 
   useEffect(() => {
-    document.title = 'Forge Global — Brand Protection and Intellectual Property Security';
+    document.title = 'Forge Global — Investigations, Enforcement Support and Brand Protection';
   }, []);
 
   if (bootState === 'loading') return <LandingBootLoader />;

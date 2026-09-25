@@ -35,14 +35,14 @@ describe("Landing Page Visual Regressions", () => {
       expect(signInLink).toHaveClass("text-white");
     });
 
-    it("has the primary organization action with a minimum touch target", () => {
+    it("has the primary consultation action with a minimum touch target", () => {
       render(
         <BrowserRouter>
           <LandingHeader />
         </BrowserRouter>,
       );
-      const organizationLink = screen.getByText(/Create organization/i);
-      expect(organizationLink.closest("a")).toHaveClass("min-h-[44px]");
+      const consultationLink = screen.getByText(/Confidential consultation/i);
+      expect(consultationLink.closest("a")).toHaveClass("min-h-[44px]");
     });
   });
 
@@ -50,7 +50,7 @@ describe("Landing Page Visual Regressions", () => {
     it("uses the approved near-white text token for the hero paragraph", () => {
       renderHero({ animated: false });
       const paragraph = screen.getByText(
-        /Search registries, analyze risk/i,
+        /We investigate counterfeiters/i,
       );
       expect(paragraph).toHaveClass("text-[#F7FAFC]");
     });

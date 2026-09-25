@@ -120,6 +120,26 @@ describe('LandingPage boot gate', () => {
 });
 
 describe('LandingPage responsive structure', () => {
+  it('presents the firm as an evidence-led brand-protection service with a separate client portal', async () => {
+    renderLanding({ fontReady: resolvedFonts, preloadImages: resolvedAssets });
+
+    expect(await screen.findByRole('heading', { level: 1, name: /protect what you’ve built/i })).toBeVisible();
+    expect(screen.getByText(/FORGEGUARD GLOBAL LIMITED helps companies defend products/i)).toBeVisible();
+    expect(screen.getAllByText('Investigations').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Enforcement Liaison/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Our mission is to protect legitimate businesses/i)).toBeVisible();
+    expect(screen.getByText(/trained investigators, intellectual property specialists/i)).toBeVisible();
+    expect(screen.getAllByRole('link', { name: /client (sign in|portal)/i }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('link', { name: /create organization/i })).toBeNull();
+  });
+
+  it('states that coercive enforcement decisions remain with competent authorities', async () => {
+    renderLanding({ fontReady: resolvedFonts, preloadImages: resolvedAssets });
+
+    expect(await screen.findByText(/enforcement authority always remains with the competent public bodies/i)).toBeVisible();
+    expect(screen.getByText(/arrests, searches, seizures, and prosecutions remain decisions/i)).toBeInTheDocument();
+  });
+
   it('keeps the mobile hero shield and copy in normal flow at 390px without overlap', async () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
     vi.stubGlobal('IntersectionObserver', IntersectionObserverMock);

@@ -1,22 +1,5 @@
-import {
-  BellRingIcon,
-  FileSearchIcon,
-  FolderKanbanIcon,
-  RadarIcon,
-  ScanSearchIcon,
-  ScrollTextIcon,
-  type LucideIcon,
-} from "lucide-react";
-import { FACETS } from "../../data/facets";
-
-const CAPABILITY_ICONS: LucideIcon[] = [
-  ScanSearchIcon,
-  RadarIcon,
-  FileSearchIcon,
-  FolderKanbanIcon,
-  BellRingIcon,
-  ScrollTextIcon,
-];
+import { CheckIcon } from 'lucide-react';
+import { BRAND_PROTECTION_SERVICES } from '../../data/brandProtection';
 
 function cardTone(index: number) {
   if (index === 1) return "bg-primary text-primary-foreground border-primary";
@@ -35,28 +18,29 @@ export function CapabilitiesSection() {
         <div className="grid gap-8 border-b border-border pb-12 lg:grid-cols-[1fr_0.82fr] lg:items-end">
           <div>
             <p className="font-subheading text-sm tracking-[0.22em] text-primary">
-              The research advantage
+              End-to-end brand protection
             </p>
             <h2 className="mt-4 max-w-3xl text-5xl font-semibold leading-[0.95] tracking-[-0.035em] text-foreground sm:text-6xl lg:text-7xl">
-              Essential intelligence for confident IP decisions.
+              From intelligence to enforcement support to prevention.
             </h2>
           </div>
           <p className="max-w-xl text-base leading-7 text-muted-foreground lg:justify-self-end">
-            Move from fragmented registry tabs and isolated documents to a
-            connected research workflow where every finding can be traced,
-            compared, and prepared for action.
+            We find infringers, establish what they are doing, prepare
+            verifiable evidence, support the appropriate authorities, and put
+            practical controls in place to reduce repeat attacks.
           </p>
         </div>
 
         <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {FACETS.map((facet) => {
-            const Icon = CAPABILITY_ICONS[facet.index];
-            const isStrong = facet.index === 1 || facet.index === 2;
+          {BRAND_PROTECTION_SERVICES.map((service, index) => {
+            const Icon = service.icon;
+            const isStrong = index === 1 || index === 2;
 
             return (
               <article
-                key={facet.id}
-                className={`group relative flex min-h-[310px] flex-col overflow-hidden rounded-[1.25rem] border p-7 transition duration-300 hover:-translate-y-1 ${cardTone(facet.index)}`}
+                key={service.id}
+                id={service.id}
+                className={`group relative flex min-h-[390px] scroll-mt-28 flex-col overflow-hidden rounded-[1.25rem] border p-7 transition duration-300 hover:-translate-y-1 ${cardTone(index)}`}
               >
                 <div className="flex items-center justify-between">
                   <span
@@ -67,18 +51,26 @@ export function CapabilitiesSection() {
                   <span
                     className={`font-subheading text-sm tracking-[0.18em] ${isStrong ? "text-current/65" : "text-muted-foreground"}`}
                   >
-                    0{facet.index + 1}
+                    0{index + 1}
                   </span>
                 </div>
                 <div className="mt-auto pt-12">
                   <h3 className="font-subheading text-3xl tracking-[0.02em]">
-                    {facet.title}
+                    {service.title}
                   </h3>
                   <p
                     className={`mt-4 text-sm leading-6 ${isStrong ? "text-current/78" : "text-muted-foreground"}`}
                   >
-                    {facet.description}
+                    {service.summary}
                   </p>
+                  <ul className={`mt-5 space-y-2 text-xs leading-5 ${isStrong ? 'text-current/78' : 'text-muted-foreground'}`}>
+                    {service.outcomes.map((outcome) => (
+                      <li key={outcome} className="flex gap-2">
+                        <CheckIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <span>{outcome}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
                 <div
                   aria-hidden="true"

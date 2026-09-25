@@ -2,9 +2,8 @@ import {
   ArrowRightIcon,
   CheckCircle2Icon,
   ChevronDownIcon,
-  SearchIcon,
+  ShieldCheckIcon,
 } from "lucide-react";
-import { Link } from "react-router-dom";
 import { ShieldStatic } from "./ShieldStatic";
 
 interface HeroSectionProps {
@@ -37,34 +36,35 @@ export function HeroSection({
               className="h-4 w-4 text-forge-subtext-onDark"
               aria-hidden="true"
             />
-            Evidence-backed IP research
+            Investigation · Enforcement support · Prevention
           </div>
 
           <h1 className="mt-7 max-w-4xl font-heading text-[clamp(3.4rem,8vw,7.5rem)] font-semibold leading-[0.82] tracking-[-0.055em] text-white">
-            Clear the noise.
+            Protect what you’ve built.
             <span className="mt-2 block text-forge-subtext-onDark">
-              Protect what you build.
+              Stop the fakes.
             </span>
           </h1>
 
           <p className="mt-7 max-w-2xl text-base leading-7 text-[#F7FAFC] sm:text-lg sm:leading-8">
-            Search registries, analyze risk, track office actions,
-            and monitor portfolios from one workspace built for IP teams.
+            We investigate counterfeiters, gather field intelligence, and
+            deliver verified evidence for lawful enforcement—then help you
+            prevent the next attack.
           </p>
 
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-            <Link
-              to="/auth/create-organization"
+            <a
+              href="mailto:help@fgiprp.com?subject=Confidential%20brand%20protection%20consultation"
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-semibold text-forge-navy transition hover:-translate-y-0.5 hover:bg-forge-teal-100"
             >
-              Start your workspace
+              Request a confidential consultation
               <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
-            </Link>
+            </a>
             <a
               href="#capabilities"
               className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/25 bg-white/5 px-6 py-3 text-sm font-medium text-white transition hover:border-white/45 hover:bg-white/10"
             >
-              Explore features
+              See how we work
             </a>
           </div>
 
@@ -84,14 +84,14 @@ export function HeroSection({
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <div>
                 <p className="font-subheading text-sm tracking-[0.18em] text-forge-silver-300">
-                  Research overview
+                  Brand protection brief
                 </p>
                 <p className="mt-1 text-xs text-white/55">
-                  One query. Complete evidence.
+                  One partner. From intelligence to prevention.
                 </p>
               </div>
               <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white">
-                <SearchIcon className="h-4 w-4" aria-hidden="true" />
+                <ShieldCheckIcon className="h-4 w-4" aria-hidden="true" />
               </span>
             </div>
 
@@ -106,14 +106,14 @@ export function HeroSection({
                 <div className="h-48" aria-hidden="true" />
               )}
               <div className="space-y-3">
-                {["Registry search", "Risk analysis", "Portfolio watch"].map(
+                {["Investigate", "Support enforcement", "Prevent recurrence"].map(
                   (label, index) => (
                     <div
                       key={label}
                       className="border-l-2 border-forge-subtext-onDark/60 bg-white/6 px-4 py-3"
                     >
                       <span className="block text-[9px] uppercase tracking-[0.2em] text-white/45">
-                        Signal 0{index + 1}
+                        Pillar 0{index + 1}
                       </span>
                       <span className="mt-1 block text-sm text-white">
                         {label}
@@ -127,18 +127,18 @@ export function HeroSection({
             <div className="grid grid-cols-2 gap-3 border-t border-white/10 pt-4 text-center">
               <div className="bg-white/6 px-3 py-3">
                 <p className="font-subheading text-2xl tracking-wide text-white">
-                  6
+                  3
                 </p>
                 <p className="text-[10px] uppercase tracking-[0.16em] text-white/50">
-                  Core tools
+                  Protection pillars
                 </p>
               </div>
               <div className="bg-white/6 px-3 py-3">
                 <p className="font-subheading text-2xl tracking-wide text-white">
-                  1
+                  6
                 </p>
                 <p className="text-[10px] uppercase tracking-[0.16em] text-white/50">
-                  Single platform
+                  Integrated services
                 </p>
               </div>
             </div>
