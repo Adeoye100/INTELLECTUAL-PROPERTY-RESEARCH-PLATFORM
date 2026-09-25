@@ -11,6 +11,7 @@ import type { OfficeActionSearchResponse, OfficeActionSearchResult, PortfolioMar
 import { listPortfolioMarks } from '../portfolio/portfolioApi';
 import { createOfficeActionRef, linkOfficeActionToMatter, searchOfficeActions, type OfficeActionSearchRequest } from './officeActionApi';
 import { getApiClient } from '../../lib/api/client';
+import { useAuthStore } from '../auth/authStore';
 
 const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   office_action: 'Office Action',
@@ -31,6 +32,8 @@ interface SearchFormInputs {
 }
 
 export const OfficeActionResearchScreen: React.FC = () => {
+  const role = useAuthStore((state) => state.user?.role);
+  const canWrite = role === 'admin' || role === 'attorney';
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedOfficeAction, setSelectedOfficeAction] = useState<OfficeActionSearchResult | null>(null);
@@ -67,14 +70,14 @@ export const OfficeActionResearchScreen: React.FC = () => {
   const portfolioMarksQuery = useQuery<PortfolioMark[]>({
     queryKey: ['portfolio'],
     queryFn: () => listPortfolioMarks().then((res) => res.items),
-    enabled: isLinkModalOpen,
+    enabled: canWrite && isLinkModalOpen,
   });
 
   // Load matters for linking
   const mattersQuery = useQuery<Matter[]>({
     queryKey: ['matters'],
     queryFn: () => getApiClient().requestJson<{ items: Matter[] }>('/matters').then((res) => res.items),
-    enabled: isLinkModalOpen && linkTargetType === 'matter',
+    enabled: canWrite && isLinkModalOpen && linkTargetType === 'matter',
   });
 
   const onSubmit = (data: SearchFormInputs) => {
@@ -321,7 +324,7 @@ export const OfficeActionResearchScreen: React.FC = () => {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Button
+                          {canWrite ? <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleLinkClick(officeAction)}
@@ -329,7 +332,7 @@ export const OfficeActionResearchScreen: React.FC = () => {
                           >
                             <Bookmark className="w-3.5 h-3.5 mr-1" aria-hidden="true" />
                             Link Precedent
-                          </Button>
+                          </Button> : <span className="text-xs text-muted-foreground">View only</span>}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -343,7 +346,7 @@ export const OfficeActionResearchScreen: React.FC = () => {
 
       {/* Link Precedent Modal */}
       <Modal
-        isOpen={isLinkModalOpen}
+        isOpen={canWrite && isLinkModalOpen}
         onClose={() => setIsLinkModalOpen(false)}
         title="Link Precedent to Firm Work"
         footer={
@@ -484,4 +487,3 @@ export const OfficeActionResearchScreen: React.FC = () => {
     </div>
   );
 };
-
