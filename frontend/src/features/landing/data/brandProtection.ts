@@ -80,12 +80,17 @@ export const INDUSTRIES = [
   'Luxury goods',
 ] as const;
 
+export const WE_ALSO_DO = [
+  'IP/Trademark infringement',
+  'Prosecution',
+] as const;
+
 export const FAQS = [
-  ['Is your work legal?', 'Yes. Investigations are scoped to operate within the applicable law, with evidence documented for verification and review.'],
-  ['Do you make arrests or conduct raids?', 'No. We gather and submit evidence and may support authorised operations. Arrests, searches, seizures, and prosecutions remain decisions of the competent authorities.'],
-  ['Will the target know about the investigation?', 'Discretion is fundamental. Operational details, client identity, strategy, and lawful sources are handled confidentially.'],
-  ['Do we need registered intellectual property?', 'Registered rights materially strengthen enforcement. The consultation establishes which rights and supporting records are available before work begins.'],
-  ['How long does an investigation take?', 'Timing depends on the scope, locations, actors, and safety considerations. The agreed investigation plan sets the initial timeline and reporting cadence.'],
-  ['What does an engagement cost?', 'Every engagement is scoped to the client’s exposure and required work. A confidential consultation comes before a written scope and quotation.'],
-  ['Can you help before counterfeiting is discovered?', 'Yes. Preventive monitoring, authentication, portfolio review, and market-entry planning are designed to identify exposure earlier.'],
+  ['Is your work legal?', 'Yes. Our investigators operate within the law of every jurisdiction, and evidence is gathered and documented to legal standards.'],
+  ['Will the counterfeiter know we are investigating?', 'No. Discretion is fundamental to our work.'],
+  ['Do you make arrests or conduct raids?', 'No. We supply evidence and support to the authorities, who carry out enforcement.'],
+  ['Do we need registered IP?', 'Registered trademarks and rights greatly strengthen enforcement. We can advise on what you need.'],
+  ['How long does an investigation take?', 'It varies with scope and location. We give a timeline at the planning stage.'],
+  ['What does it cost?', 'Every engagement is scoped to your needs. Contact us for a confidential quote.'],
+  ['Can you protect us without an active problem?', 'Yes. Our preventive technology and risk assessments are designed for that.'],
 ] as const;

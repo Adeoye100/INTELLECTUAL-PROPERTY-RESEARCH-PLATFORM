@@ -1,11 +1,25 @@
-import { ArrowRightIcon, LockKeyholeIcon } from 'lucide-react';
+import { ArrowRightIcon, LockKeyholeIcon, CheckCircle2Icon } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { FAQS } from '../../data/brandProtection';
+import { FAQS, WE_ALSO_DO } from '../../data/brandProtection';
 
 export function CTASection() {
   return (
     <section id="contact" className="bg-[color:var(--landing-surface)] px-6 pt-10 md:px-10 lg:pt-16">
       <div className="mx-auto max-w-[1240px] border-t border-border py-20">
+        <div className="mb-20 grid gap-12 lg:grid-cols-[0.85fr_1.15fr]">
+          <div>
+            <p className="font-subheading text-sm tracking-[0.22em] text-primary">We also do</p>
+            <h2 className="mt-4 max-w-lg text-5xl font-semibold leading-[0.95] tracking-[-0.035em] text-foreground sm:text-6xl">Additional services</h2>
+          </div>
+          <div className="flex flex-col justify-center gap-4">
+            {WE_ALSO_DO.map((item) => (
+              <div key={item} className="flex items-center gap-3 rounded-lg border border-border bg-card px-6 py-5 text-card-foreground">
+                <CheckCircle2Icon className="h-5 w-5 text-primary" aria-hidden="true" />
+                <span className="text-base font-medium">{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
         <div className="grid gap-12 lg:grid-cols-[0.85fr_1.15fr]">
           <div>
             <p className="font-subheading text-sm tracking-[0.22em] text-primary">Frequently asked questions</p>
