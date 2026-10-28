@@ -94,6 +94,35 @@ export class RegistryTrademarkRepository {
     return result.rows;
   }
 
+  async allProjection(limit, cursor = null, statuses = null) {
+    const statusClause = statuses ? 'AND status = ANY($4::text[])' : '';
+    const result = await this.pool.query(`
+      SELECT
+        id,
+        mark_text,
+        owner,
+        jurisdiction,
+        nice_classes,
+        status,
+        filing_date,
+        source_registry,
+        source_reference_id,
+        updated_at
+      FROM registry_trademarks
+      WHERE ($2::timestamptz IS NULL
+         OR (updated_at, id) > ($2::timestamptz, $3::uuid))
+        ${statusClause}
+      ORDER BY updated_at, id
+      LIMIT $1
+    `, [
+      limit,
+      cursor?.updatedAt ?? null,
+      cursor?.id ?? null,
+      ...(statuses ? [statuses] : []),
+    ]);
+    return result.rows;
+  }
+
   async markProjected(rows) {
     if (!rows.length) return;
     const versions = JSON.stringify(rows.map(({ id, updated_at: updatedAt }) => ({ id, updatedAt })));

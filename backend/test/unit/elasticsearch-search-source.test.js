@@ -88,7 +88,10 @@ describe('ElasticsearchSearchSource', () => {
     const body = parseBody(calls[0]);
     const bool = body.query.bool;
 
-    assert.deepEqual(bool.filter[0], { term: { source_registry: 'USPTO' } });
+    assert.deepEqual(bool.filter.slice(0, 2), [
+      { term: { source_registry: 'USPTO' } },
+      { terms: { status: ['registered', 'pending'] } },
+    ]);
     assert.deepEqual(bool.must[0].bool.should, [
       { match: { mark_text: { query: 'NIMBL', fuzziness: 'AUTO' } } },
       { match: { 'mark_text.phonetic': { query: 'NIMBL' } } },
@@ -104,6 +107,7 @@ describe('ElasticsearchSearchSource', () => {
     });
     assert.deepEqual(parseBody(calls[0]).query.bool.filter, [
       { term: { source_registry: 'USPTO' } },
+      { terms: { status: ['registered', 'pending'] } },
       { terms: { jurisdiction: ['US', 'EU'] } },
       { terms: { nice_classes: [9, 42] } },
     ]);
@@ -117,6 +121,7 @@ describe('ElasticsearchSearchSource', () => {
     await new ElasticsearchSearchSource({ sourceName, baseUrl, fetchImpl }).search(query);
     assert.deepEqual(parseBody(calls[0]).query.bool.filter, [
       { term: { source_registry: 'USPTO' } },
+      { terms: { status: ['registered', 'pending'] } },
       { term: { status: 'registered' } },
       { term: { owner: 'Nimbl Ltd.' } },
       { range: { filing_date: { gte: '2025-01-01', lte: '2026-01-01' } } },
@@ -128,6 +133,7 @@ describe('ElasticsearchSearchSource', () => {
     });
     assert.deepEqual(parseBody(empty.calls[0]).query.bool.filter, [
       { term: { source_registry: 'USPTO' } },
+      { terms: { status: ['registered', 'pending'] } },
     ]);
   });
 

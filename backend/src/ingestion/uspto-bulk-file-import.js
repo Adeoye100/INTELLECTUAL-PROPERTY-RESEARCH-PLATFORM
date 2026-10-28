@@ -3,6 +3,7 @@ import path from 'node:path';
 import { Transform } from 'node:stream';
 import unzipper from 'unzipper';
 import { parseUsptoBulkXml } from '../registries/uspto/bulk-xml-parser.js';
+import { shouldRetainUsptoRecord } from './uspto-record-filter.js';
 
 const MAX_INPUT_BYTES = 4 * 1024 * 1024 * 1024;
 const MAX_UNCOMPRESSED_XML_BYTES = 4 * 1024 * 1024 * 1024;
@@ -182,6 +183,7 @@ async function ingestFiles({
   batchSize,
 }) {
   let processedRecordCount = 0;
+  let retainedRecordCount = 0;
   let changedRecordCount = 0;
   let dataThroughDate = null;
   const batch = [];
@@ -201,6 +203,8 @@ async function ingestFiles({
         }
         processedRecordCount += 1;
         dataThroughDate = laterDate(dataThroughDate, calendarDate(record.sourceUpdatedAt));
+        if (!shouldRetainUsptoRecord(record)) continue;
+        retainedRecordCount += 1;
         batch.push(record);
         if (batch.length >= batchSize) await flush();
       }
@@ -223,6 +227,7 @@ async function ingestFiles({
       latestDiscoveredSourceDate: dataThroughDate,
       discoveredFileCount: files.length,
       processedRecordCount,
+      retainedRecordCount,
       changedRecordCount,
     });
     await refreshRepository.markComplete({
@@ -232,7 +237,12 @@ async function ingestFiles({
       projectionBacklogCount: 0,
     });
 
-    return { processedRecordCount, changedRecordCount, dataThroughDate };
+    return {
+      processedRecordCount,
+      retainedRecordCount,
+      changedRecordCount,
+      dataThroughDate,
+    };
   } catch (error) {
     await refreshRepository.markFailed({
       runId: run.id,

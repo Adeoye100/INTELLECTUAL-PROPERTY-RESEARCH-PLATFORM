@@ -228,6 +228,13 @@ pnpm indices:elasticsearch
 
 # Run separately after Postgres ingestion.
 pnpm sync:elasticsearch
+
+# Build a new index without touching the live index. The target must be new.
+ELASTICSEARCH_REBUILD_INDEX=trademarks_composite_rebuild_YYYYMMDD \
+  pnpm rebuild:elasticsearch
+
+# Inspect the existing corpus before any pruning.
+pnpm maintain:uspto-corpus
 ```
 
 `ingest:uspto` reads the daily `apcYYMMDD.zip` links from
@@ -246,6 +253,24 @@ deletion/recreation must not be automated casually. `sync:elasticsearch` selects
 new/changed Postgres rows, submits them through that projector, and marks the
 exact projected row version only after the bulk request succeeds. The registry
 adapter never receives an Elasticsearch client.
+
+The USPTO importer retains only normalized `registered` and `pending` records;
+all Nice Classes on a retained record are preserved, including an empty class
+array. Existing inactive rows require the explicit maintenance command above.
+That command is dry-run by default. After verifying the preview and a completed
+new Elasticsearch rebuild, an operator may run
+`pnpm maintain:uspto-corpus -- --apply` to delete inactive USPTO rows, followed
+by `--apply --drop-search-indexes` only after Elasticsearch is the verified live
+search backend. The drop list contains only the five optional fuzzy-search
+indexes;
+exact-match, filter, and projection indexes are retained.
+
+The rebuild command refuses to reuse an existing target index. After its output
+has been verified, set `SEARCH_BACKEND=elasticsearch`, point `ELASTICSEARCH_URL`
+at the managed cluster, and set `ELASTICSEARCH_INDEX` to the new index in both
+the API and refresh-worker environments. Keep the previous index until the
+cutover is confirmed so rollback is a configuration change rather than a data
+restore.
 
 These are manual commands for now. No `node-cron` scheduler was placed in the API
 process, and no Redis queue library was introduced merely for this ticket. The

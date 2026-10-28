@@ -97,18 +97,37 @@ async function ensureIndex({ baseUrl, indexName, definition, fetchImpl }) {
   );
 }
 
+export async function ensureElasticsearchIndex({
+  baseUrl,
+  indexName,
+  definition,
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  if (!baseUrl?.trim()) throw new Error('ELASTICSEARCH_URL is required for index management.');
+  if (typeof indexName !== 'string' || !/^[a-z][a-z0-9_-]{0,254}$/.test(indexName)) {
+    throw new TypeError('Elasticsearch index name is invalid.');
+  }
+  if (!definition || typeof definition !== 'object') {
+    throw new TypeError('An Elasticsearch index definition is required.');
+  }
+  if (typeof fetchImpl !== 'function') throw new Error('A fetch implementation is required.');
+
+  return ensureIndex({
+    baseUrl: baseUrl.replace(/\/$/, ''),
+    indexName,
+    definition,
+    fetchImpl,
+  });
+}
+
 export async function ensureElasticsearchIndices({
   baseUrl,
   fetchImpl = globalThis.fetch,
 } = {}) {
-  if (!baseUrl?.trim()) throw new Error('ELASTICSEARCH_URL is required for index management.');
-  if (typeof fetchImpl !== 'function') throw new Error('A fetch implementation is required.');
-  const normalizedBaseUrl = baseUrl.replace(/\/$/, '');
-
   const results = [];
   for (const [indexName, definition] of Object.entries(indexDefinitions)) {
-    results.push(await ensureIndex({
-      baseUrl: normalizedBaseUrl,
+    results.push(await ensureElasticsearchIndex({
+      baseUrl,
       indexName,
       definition,
       fetchImpl,

@@ -83,6 +83,9 @@ export class PostgresSearchSource {
     const sourceParam = push(values, this.sourceName);
     const markParam = push(values, mark);
     const where = [`source_registry = ${sourceParam}`];
+    if (this.sourceName === 'USPTO') {
+      where.push("status = ANY(ARRAY['registered', 'pending']::text[])");
+    }
 
     if (Array.isArray(query.jurisdictions) && query.jurisdictions.length > 0) {
       const param = push(values, query.jurisdictions);

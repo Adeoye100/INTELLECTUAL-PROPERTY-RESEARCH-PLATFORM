@@ -20,6 +20,8 @@
     "import:uspto-bulk": "node --env-file-if-exists=.env scripts/import-uspto-bulk-file.js",
     "ingest:office-actions": "node --env-file-if-exists=.env scripts/ingest-office-actions.js",
     "sync:elasticsearch": "node src/ingestion/run-elasticsearch-sync.js",
+    "rebuild:elasticsearch": "node src/ingestion/run-elasticsearch-rebuild.js",
+    "maintain:uspto-corpus": "node --env-file-if-exists=.env scripts/maintain-uspto-corpus.js",
     "refresh:uspto-search": "node --env-file-if-exists=.env src/ingestion/run-uspto-search-refresh.js",
     "verify:supabase-token": "node --env-file=.env scripts/verify-supabase-token.js",
     "verify:supabase-rbac": "node --env-file=.env scripts/verify-supabase-rbac.js",

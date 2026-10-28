@@ -66,9 +66,10 @@ describe('offline USPTO bulk file import', () => {
     assert.equal(result.status, 'complete');
     assert.equal(result.coverageKind, 'incremental');
     assert.equal(result.processedRecordCount, 2);
-    assert.equal(result.changedRecordCount, 2);
+    assert.equal(result.retainedRecordCount, 1);
+    assert.equal(result.changedRecordCount, 1);
     assert.equal(result.dataThroughDate, '2026-01-05');
-    assert.equal(repos.batches.length, 2);
+    assert.equal(repos.batches.length, 1);
     assert.deepEqual(repos.batches[0][0], {
       sourceReferenceId: '98038829',
       markText: 'NIMBL VISUAL MEDIA & DESIGN',
@@ -141,6 +142,8 @@ describe('offline USPTO bulk file import', () => {
     assert.equal(result.expectedPartCount, 2);
     assert.equal(result.discoveredFileCount, 2);
     assert.equal(result.processedRecordCount, 4);
+    assert.equal(result.retainedRecordCount, 2);
+    assert.equal(result.changedRecordCount, 2);
     assert.equal(result.dataThroughDate, '2026-01-05');
 
     const started = repos.calls.find(([name]) => name === 'startRun')?.[1];

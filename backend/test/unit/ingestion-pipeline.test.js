@@ -6,6 +6,7 @@ import {
   syncRegistryTrademarksToElasticsearch,
 } from '../../src/ingestion/elasticsearch-projector.js';
 import { ingestRegistryUpdates } from '../../src/ingestion/ingest-registry.js';
+import { RegistryTrademarkRepository } from '../../src/ingestion/registry-trademark-repository.js';
 
 describe('registry ingestion boundaries', () => {
   it('writes adapter records to PostgreSQL repository batches without touching Elasticsearch', async () => {
@@ -31,7 +32,12 @@ describe('registry ingestion boundaries', () => {
       batchSize: 1,
     });
     assert.deepEqual(calls.map((records) => records[0].sourceReferenceId), ['one', 'two']);
-    assert.deepEqual(result, { sourceName: 'fixture registry', processed: 2, changed: 2 });
+    assert.deepEqual(result, {
+      sourceName: 'fixture registry',
+      processed: 2,
+      retained: 2,
+      changed: 2,
+    });
   });
 
   it('projects pending PostgreSQL rows in a separate Elasticsearch bulk step', async () => {
@@ -70,6 +76,77 @@ describe('registry ingestion boundaries', () => {
     assert.match(request.options.body, /"_index":"trademarks_composite"/);
     assert.match(request.options.body, /"source_registry":"USPTO"/);
     assert.deepEqual(repositoryCalls, [[row]]);
+  });
+
+  it('supports a full Elasticsearch rebuild without changing projection markers', async () => {
+    const rows = [[
+      {
+        id: 'c2826bb3-088f-43aa-95de-61e4fd555429',
+        mark_text: 'LIVE MARK',
+        owner: null,
+        jurisdiction: 'US',
+        nice_classes: [42],
+        status: 'registered',
+        filing_date: '2026-01-05',
+        source_registry: 'USPTO',
+        source_reference_id: 'USPTO-1',
+        updated_at: '2026-01-05T05:29:00.000Z',
+      },
+    ], []];
+    const repository = {
+      async allProjection() { return rows.shift(); },
+      async markProjected() { throw new Error('full rebuild must not mark the live projection'); },
+    };
+    const projected = [];
+    const projector = {
+      async project(batch) { projected.push(batch); },
+    };
+
+    assert.deepEqual(
+      await syncRegistryTrademarksToElasticsearch({
+        repository,
+        projector,
+        full: true,
+        batchSize: 1,
+      }),
+      { projected: 1 },
+    );
+    assert.equal(projected.length, 1);
+    assert.equal(projected[0][0].source_reference_id, 'USPTO-1');
+  });
+
+  it('streams all projection rows with a stable updated-at/id cursor', async () => {
+    const calls = [];
+    const repository = new RegistryTrademarkRepository({
+      async query(sql, parameters) {
+        calls.push({ sql, parameters });
+        return { rows: [{ id: 'row-2', updated_at: '2026-01-06T00:00:00.000Z' }] };
+      },
+    });
+
+    const rows = await repository.allProjection(100, {
+      updatedAt: '2026-01-05T00:00:00.000Z',
+      id: 'row-1',
+    });
+
+    assert.deepEqual(rows, [{ id: 'row-2', updated_at: '2026-01-06T00:00:00.000Z' }]);
+    assert.deepEqual(calls[0].parameters, [100, '2026-01-05T00:00:00.000Z', 'row-1']);
+    assert.match(calls[0].sql, /\(updated_at, id\) > \(\$2::timestamptz, \$3::uuid\)/);
+  });
+
+  it('can constrain a full projection to active statuses', async () => {
+    const calls = [];
+    const repository = new RegistryTrademarkRepository({
+      async query(sql, parameters) {
+        calls.push({ sql, parameters });
+        return { rows: [] };
+      },
+    });
+
+    await repository.allProjection(100, null, ['registered', 'pending']);
+
+    assert.deepEqual(calls[0].parameters, [100, null, null, ['registered', 'pending']]);
+    assert.match(calls[0].sql, /status = ANY\(\$4::text\[\]\)/);
   });
 
   it('projectToElasticsearch writes one PostgreSQL-shaped row in the composite shape', async () => {

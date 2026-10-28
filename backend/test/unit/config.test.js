@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { loadConfig, loadSupabaseConfig, loadWorkerFeatureGate } from '../../src/config.js';
+import {
+  loadConfig,
+  loadElasticsearchRebuildConfig,
+  loadSupabaseConfig,
+  loadWorkerFeatureGate,
+} from '../../src/config.js';
 
 const jwksEnvironment = {
   SUPABASE_URL: 'https://project-ref.supabase.co',
@@ -154,6 +159,25 @@ describe('search configuration', () => {
       () => loadConfig(applicationEnvironment({ WATCH_ENABLED: 'true', SEARCH_ENABLED: 'false' })),
       /WATCH_ENABLED requires SEARCH_ENABLED=true/,
     );
+  });
+});
+
+describe('Elasticsearch rebuild configuration', () => {
+  it('requires an explicit target index so a rebuild cannot overwrite the live index accidentally', () => {
+    const base = {
+      DATABASE_URL: 'postgresql://localhost/iprp',
+      ELASTICSEARCH_URL: 'https://search.example.test',
+    };
+    assert.throws(
+      () => loadElasticsearchRebuildConfig(base),
+      /ELASTICSEARCH_REBUILD_INDEX is required/,
+    );
+
+    const config = loadElasticsearchRebuildConfig({
+      ...base,
+      ELASTICSEARCH_REBUILD_INDEX: 'trademarks_composite_rebuild_20261028',
+    });
+    assert.equal(config.rebuildIndex, 'trademarks_composite_rebuild_20261028');
   });
 });
 

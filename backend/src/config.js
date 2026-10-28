@@ -569,6 +569,18 @@ export function loadElasticsearchSyncConfig(env = process.env) {
   };
 }
 
+export function loadElasticsearchRebuildConfig(env = process.env) {
+  const config = loadElasticsearchSyncConfig(env);
+  const rebuildIndex = env.ELASTICSEARCH_REBUILD_INDEX?.trim();
+  if (!rebuildIndex) {
+    throw new Error('ELASTICSEARCH_REBUILD_INDEX is required for a full Elasticsearch rebuild.');
+  }
+  return {
+    ...config,
+    rebuildIndex: elasticsearchIndexName(rebuildIndex),
+  };
+}
+
 export function loadElasticsearchIndexConfig(env = process.env) {
   return {
     elasticsearchUrl: elasticsearchSearchUrl(env),

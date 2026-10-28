@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  ensureElasticsearchIndex,
   ensureElasticsearchIndices,
   indexDefinitions,
   OFFICE_ACTIONS_INDEX,
@@ -76,5 +77,30 @@ describe('Elasticsearch index management', () => {
     );
     assert.deepEqual(stored.get(TRADEMARKS_COMPOSITE_INDEX), indexDefinitions[TRADEMARKS_COMPOSITE_INDEX]);
     assert.equal(requests.filter(({ options }) => options.method === 'PUT').length, 2);
+  });
+
+  it('can create a separately named trademark index for an atomic rebuild', async () => {
+    const requests = [];
+    const fetchImpl = async (url, options) => {
+      requests.push({ url, options });
+      if (options.method === 'HEAD') return response(404);
+      return response(200, '{"acknowledged":true}');
+    };
+
+    const result = await ensureElasticsearchIndex({
+      baseUrl: 'http://elasticsearch.test:9200',
+      indexName: 'trademarks_composite_rebuild_20261028',
+      definition: indexDefinitions[TRADEMARKS_COMPOSITE_INDEX],
+      fetchImpl,
+    });
+
+    assert.deepEqual(result, {
+      name: 'trademarks_composite_rebuild_20261028',
+      created: true,
+    });
+    assert.equal(requests[0].options.method, 'HEAD');
+    assert.equal(requests[1].options.method, 'PUT');
+    assert.match(requests[1].url, /trademarks_composite_rebuild_20261028$/);
+    assert.deepEqual(JSON.parse(requests[1].options.body), indexDefinitions[TRADEMARKS_COMPOSITE_INDEX]);
   });
 });

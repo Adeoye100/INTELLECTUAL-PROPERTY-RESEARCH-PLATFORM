@@ -25,6 +25,7 @@ function refreshRunFromRow(row) {
     dataThroughDate: formatDateOnly(row.data_through_date),
     discoveredFileCount: Number(row.discovered_file_count ?? 0),
     processedRecordCount: Number(row.processed_record_count ?? 0),
+    retainedRecordCount: Number(row.retained_record_count ?? 0),
     changedRecordCount: Number(row.changed_record_count ?? 0),
     projectedRecordCount: Number(row.projected_record_count ?? 0),
     projectionBacklogCount: row.projection_backlog_count !== null && row.projection_backlog_count !== undefined
@@ -41,7 +42,7 @@ function refreshRunFromRow(row) {
 const SELECT_COLUMNS = `
   id, source_registry, status, coverage_kind, source_release, expected_file_count,
   requested_since_date, latest_discovered_source_date, data_through_date,
-  discovered_file_count, processed_record_count, changed_record_count,
+  discovered_file_count, processed_record_count, retained_record_count, changed_record_count,
   projected_record_count, projection_backlog_count, started_at, ingestion_completed_at,
   projection_completed_at, completed_at, error_code
 `;
@@ -114,6 +115,7 @@ export class RegistryRefreshRepository {
     latestDiscoveredSourceDate,
     discoveredFileCount,
     processedRecordCount,
+    retainedRecordCount,
     changedRecordCount,
   }) {
     if (!runId) throw new TypeError('markIngested requires a runId.');
@@ -123,7 +125,8 @@ export class RegistryRefreshRepository {
            latest_discovered_source_date = $2,
            discovered_file_count = $3,
            processed_record_count = $4,
-           changed_record_count = $5,
+           retained_record_count = $5,
+           changed_record_count = $6,
            ingestion_completed_at = now()
        WHERE id = $1
        RETURNING ${SELECT_COLUMNS}`,
@@ -132,6 +135,7 @@ export class RegistryRefreshRepository {
         latestDiscoveredSourceDate ?? null,
         Math.max(0, discoveredFileCount ?? 0),
         Math.max(0, processedRecordCount ?? 0),
+        Math.max(0, retainedRecordCount ?? 0),
         Math.max(0, changedRecordCount ?? 0),
       ],
     );

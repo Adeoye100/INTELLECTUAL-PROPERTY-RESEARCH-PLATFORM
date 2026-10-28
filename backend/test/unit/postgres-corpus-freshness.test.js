@@ -141,4 +141,37 @@ describe('persisted PostgreSQL corpus freshness', () => {
     assert.deepEqual(calls[0].parameters, ['USPTO']);
     assert.match(calls[0].sql, /coverage_kind = 'baseline'/);
   });
+
+  it('persists and returns the retained USPTO record count', async () => {
+    const calls = [];
+    const repository = new RegistryRefreshRepository({
+      async query(sql, parameters) {
+        calls.push({ sql, parameters });
+        return {
+          rows: [{
+            id: 'run-1',
+            source_registry: 'USPTO',
+            status: 'ingested',
+            coverage_kind: 'baseline',
+            retained_record_count: 7,
+            processed_record_count: 10,
+            changed_record_count: 7,
+          }],
+        };
+      },
+    });
+
+    const result = await repository.markIngested({
+      runId: 'run-1',
+      latestDiscoveredSourceDate: '2026-09-14',
+      discoveredFileCount: 1,
+      processedRecordCount: 10,
+      retainedRecordCount: 7,
+      changedRecordCount: 7,
+    });
+
+    assert.match(calls[0].sql, /retained_record_count = \$5/);
+    assert.deepEqual(calls[0].parameters, ['run-1', '2026-09-14', 1, 10, 7, 7]);
+    assert.equal(result.retainedRecordCount, 7);
+  });
 });

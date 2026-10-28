@@ -51,6 +51,7 @@ describe('PostgresSearchSource', () => {
     assert.match(captured.text, /to_tsvector\('simple', mark_text\)/);
     assert.match(captured.text, /soundex\(mark_text\) = soundex\(\$2\)/);
     assert.match(captured.text, /nice_classes &&/);
+    assert.match(captured.text, /status = ANY\(ARRAY\['registered', 'pending'\]::text\[\]\)/);
     assert.equal(captured.values[0], 'USPTO');
     assert.equal(captured.values[1], 'Forge Global');
     assert.equal(captured.values.at(-1), 25);
@@ -91,6 +92,7 @@ describe('PostgresSearchSource', () => {
     assert.match(captured.text, /soundex\(mark_text\) = soundex\(\$2\)/);
     assert.match(captured.text, /\(SELECT value FROM fast_count\) < \$5/);
     assert.match(captured.text, /mark_text % \$2/);
+    assert.match(captured.text, /status = ANY\(ARRAY\['registered', 'pending'\]::text\[\]\)/);
     assert.doesNotMatch(captured.text, /WHERE[\s\S]*lower\(mark_text\) = lower\(\$2\)[\s\S]*OR mark_text % \$2/);
     assert.equal(captured.values[0], 'USPTO');
     assert.equal(captured.values[1], 'COCA-COLA');

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { UsptoBulkXmlAdapter } from '../../src/registries/uspto/bulk-xml-adapter.js';
-import { ingestRegistryRecords } from '../../src/ingestion/ingest-registry.js';
+import { ingestRegistryRecords, ingestRegistryUpdates } from '../../src/ingestion/ingest-registry.js';
 import { SearchFreshnessService } from '../../src/search/search-freshness-service.js';
 import { FreshnessGuardedSearchService } from '../../src/search/freshness-guarded-search-service.js';
 
@@ -92,6 +92,66 @@ describe('SEARCH-DATA-01 unit test suite', () => {
       assert.equal(batches.length, 2);
       assert.equal(batches[0].length, 2);
       assert.equal(batches[1].length, 1);
+    });
+
+    it('counts filtered source records separately and never writes them', async () => {
+      async function* generateRecords() {
+        yield { sourceReferenceId: 'live', status: 'LIVE' };
+        yield { sourceReferenceId: 'dead', status: 'DEAD' };
+      }
+      const batches = [];
+      const repository = {
+        async upsertBatch(batch) {
+          batches.push([...batch]);
+          return batch.length;
+        },
+      };
+
+      const result = await ingestRegistryRecords({
+        records: generateRecords(),
+        repository,
+        batchSize: 2,
+        recordFilter: (record) => record.status === 'LIVE',
+      });
+
+      assert.deepEqual(result, {
+        processed: 2,
+        retained: 1,
+        changed: 1,
+      });
+      assert.deepEqual(batches, [[{ sourceReferenceId: 'live', status: 'LIVE' }]]);
+    });
+
+    it('passes the retention policy through the adapter update helper', async () => {
+      const batches = [];
+      const adapter = {
+        sourceName: 'USPTO',
+        async *fetchUpdates() {
+          yield { sourceReferenceId: 'registered', status: 'registered' };
+          yield { sourceReferenceId: 'abandoned', status: 'abandoned' };
+        },
+      };
+      const repository = {
+        async upsertBatch(batch) {
+          batches.push([...batch]);
+          return batch.length;
+        },
+      };
+
+      const result = await ingestRegistryUpdates({
+        adapter,
+        repository,
+        since: new Date('2026-01-05'),
+        recordFilter: (record) => record.status === 'registered',
+      });
+
+      assert.deepEqual(result, {
+        sourceName: 'USPTO',
+        processed: 2,
+        retained: 1,
+        changed: 1,
+      });
+      assert.deepEqual(batches, [[{ sourceReferenceId: 'registered', status: 'registered' }]]);
     });
   });
 

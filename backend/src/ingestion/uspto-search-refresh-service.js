@@ -8,6 +8,7 @@ import {
   ElasticsearchProjector,
   syncRegistryTrademarksToElasticsearch,
 } from './elasticsearch-projector.js';
+import { shouldRetainUsptoRecord } from './uspto-record-filter.js';
 
 const LOCK_KEY = 'uspto_search_refresh';
 
@@ -160,6 +161,7 @@ export async function executeUsptoSearchRefresh({
       : null;
 
     let processedRecordCount = 0;
+    let retainedRecordCount = 0;
     let changedRecordCount = 0;
     let lastProcessedFileDate = null;
 
@@ -168,8 +170,10 @@ export async function executeUsptoSearchRefresh({
         records: adapter.fetchUpdate(update),
         repository: trademarkRepo,
         batchSize: 500,
+        recordFilter: shouldRetainUsptoRecord,
       });
       processedRecordCount += result.processed;
+      retainedRecordCount += result.retained;
       changedRecordCount += result.changed;
       lastProcessedFileDate = update.date.toISOString().slice(0, 10);
       console.log('USPTO bulk file ingested', {
@@ -189,6 +193,7 @@ export async function executeUsptoSearchRefresh({
       latestDiscoveredSourceDate,
       discoveredFileCount,
       processedRecordCount,
+      retainedRecordCount,
       changedRecordCount,
     });
 
@@ -225,6 +230,7 @@ export async function executeUsptoSearchRefresh({
       since: requestedSinceDate,
       filesDiscovered: discoveredFileCount,
       processed: processedRecordCount,
+      retained: retainedRecordCount,
       changed: changedRecordCount,
       projected: projectedRecordCount,
       dataThrough: dataThroughDate,

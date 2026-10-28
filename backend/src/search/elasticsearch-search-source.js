@@ -35,6 +35,9 @@ function addOptionalTermFilter(filters, field, value) {
 
 function buildQuery(query = {}, sourceName, maxResults) {
   const filters = [{ term: { source_registry: sourceName } }];
+  if (sourceName === 'USPTO') {
+    filters.push({ terms: { status: ['registered', 'pending'] } });
+  }
   if (Array.isArray(query.jurisdictions) && query.jurisdictions.length > 0) {
     filters.push({ terms: { jurisdiction: query.jurisdictions } });
   }

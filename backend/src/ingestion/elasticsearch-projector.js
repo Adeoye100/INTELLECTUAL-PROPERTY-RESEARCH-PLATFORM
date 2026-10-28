@@ -102,13 +102,22 @@ export async function syncRegistryTrademarksToElasticsearch({
   repository,
   projector,
   batchSize = 500,
+  full = false,
+  fullStatuses = null,
 }) {
   let projected = 0;
+  let cursor = null;
   while (true) {
-    const rows = await repository.pendingProjection(batchSize);
+    const rows = full
+      ? await repository.allProjection(batchSize, cursor, fullStatuses)
+      : await repository.pendingProjection(batchSize);
     if (!rows.length) return { projected };
     await projector.project(rows);
-    await repository.markProjected(rows);
+    if (!full) await repository.markProjected(rows);
     projected += rows.length;
+    if (full) {
+      const last = rows[rows.length - 1];
+      cursor = { updatedAt: last.updated_at, id: last.id };
+    }
   }
 }

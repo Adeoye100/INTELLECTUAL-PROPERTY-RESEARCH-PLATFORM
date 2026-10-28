@@ -3,6 +3,7 @@ import { createPool } from '../db/pool.js';
 import { UsptoBulkXmlAdapter } from '../registries/uspto/bulk-xml-adapter.js';
 import { ingestRegistryUpdates } from './ingest-registry.js';
 import { RegistryTrademarkRepository } from './registry-trademark-repository.js';
+import { shouldRetainUsptoRecord } from './uspto-record-filter.js';
 
 function argument(name) {
   const index = process.argv.indexOf(name);
@@ -37,6 +38,7 @@ try {
     adapter,
     repository: new RegistryTrademarkRepository(pool),
     since,
+    recordFilter: shouldRetainUsptoRecord,
   });
   console.log('USPTO ingestion complete', { ...result, since: since.toISOString().slice(0, 10) });
 } finally {
