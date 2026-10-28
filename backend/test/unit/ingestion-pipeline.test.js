@@ -149,6 +149,48 @@ describe('registry ingestion boundaries', () => {
     assert.match(calls[0].sql, /status = ANY\(\$4::text\[\]\)/);
   });
 
+  it('can constrain a full projection to one source registry', async () => {
+    const calls = [];
+    const repository = new RegistryTrademarkRepository({
+      async query(sql, parameters) {
+        calls.push({ sql, parameters });
+        return { rows: [] };
+      },
+    });
+
+    await repository.allProjection(100, null, ['registered', 'pending'], 'USPTO');
+
+    assert.deepEqual(calls[0].parameters, [100, null, null, ['registered', 'pending'], 'USPTO']);
+    assert.match(calls[0].sql, /source_registry = \$5/);
+  });
+
+  it('streams a source-scoped full projection by primary-key cursor', async () => {
+    const calls = [];
+    const repository = new RegistryTrademarkRepository({
+      async query(sql, parameters) {
+        calls.push({ sql, parameters });
+        return { rows: [] };
+      },
+    });
+
+    await repository.allProjectionById(
+      100,
+      '11111111-1111-4111-8111-111111111111',
+      ['registered', 'pending'],
+      'USPTO',
+    );
+
+    assert.deepEqual(calls[0].parameters, [
+      100,
+      '11111111-1111-4111-8111-111111111111',
+      ['registered', 'pending'],
+      'USPTO',
+    ]);
+    assert.match(calls[0].sql, /id > \$2::uuid/);
+    assert.match(calls[0].sql, /source_registry = \$4/);
+    assert.match(calls[0].sql, /ORDER BY id/);
+  });
+
   it('projectToElasticsearch writes one PostgreSQL-shaped row in the composite shape', async () => {
     let request;
     const row = {

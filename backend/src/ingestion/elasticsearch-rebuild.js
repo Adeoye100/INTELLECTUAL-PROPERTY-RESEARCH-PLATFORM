@@ -33,6 +33,8 @@ export async function rebuildRegistryTrademarksInElasticsearch({
     batchSize,
     full: true,
     fullStatuses: ACTIVE_USPTO_STATUSES,
+    fullSourceRegistry: 'USPTO',
+    fullOrderById: true,
   });
   return { indexName, created: true, ...result };
 }

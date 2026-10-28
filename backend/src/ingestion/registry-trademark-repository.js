@@ -94,8 +94,10 @@ export class RegistryTrademarkRepository {
     return result.rows;
   }
 
-  async allProjection(limit, cursor = null, statuses = null) {
+  async allProjection(limit, cursor = null, statuses = null, sourceRegistry = null) {
     const statusClause = statuses ? 'AND status = ANY($4::text[])' : '';
+    const sourceParameter = statuses ? 5 : 4;
+    const sourceClause = sourceRegistry ? `AND source_registry = $${sourceParameter}` : '';
     const result = await this.pool.query(`
       SELECT
         id,
@@ -112,6 +114,7 @@ export class RegistryTrademarkRepository {
       WHERE ($2::timestamptz IS NULL
          OR (updated_at, id) > ($2::timestamptz, $3::uuid))
         ${statusClause}
+        ${sourceClause}
       ORDER BY updated_at, id
       LIMIT $1
     `, [
@@ -119,6 +122,38 @@ export class RegistryTrademarkRepository {
       cursor?.updatedAt ?? null,
       cursor?.id ?? null,
       ...(statuses ? [statuses] : []),
+      ...(sourceRegistry ? [sourceRegistry] : []),
+    ]);
+    return result.rows;
+  }
+
+  async allProjectionById(limit, cursorId = null, statuses = null, sourceRegistry = null) {
+    const statusClause = statuses ? 'AND status = ANY($3::text[])' : '';
+    const sourceParameter = statuses ? 4 : 3;
+    const sourceClause = sourceRegistry ? `AND source_registry = $${sourceParameter}` : '';
+    const result = await this.pool.query(`
+      SELECT
+        id,
+        mark_text,
+        owner,
+        jurisdiction,
+        nice_classes,
+        status,
+        filing_date,
+        source_registry,
+        source_reference_id,
+        updated_at
+      FROM registry_trademarks
+      WHERE ($2::uuid IS NULL OR id > $2::uuid)
+        ${statusClause}
+        ${sourceClause}
+      ORDER BY id
+      LIMIT $1
+    `, [
+      limit,
+      cursorId,
+      ...(statuses ? [statuses] : []),
+      ...(sourceRegistry ? [sourceRegistry] : []),
     ]);
     return result.rows;
   }

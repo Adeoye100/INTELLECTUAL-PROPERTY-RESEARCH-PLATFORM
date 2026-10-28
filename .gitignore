@@ -76,3 +76,4 @@ tmp/
 temp/
 .tmp/
 /IPRP_conversation
+/backend/.secret/

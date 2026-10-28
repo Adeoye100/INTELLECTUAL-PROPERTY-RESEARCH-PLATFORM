@@ -15,9 +15,10 @@ describe('Elasticsearch registry rebuild', () => {
   it('creates a new index and fully projects the PostgreSQL corpus without marking rows', async () => {
     const requests = [];
     const repository = {
-      async allProjection(limit, cursor, statuses) {
+      async allProjectionById(limit, cursor, statuses, sourceRegistry) {
         assert.equal(limit, 1);
         assert.deepEqual(statuses, ['registered', 'pending']);
+        assert.equal(sourceRegistry, 'USPTO');
         if (!cursor) {
           return [{
             id: 'mark-1',

@@ -104,12 +104,16 @@ export async function syncRegistryTrademarksToElasticsearch({
   batchSize = 500,
   full = false,
   fullStatuses = null,
+  fullSourceRegistry = null,
+  fullOrderById = false,
 }) {
   let projected = 0;
   let cursor = null;
   while (true) {
     const rows = full
-      ? await repository.allProjection(batchSize, cursor, fullStatuses)
+      ? fullOrderById
+        ? await repository.allProjectionById(batchSize, cursor?.id ?? null, fullStatuses, fullSourceRegistry)
+        : await repository.allProjection(batchSize, cursor, fullStatuses, fullSourceRegistry)
       : await repository.pendingProjection(batchSize);
     if (!rows.length) return { projected };
     await projector.project(rows);
@@ -117,7 +121,9 @@ export async function syncRegistryTrademarksToElasticsearch({
     projected += rows.length;
     if (full) {
       const last = rows[rows.length - 1];
-      cursor = { updatedAt: last.updated_at, id: last.id };
+      cursor = fullOrderById
+        ? { id: last.id }
+        : { updatedAt: last.updated_at, id: last.id };
     }
   }
 }
