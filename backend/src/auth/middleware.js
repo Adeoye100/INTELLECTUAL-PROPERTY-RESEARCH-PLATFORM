@@ -18,7 +18,7 @@ export function createSupabaseAuthenticate(verifier, logger = console) {
     } catch (error) {
       logger.warn('Supabase authentication failed', {
         name: error?.name ?? 'Error',
-        code: error?.code ?? 'SUPABASE_TOKEN_UNVERIFIABLE',
+        code: error?.code ?? 'TOKEN_UNVERIFIABLE',
       });
       return next(unauthorized('Access token is invalid or expired.'));
     }
@@ -51,6 +51,7 @@ export function createResolveRoleAndFirm(roleFirmResolver) {
       );
       const authorizedUser = {
         ...request.user,
+        email: membership?.email || request.user.email,
         role: membership?.role,
         firmId: membership?.firmId,
       };

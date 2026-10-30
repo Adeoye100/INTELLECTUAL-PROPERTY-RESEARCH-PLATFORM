@@ -89,7 +89,7 @@ export class PortfolioMarkRepository {
         nice_classes, status, filing_date, registration_date, renewal_date
       ) VALUES (
         $1,
-        (SELECT id FROM users WHERE supabase_user_id = $2 AND firm_id = $1),
+        (SELECT id FROM users WHERE (clerk_user_id = $2 OR supabase_user_id::text = $2 OR id::text = $2) AND firm_id = $1),
         $3, $4, $5, $6, $7, $8, $9, $10, $11
       ) RETURNING ${SELECT_COLUMNS}`,
       [

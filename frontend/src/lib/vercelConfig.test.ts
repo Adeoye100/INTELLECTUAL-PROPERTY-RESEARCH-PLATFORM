@@ -38,7 +38,7 @@ describe('Vercel production configuration', () => {
 
     expect(csp).toContain("default-src 'self'");
     expect(csp).toContain("frame-ancestors 'none'");
-    expect(csp).toContain('https://ccslkfqnziikcsgbrwfd.supabase.co');
+    expect(csp).toContain('https://bhpsfxchuxhrngbzaxff.supabase.co');
     expect(csp).toContain('https://iprp-api.onrender.com');
     expect(csp).not.toContain("'unsafe-eval'");
     expect(csp).not.toMatch(/\*|localhost/i);

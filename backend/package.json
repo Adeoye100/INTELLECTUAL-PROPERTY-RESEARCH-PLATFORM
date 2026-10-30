@@ -48,9 +48,12 @@
   },
   "type": "module",
   "dependencies": {
+    "@clerk/backend": "3.26.4",
+    "@clerk/express": "2.1.85",
     "argon2": "^0.45.1",
     "express": "^5.2.1",
     "jose": "^6.2.8",
+    "mongodb": "7.7.0",
     "pg": "^8.22.0",
     "redis": "^6.2.0",
     "saxes": "^6.0.0",

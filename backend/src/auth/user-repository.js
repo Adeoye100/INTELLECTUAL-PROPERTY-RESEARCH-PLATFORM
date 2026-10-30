@@ -52,24 +52,51 @@ export class UserRepository {
     const result = await this.pool.query(
       `SELECT role, firm_id
        FROM users
-       WHERE supabase_user_id = $1 AND active = true`,
+       WHERE (supabase_user_id::text = $1 OR clerk_user_id = $1) AND active = true`,
       [supabaseUserId],
     );
     if (!result.rowCount) return null;
     return { role: result.rows[0].role, firmId: result.rows[0].firm_id };
   }
 
+  async findByAuthId(authId, email) {
+    if (!authId) return null;
+    const result = await this.pool.query(
+      `SELECT role, firm_id, email
+       FROM users
+       WHERE (clerk_user_id = $1 OR supabase_user_id::text = $1) AND active = true`,
+      [authId],
+    );
+    if (result.rowCount) return { role: result.rows[0].role, firmId: result.rows[0].firm_id, email: result.rows[0].email };
+
+    if (email && typeof email === 'string') {
+      const normalizedEmail = email.trim().toLowerCase();
+      const linked = await this.pool.query(
+        `UPDATE users
+         SET clerk_user_id = $1
+         WHERE (clerk_user_id IS NULL OR clerk_user_id = '')
+           AND lower(email) = $2
+           AND active = true
+         RETURNING role, firm_id, email`,
+        [authId, normalizedEmail],
+      );
+      if (linked.rowCount) return { role: linked.rows[0].role, firmId: linked.rows[0].firm_id, email: linked.rows[0].email };
+    }
+    return null;
+  }
+
   async findOrLinkBySupabaseIdentity(supabaseUserId, normalizedEmail) {
+    const isClerk = String(supabaseUserId).startsWith('user_');
     const result = await this.pool.query(
       `WITH existing AS (
          SELECT role, firm_id
          FROM users
-         WHERE supabase_user_id = $1 AND active = true
+         WHERE (supabase_user_id::text = $1 OR clerk_user_id = $1) AND active = true
        ), linked AS (
          UPDATE users
-         SET supabase_user_id = $1
-         WHERE supabase_user_id IS NULL
-           AND email = $2
+         SET clerk_user_id = CASE WHEN $3 = true THEN $1 ELSE clerk_user_id END,
+             supabase_user_id = CASE WHEN $3 = false AND supabase_user_id IS NULL THEN $1::uuid ELSE supabase_user_id END
+         WHERE lower(email) = $2
            AND active = true
            AND NOT EXISTS (SELECT 1 FROM existing)
          RETURNING role, firm_id
@@ -78,7 +105,7 @@ export class UserRepository {
        UNION ALL
        SELECT role, firm_id FROM linked
        LIMIT 1`,
-      [supabaseUserId, normalizedEmail],
+      [supabaseUserId, normalizedEmail, isClerk],
     );
     if (!result.rowCount) return null;
     return { role: result.rows[0].role, firmId: result.rows[0].firm_id };
@@ -90,6 +117,7 @@ export class UserRepository {
     email,
     supabaseUserId,
   }) {
+    const isClerk = String(supabaseUserId).startsWith('user_');
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
@@ -99,7 +127,7 @@ export class UserRepository {
         `SELECT u.*, f.name AS firm_name
          FROM users u
          JOIN firms f ON f.id = u.firm_id
-         WHERE u.supabase_user_id = $1 AND u.active = true`,
+         WHERE (u.clerk_user_id = $1 OR u.supabase_user_id::text = $1) AND u.active = true`,
         [supabaseUserId],
       );
       if (existingUser.rowCount) {
@@ -110,14 +138,15 @@ export class UserRepository {
       const linkedUser = await client.query(
         `WITH linked AS (
            UPDATE users
-           SET supabase_user_id = $1
-           WHERE supabase_user_id IS NULL AND email = $2 AND active = true
+           SET clerk_user_id = CASE WHEN $3 = true THEN $1 ELSE clerk_user_id END,
+               supabase_user_id = CASE WHEN $3 = false AND supabase_user_id IS NULL THEN $1::uuid ELSE supabase_user_id END
+           WHERE email = $2 AND active = true
            RETURNING *
          )
          SELECT linked.*, f.name AS firm_name
          FROM linked
          JOIN firms f ON f.id = linked.firm_id`,
-        [supabaseUserId, email],
+        [supabaseUserId, email, isClerk],
       );
       if (linkedUser.rowCount) {
         await client.query('COMMIT');
@@ -142,10 +171,10 @@ export class UserRepository {
       const firm = inserted.rows[0];
 
       const userResult = await client.query(
-        `INSERT INTO users (firm_id, email, password_hash, role, supabase_user_id)
-         VALUES ($1, $2, NULL, $3, $4)
+        `INSERT INTO users (firm_id, email, password_hash, role, supabase_user_id, clerk_user_id)
+         VALUES ($1, $2, NULL, $3, CASE WHEN $5 = true THEN NULL ELSE $4::uuid END, CASE WHEN $5 = true THEN $4 ELSE NULL END)
          RETURNING id, firm_id, email, password_hash, role, created_at, last_login_at`,
-        [firm.id, email, 'admin', supabaseUserId],
+        [firm.id, email, 'admin', supabaseUserId, isClerk],
       );
       await client.query('COMMIT');
 

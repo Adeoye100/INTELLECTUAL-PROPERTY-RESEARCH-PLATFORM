@@ -13,9 +13,10 @@ export { AUTH_SYNCHRONIZATION_DIAGNOSTIC_EVENT } from './authSessionLifecycle';
 interface AuthState {
   token: string | null;
   user: AuthenticatedUser | null;
-  status: 'initializing' | 'authenticated' | 'unauthenticated';
+  status: 'initializing' | 'authenticated' | 'unauthenticated' | 'unassigned';
   setSession: (token: string, user: AuthenticatedUser, expiresAt?: number) => void;
   clearSession: () => void;
+  setStatus: (status: 'initializing' | 'authenticated' | 'unauthenticated' | 'unassigned') => void;
 }
 
 interface CurrentUserResponse {
@@ -42,6 +43,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
     set({ token, user, status: 'authenticated' });
   },
   clearSession: () => sessionLifecycle.clearSession(),
+  setStatus: (status) => set({ status }),
 }));
 
 const sessionLifecycle = new AuthSessionLifecycle({

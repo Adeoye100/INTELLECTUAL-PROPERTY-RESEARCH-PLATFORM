@@ -1,5 +1,6 @@
 const APPLICATION_ROLES = new Set(['admin', 'attorney', 'viewer']);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const USER_ID_PATTERN = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|user_[a-zA-Z0-9_]+)$/i;
 
 export const ROLE_CACHE_TTL_SECONDS = 60;
 
@@ -15,6 +16,7 @@ export class RedisRoleFirmResolver {
   constructor({
     redisClient,
     userRepository,
+    supabaseAdminUserService,
     ttlSeconds = ROLE_CACHE_TTL_SECONDS,
   }) {
     if (
@@ -27,7 +29,7 @@ export class RedisRoleFirmResolver {
     }
     if (
       !userRepository
-      || typeof userRepository.findBySupabaseUserId !== 'function'
+      || (typeof userRepository.findBySupabaseUserId !== 'function' && typeof userRepository.findByAuthId !== 'function')
     ) {
       throw new TypeError('RedisRoleFirmResolver needs a user repository.');
     }
@@ -37,6 +39,7 @@ export class RedisRoleFirmResolver {
 
     this.redisClient = redisClient;
     this.userRepository = userRepository;
+    this.adminUserService = supabaseAdminUserService || null;
     this.ttlSeconds = ttlSeconds;
   }
 
@@ -45,7 +48,7 @@ export class RedisRoleFirmResolver {
   }
 
   async resolveRoleAndFirm(supabaseUserId, email) {
-    if (typeof supabaseUserId !== 'string' || !UUID_PATTERN.test(supabaseUserId)) return null;
+    if (typeof supabaseUserId !== 'string' || !USER_ID_PATTERN.test(supabaseUserId)) return null;
 
     const key = this.keyFor(supabaseUserId);
     const serialized = await this.redisClient.get(key);
@@ -53,23 +56,51 @@ export class RedisRoleFirmResolver {
       try {
         const cached = JSON.parse(serialized);
         if (cached?.missing === true) return null;
-        if (validMembership(cached)) return { role: cached.role, firmId: cached.firmId };
+        if (validMembership(cached)) {
+          return {
+            role: cached.role,
+            firmId: cached.firmId,
+            ...(cached.email ? { email: cached.email } : {}),
+          };
+        }
       } catch {
         // Invalid internal cache data is discarded and reloaded from PostgreSQL.
       }
       await this.redisClient.del(key);
     }
 
-    const membership = await this.userRepository.findBySupabaseUserId(supabaseUserId);
+    let membership = typeof this.userRepository.findByAuthId === 'function'
+      ? await this.userRepository.findByAuthId(supabaseUserId, email)
+      : await this.userRepository.findBySupabaseUserId(supabaseUserId);
+
+    if (!membership && this.adminUserService && typeof this.adminUserService.getAuthoritativeUser === 'function') {
+      try {
+        const authoritative = await this.adminUserService.getAuthoritativeUser(supabaseUserId);
+        if (authoritative?.email) {
+          membership = typeof this.userRepository.findByAuthId === 'function'
+            ? await this.userRepository.findByAuthId(supabaseUserId, authoritative.email)
+            : (typeof this.userRepository.findOrLinkBySupabaseIdentity === 'function'
+              ? await this.userRepository.findOrLinkBySupabaseIdentity(supabaseUserId, authoritative.email)
+              : null);
+        }
+      } catch {
+        // Fall back to missing
+      }
+    }
+
     const cacheValue = validMembership(membership)
-      ? { role: membership.role, firmId: membership.firmId }
+      ? {
+          role: membership.role,
+          firmId: membership.firmId,
+          ...(membership.email ? { email: membership.email } : {}),
+        }
       : { missing: true };
     await this.redisClient.set(key, JSON.stringify(cacheValue), { EX: this.ttlSeconds });
     return cacheValue.missing ? null : cacheValue;
   }
 
   async invalidate(supabaseUserId) {
-    if (typeof supabaseUserId !== 'string' || !UUID_PATTERN.test(supabaseUserId)) return;
+    if (typeof supabaseUserId !== 'string' || !USER_ID_PATTERN.test(supabaseUserId)) return;
     await this.redisClient.del(this.keyFor(supabaseUserId));
   }
 }

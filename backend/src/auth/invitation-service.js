@@ -7,6 +7,7 @@ import { createOpaqueInvitationToken, hashInvitationToken } from './invitation-t
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ROLES = new Set(['admin', 'attorney', 'viewer']);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const USER_ID_PATTERN = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|user_[a-zA-Z0-9_]+)$/i;
 const unavailableMessage = 'This invitation is invalid or unavailable.';
 
 const normalizedEmail = (value) => String(value ?? '').trim().toLowerCase();
@@ -49,7 +50,7 @@ function validateIssueInput(input) {
 }
 
 function requireAuth(auth) {
-  if (!auth || typeof auth.userId !== 'string' || !UUID_PATTERN.test(auth.userId)
+  if (!auth || typeof auth.userId !== 'string' || !USER_ID_PATTERN.test(auth.userId)
     || typeof auth.firmId !== 'string' || !UUID_PATTERN.test(auth.firmId)) {
     throw forbidden();
   }
@@ -150,7 +151,7 @@ export class InvitationService {
   }
 
   async redeem(token, auth, requestContext = null) {
-    if (!auth || auth.supabaseRole !== 'authenticated' || !UUID_PATTERN.test(auth.userId)) throw forbidden('A verified Supabase session is required.');
+    if (!auth || auth.supabaseRole !== 'authenticated' || !USER_ID_PATTERN.test(auth.userId)) throw forbidden('A verified session is required.');
     const resolved = await this.resolveToken(token);
     this.assertUsable(resolved.invitation);
     let authoritative;

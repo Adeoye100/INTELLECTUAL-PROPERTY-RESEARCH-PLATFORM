@@ -61,7 +61,9 @@ export class ExportRepository {
   async insert({ transaction, exportRecord, actorUserId }) {
     const result = await executor(this, transaction).query(
       `WITH requester AS (
-        SELECT id FROM users WHERE firm_id = $2 AND supabase_user_id = $3
+        SELECT id FROM users
+        WHERE firm_id = $2
+          AND (clerk_user_id = $3 OR supabase_user_id::text = $3 OR id::text = $3)
       )
       INSERT INTO exports (
         id, firm_id, requested_by_user_id, export_type, status, source_entity_id, request_id,
@@ -101,7 +103,7 @@ export class ExportRepository {
     const values = [firmId];
     const clauses = ['exports.firm_id = $1'];
     const add = (sql, value) => { values.push(value); clauses.push(sql.replace('?', `$${values.length}`)); };
-    if (actorUserId) add('exports.requested_by_user_id = (SELECT id FROM users WHERE firm_id = $1 AND supabase_user_id = ?)', actorUserId);
+    if (actorUserId) add('exports.requested_by_user_id = (SELECT id FROM users WHERE firm_id = $1 AND (clerk_user_id = ? OR supabase_user_id::text = ? OR id::text = ?))', actorUserId);
     if (filters.status) add('exports.status = ?', filters.status);
     if (filters.type) add('exports.export_type = ?', filters.type);
     if (pagination.cursor) {

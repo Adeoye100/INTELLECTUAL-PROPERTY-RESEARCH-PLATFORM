@@ -31,7 +31,9 @@ if (canonicalUrl) {
   window.location.replace(canonicalUrl);
 } else enableMocking()
   .then(async () => {
-    await initializeAuth();
+    if (!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY) {
+      await initializeAuth();
+    }
     createRoot(document.getElementById("root")!).render(
       <StrictMode>
         <App />

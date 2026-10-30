@@ -453,6 +453,17 @@ function asymmetricAlgorithms(env, mode) {
   return [...new Set(algorithms)];
 }
 
+export function loadClerkConfig(env = process.env) {
+  const clerkSecretKey = env.CLERK_SECRET_KEY?.trim() || undefined;
+  const clerkPublishableKey = env.CLERK_PUBLISHABLE_KEY?.trim() || undefined;
+  const clerkJwtKey = env.CLERK_JWT_KEY?.trim() || undefined;
+  return {
+    clerkSecretKey,
+    clerkPublishableKey,
+    clerkJwtKey,
+  };
+}
+
 export function loadSupabaseConfig(env = process.env) {
   const supabaseJwtVerificationMode = verificationMode(env);
   const supabasePublishableKey = env.SUPABASE_PUBLISHABLE_KEY?.trim() || undefined;
@@ -478,10 +489,26 @@ export function loadConfig(env = process.env) {
     throw new Error('JWT_ACCESS_SECRET must contain at least 32 bytes.');
   }
 
-  const supabaseConfig = loadSupabaseConfig(env);
-  if (!supabaseConfig.supabaseSecretKey) {
+  const clerkConfig = loadClerkConfig(env);
+  const authProvider = env.AUTH_PROVIDER?.trim()
+    || (clerkConfig.clerkSecretKey ? 'clerk' : 'supabase');
+
+  let supabaseConfig = {};
+  if (authProvider === 'supabase' || env.SUPABASE_SECRET_KEY) {
+    try {
+      supabaseConfig = loadSupabaseConfig(env);
+    } catch (error) {
+      if (authProvider === 'supabase') throw error;
+    }
+  }
+
+  if (authProvider === 'clerk' && !clerkConfig.clerkSecretKey) {
+    throw new Error('Missing required environment variable: CLERK_SECRET_KEY');
+  }
+  if (authProvider === 'supabase' && !supabaseConfig.supabaseSecretKey) {
     throw new Error('Missing required environment variable: SUPABASE_SECRET_KEY');
   }
+
   const searchConfig = loadSearchConfig(env);
   const officeActionSearchConfig = loadOfficeActionSearchConfig(env);
   const pdfExportConfig = loadPdfExportConfig(env, environment);
@@ -490,20 +517,29 @@ export function loadConfig(env = process.env) {
     throw new Error('WATCH_ENABLED requires SEARCH_ENABLED=true.');
   }
   const authRateLimitConfig = loadAuthRateLimitConfig(
-    env, jwtAccessSecret, supabaseConfig.supabaseSecretKey, environment,
+    env, jwtAccessSecret, supabaseConfig.supabaseSecretKey || clerkConfig.clerkSecretKey, environment,
   );
   const database = databaseConfig(env, environment);
   const httpServer = loadHttpServerConfig(env);
   const configuredRedisUrl = redisUrl(env, environment);
   if (environment === 'production') {
     rejectProductionPlaceholder(jwtAccessSecret, 'JWT_ACCESS_SECRET', environment);
-    rejectProductionPlaceholder(supabaseConfig.supabaseSecretKey, 'SUPABASE_SECRET_KEY', environment);
+    if (supabaseConfig.supabaseSecretKey) {
+      rejectProductionPlaceholder(supabaseConfig.supabaseSecretKey, 'SUPABASE_SECRET_KEY', environment);
+    }
+    if (clerkConfig.clerkSecretKey) {
+      rejectProductionPlaceholder(clerkConfig.clerkSecretKey, 'CLERK_SECRET_KEY', environment);
+    }
     rejectProductionPlaceholder(authRateLimitConfig.authRateLimitKeySecret, 'AUTH_RATE_LIMIT_KEY_SECRET', environment);
-    rejectProductionPlaceholder(supabaseConfig.supabaseUrl, 'SUPABASE_URL', environment);
+    if (supabaseConfig.supabaseUrl) {
+      rejectProductionPlaceholder(supabaseConfig.supabaseUrl, 'SUPABASE_URL', environment);
+    }
   }
 
   return {
     environment,
+    authProvider,
+    ...clerkConfig,
     ...invitationConfig,
     port: positiveInteger(env, 'PORT', 3000),
     ...database,

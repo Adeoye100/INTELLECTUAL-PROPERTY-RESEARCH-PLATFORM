@@ -61,7 +61,9 @@ export class SearchResultRepository {
   async insertSnapshot({ transaction, snapshot, actorUserId }) {
     const result = await executor(this, transaction).query(
       `WITH requester AS (
-        SELECT id FROM users WHERE firm_id = $2 AND supabase_user_id = $3
+        SELECT id FROM users
+        WHERE firm_id = $2
+          AND (clerk_user_id = $3 OR supabase_user_id::text = $3 OR id::text = $3)
       )
       INSERT INTO search_results (
         id, firm_id, requested_by_user_id, request_id, query_snapshot, results_snapshot,
@@ -97,7 +99,7 @@ export class SearchResultRepository {
               search_results.source_statuses, search_results.partial, search_results.result_count,
               search_results.methodology_versions, search_results.created_at,
               search_results.data_through_date, search_results.source_indexed_at, search_results.registry_refresh_run_id,
-              users.supabase_user_id AS requested_by_actor_user_id
+              COALESCE(users.clerk_user_id, users.supabase_user_id::text) AS requested_by_actor_user_id
        FROM search_results
        JOIN users ON users.id = search_results.requested_by_user_id
        WHERE search_results.firm_id = $1 AND search_results.request_id = $2`,
@@ -114,7 +116,7 @@ export class SearchResultRepository {
       clauses.push(sql.replace('?', `$${values.length}`));
     };
     if (actorUserId) add(
-      'requested_by_user_id = (SELECT id FROM users WHERE firm_id = $1 AND supabase_user_id = ?)',
+      'requested_by_user_id = (SELECT id FROM users WHERE firm_id = $1 AND (clerk_user_id = ? OR supabase_user_id::text = ? OR id::text = ?))',
       actorUserId,
     );
     if (filters.requestedByUserId) add('requested_by_user_id = ?', filters.requestedByUserId);

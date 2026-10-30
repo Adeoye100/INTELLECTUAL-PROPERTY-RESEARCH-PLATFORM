@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { SignIn } from '@clerk/react';
 import { Button } from '../../components/Button';
 import { HourglassLoader } from '../../components/HourglassLoader';
 import { supabase } from '../../lib/supabase';
@@ -90,6 +91,25 @@ export const LoginScreen: React.FC = () => {
       setIsGoogleRedirecting(false);
     }
   };
+
+  if (import.meta.env.VITE_CLERK_PUBLISHABLE_KEY) {
+    return (
+      <div className="flex justify-center">
+        <SignIn
+          routing="hash"
+          appearance={{
+            elements: {
+              rootBox: 'w-full',
+              cardBox: 'w-full shadow-none',
+              card: 'w-full bg-transparent shadow-none border-0 p-0',
+            },
+          }}
+          signUpUrl="/auth/create-organization"
+          fallbackRedirectUrl="/app"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

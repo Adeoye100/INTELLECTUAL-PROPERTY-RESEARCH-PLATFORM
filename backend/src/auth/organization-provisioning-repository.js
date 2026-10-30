@@ -14,11 +14,12 @@ export class OrganizationProvisioningRepository {
   }
 
   async createFirmFromIntent({ tokenHash, email, supabaseUserId }) {
+    const isClerk = String(supabaseUserId).startsWith('user_');
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [supabaseUserId]);
-      const existing = await client.query(`SELECT u.id, u.firm_id, u.email, u.role, f.name AS firm_name FROM users u JOIN firms f ON f.id = u.firm_id WHERE u.supabase_user_id = $1`, [supabaseUserId]);
+      const existing = await client.query(`SELECT u.id, u.firm_id, u.email, u.role, f.name AS firm_name FROM users u JOIN firms f ON f.id = u.firm_id WHERE (u.clerk_user_id = $1 OR u.supabase_user_id::text = $1)`, [supabaseUserId]);
       if (existing.rowCount) { await client.query('COMMIT'); return this.mapUser(existing.rows[0]); }
       const intentResult = await client.query(`SELECT * FROM organization_provisioning_intents WHERE token_hash = $1 FOR UPDATE`, [tokenHash]);
       if (!intentResult.rowCount) throw provisioningError('INTENT_INVALID');
@@ -29,7 +30,7 @@ export class OrganizationProvisioningRepository {
       if (firmExists.rowCount) throw provisioningError('FIRM_NAME_EXISTS');
       const firmResult = await client.query(`INSERT INTO firms (name) VALUES ($1) RETURNING id, name`, [intent.firm_name]);
       const firm = firmResult.rows[0];
-      const userResult = await client.query(`INSERT INTO users (firm_id, email, password_hash, role, supabase_user_id) VALUES ($1, $2, NULL, 'admin', $3) RETURNING id, firm_id, email, role, last_login_at`, [firm.id, email, supabaseUserId]);
+      const userResult = await client.query(`INSERT INTO users (firm_id, email, password_hash, role, supabase_user_id, clerk_user_id) VALUES ($1, $2, NULL, 'admin', CASE WHEN $4 = true THEN NULL ELSE $3::uuid END, CASE WHEN $4 = true THEN $3 ELSE NULL END) RETURNING id, firm_id, email, role, last_login_at`, [firm.id, email, supabaseUserId, isClerk]);
       await client.query('UPDATE organization_provisioning_intents SET consumed_at = now() WHERE id = $1', [intent.id]);
       await client.query('COMMIT');
       return this.mapUser({ ...userResult.rows[0], firm_name: firm.name });

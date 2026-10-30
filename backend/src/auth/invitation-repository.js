@@ -89,7 +89,7 @@ export class InvitationRepository {
 
   async assertAdmin(transaction, { firmId, actorSupabaseUserId }) {
     const result = await transaction.query(
-      `SELECT id FROM users WHERE firm_id = $1 AND supabase_user_id = $2 AND role = 'admin' AND active = true FOR UPDATE`,
+      `SELECT id FROM users WHERE firm_id = $1 AND (clerk_user_id = $2 OR supabase_user_id::text = $2 OR id::text = $2) AND role = 'admin' AND active = true FOR UPDATE`,
       [firmId, actorSupabaseUserId],
     );
     if (!result.rowCount) throw invitationError('ADMIN_REQUIRED');
@@ -196,7 +196,7 @@ export class InvitationRepository {
     if (email !== invitation.email) throw invitationError('EMAIL_MISMATCH');
 
     const identity = await transaction.query(
-      'SELECT id, firm_id, email, role, supabase_user_id, active, last_login_at FROM users WHERE supabase_user_id = $1 FOR UPDATE',
+      'SELECT id, firm_id, email, role, supabase_user_id, active, last_login_at FROM users WHERE (clerk_user_id = $1 OR supabase_user_id::text = $1 OR id::text = $1) FOR UPDATE',
       [supabaseUserId],
     );
     let user;

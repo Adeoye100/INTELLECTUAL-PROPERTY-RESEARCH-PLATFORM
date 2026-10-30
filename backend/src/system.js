@@ -12,6 +12,8 @@ import { createInvitationMailer } from './auth/invitation-mailer.js';
 import { RedisRoleFirmResolver } from './auth/role-firm-resolver.js';
 import { SupabaseAdminUserService } from './auth/supabase-admin-user-service.js';
 import { SupabaseVerifier } from './auth/supabase-verifier.js';
+import { ClerkVerifier } from './auth/clerk-verifier.js';
+import { ClerkAdminUserService } from './auth/clerk-admin-user-service.js';
 import { TokenService } from './auth/token-service.js';
 import { UserRepository } from './auth/user-repository.js';
 import { RedisAuthRateLimiter } from './auth/auth-rate-limiter.js';
@@ -56,6 +58,7 @@ export async function createSystem(config, { officeActionSources = null, exportS
 
   const { searchSources, federatedSearchService, searchService } = createSearchRuntime(config, {
     freshnessService: searchFreshnessService,
+    database: pool,
   });
 
   const resolvedOfficeActionSources = officeActionSources ?? (
@@ -69,16 +72,26 @@ export async function createSystem(config, { officeActionSources = null, exportS
     federatedOfficeActionSearchService,
     officeActionSearchService,
   } = createOfficeActionSearchRuntime(config, { sources: resolvedOfficeActionSources });
-  const supabaseVerifier = new SupabaseVerifier({
-    supabaseUrl: config.supabaseUrl,
-    publishableKey: config.supabasePublishableKey,
-    verificationMode: config.supabaseJwtVerificationMode,
-    algorithms: config.supabaseJwtAlgorithms,
-  });
-  const supabaseAdminUserService = new SupabaseAdminUserService({
-    supabaseUrl: config.supabaseUrl,
-    secretKey: config.supabaseSecretKey,
-  });
+   const authVerifier = config.authProvider === 'clerk'
+    ? new ClerkVerifier({
+      secretKey: config.clerkSecretKey,
+      publishableKey: config.clerkPublishableKey,
+      jwtKey: config.clerkJwtKey,
+    })
+    : new SupabaseVerifier({
+      supabaseUrl: config.supabaseUrl,
+      publishableKey: config.supabasePublishableKey,
+      verificationMode: config.supabaseJwtVerificationMode,
+      algorithms: config.supabaseJwtAlgorithms,
+    });
+  const adminUserService = config.authProvider === 'clerk'
+    ? new ClerkAdminUserService({
+      secretKey: config.clerkSecretKey,
+    })
+    : new SupabaseAdminUserService({
+      supabaseUrl: config.supabaseUrl,
+      secretKey: config.supabaseSecretKey,
+    });
 
   const organizationProvisioningRepository = new OrganizationProvisioningRepository(pool);
   const invitationRepository = new InvitationRepository(pool);
@@ -110,23 +123,23 @@ export async function createSystem(config, { officeActionSources = null, exportS
   const roleFirmResolver = new RedisRoleFirmResolver({
     redisClient,
     userRepository,
-    supabaseAdminUserService,
+    supabaseAdminUserService: adminUserService,
   });
   const auditLogRepository = new AuditLogRepository(pool);
   const auditService = new AuditService({ repository: auditLogRepository });
   const invitationService = new InvitationService({
     invitationRepository, tokenService, invitationMailer: createInvitationMailer(config), auditService,
-    roleFirmResolver, supabaseAdminUserService, inviteTokenTtlSeconds: config.inviteTokenTtlSeconds,
+    roleFirmResolver, supabaseAdminUserService: adminUserService, inviteTokenTtlSeconds: config.inviteTokenTtlSeconds,
   });
   const exportAuditService = new ExportAuditService({ auditService });
   const searchResultRepository = new SearchResultRepository(pool);
   const searchResultService = new SearchResultService({ repository: searchResultRepository, auditService });
   const authenticate = [
-    createSupabaseAuthenticate(supabaseVerifier),
+    createSupabaseAuthenticate(authVerifier),
     createResolveRoleAndFirm(roleFirmResolver),
   ];
-  const authenticateIdentity = createSupabaseAuthenticate(supabaseVerifier);
-  const provisioningService = new ProvisioningService({ organizationProvisioningRepository, roleFirmResolver, supabaseAdminUserService, firmSignupEnabled: config.publicFirmSignupEnabled, organizationIntentTtlSeconds: config.organizationIntentTtlSeconds });
+  const authenticateIdentity = createSupabaseAuthenticate(authVerifier);
+  const provisioningService = new ProvisioningService({ organizationProvisioningRepository, roleFirmResolver, supabaseAdminUserService: adminUserService, firmSignupEnabled: config.publicFirmSignupEnabled, organizationIntentTtlSeconds: config.organizationIntentTtlSeconds });
   const portfolioMarkRepository = new PortfolioMarkRepository(pool);
   const portfolioMarkService = new PortfolioMarkService({
     repository: portfolioMarkRepository, auditService,
@@ -218,8 +231,10 @@ export async function createSystem(config, { officeActionSources = null, exportS
     officeActionSearchService,
     alertGenerationService,
     roleFirmResolver,
-    supabaseAdminUserService,
-    supabaseVerifier,
+    authVerifier,
+    adminUserService,
+    supabaseAdminUserService: adminUserService,
+    supabaseVerifier: authVerifier,
     searchSources,
     federatedSearchService,
     searchService,

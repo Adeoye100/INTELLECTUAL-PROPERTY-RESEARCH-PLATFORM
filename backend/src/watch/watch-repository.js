@@ -84,7 +84,7 @@ export class WatchRepository {
         INSERT INTO watches (
           firm_id, portfolio_mark_id, owner_user_id, state, alert_channel, alert_mode, poll_interval_minutes, next_poll_at
         ) VALUES (
-          $1, $2, (SELECT id FROM users WHERE supabase_user_id = $3 AND firm_id = $1), $4, $5, $6, $7, $8
+          $1, $2, (SELECT id FROM users WHERE (clerk_user_id = $3 OR supabase_user_id::text = $3 OR id::text = $3) AND firm_id = $1), $4, $5, $6, $7, $8
         ) RETURNING *
       )
       SELECT ${WATCH_SUMMARY_COLUMNS}

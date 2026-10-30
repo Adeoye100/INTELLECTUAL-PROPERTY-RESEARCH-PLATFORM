@@ -41,4 +41,26 @@ describe('RedisRoleFirmResolver', () => {
     const resolver = new RedisRoleFirmResolver({ redisClient: fakeRedis(), userRepository: { async findBySupabaseUserId() { assert.fail('invalid identity must not query PostgreSQL'); } } });
     assert.equal(await resolver.resolveRoleAndFirm('not-a-uuid'), null);
   });
+
+  it('resolves Clerk user IDs and caches membership', async () => {
+    const redisClient = fakeRedis();
+    let lookups = 0;
+    const clerkUserId = 'user_2bXYZ987654321';
+    const resolver = new RedisRoleFirmResolver({
+      redisClient,
+      userRepository: {
+        async findByAuthId(id) {
+          assert.equal(id, clerkUserId);
+          lookups += 1;
+          return { role: 'admin', firmId };
+        },
+      },
+    });
+    assert.deepEqual(await resolver.resolveRoleAndFirm(clerkUserId), { role: 'admin', firmId });
+    assert.deepEqual(await resolver.resolveRoleAndFirm(clerkUserId), { role: 'admin', firmId });
+    assert.equal(lookups, 1);
+    await resolver.invalidate(clerkUserId);
+    assert.deepEqual(await resolver.resolveRoleAndFirm(clerkUserId), { role: 'admin', firmId });
+    assert.equal(lookups, 2);
+  });
 });

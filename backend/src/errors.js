@@ -43,6 +43,8 @@ export function errorHandler(error, _request, response, _next) {
   console.error('Unhandled API error', {
     name: error?.name ?? 'Error',
     code: error?.code ?? 'UNKNOWN',
+    message: error?.message,
+    stack: error?.stack,
   });
   return response.status(500).json({
     code: 'INTERNAL_ERROR',

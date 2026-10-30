@@ -44,7 +44,9 @@ export class AuditLogRepository {
   }) {
     const result = await executor(this, transaction).query(
       `WITH actor AS (
-        SELECT id FROM users WHERE firm_id = $2 AND supabase_user_id = $3
+        SELECT id FROM users
+        WHERE firm_id = $2
+          AND (clerk_user_id = $3 OR supabase_user_id::text = $3 OR id::text = $3)
       )
       INSERT INTO audit_logs (
         id, firm_id, actor_user_id, action, entity_type, entity_id, before_state, after_state,

@@ -2,7 +2,7 @@ import { badRequest, conflict, forbidden, gone } from '../errors.js';
 import { createOpaqueInvitationToken, hashOpaqueToken } from './invitation-token.js';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const USER_ID_PATTERN = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|user_[a-zA-Z0-9_]+)$/i;
 const normalizeEmail = (email) => String(email ?? '').trim().toLowerCase();
 const displayFirmName = (name) => String(name ?? '').trim().replace(/\s+/g, ' ');
 const publicUser = (user) => ({ id: user.id, firmId: user.firmId, email: user.email, role: user.role });
@@ -34,8 +34,8 @@ export class ProvisioningService {
 
   async provisionFirm(auth, input) {
     this.ensureSignupEnabled();
-    if (auth?.supabaseRole !== 'authenticated' || typeof auth.userId !== 'string' || !UUID_PATTERN.test(auth.userId)) {
-      throw forbidden('A verified Supabase user is required to provision a firm.');
+    if (auth?.supabaseRole !== 'authenticated' || typeof auth.userId !== 'string' || !USER_ID_PATTERN.test(auth.userId)) {
+      throw forbidden('A verified identity is required to provision a firm.');
     }
     const email = normalizeEmail(auth.email);
     if (!EMAIL_PATTERN.test(email)) throw badRequest('VERIFIED_EMAIL_REQUIRED', 'The verified Supabase identity must include an email address.');

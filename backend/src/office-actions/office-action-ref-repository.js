@@ -77,7 +77,7 @@ export class OfficeActionRefRepository {
         source_document_url, source_metadata, linked_by_user_id
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-        (SELECT id FROM users WHERE supabase_user_id = $13 AND firm_id = $1)
+        (SELECT id FROM users WHERE (clerk_user_id = $13 OR supabase_user_id::text = $13 OR id::text = $13) AND firm_id = $1)
       ) RETURNING ${SELECT_COLUMNS}`,
       [
         firmId, portfolioMarkId, input.sourceRegistry, input.sourceReferenceId, input.applicationNumber,

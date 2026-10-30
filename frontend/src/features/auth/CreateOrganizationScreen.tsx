@@ -1,6 +1,7 @@
 import type { FormEvent } from "react";
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { SignUp } from '@clerk/react';
 import { Button } from '../../components/Button';
 import { supabase } from '../../lib/supabase';
 import { authErrorMessage, toAuthApiError } from './authApi';
@@ -54,6 +55,25 @@ export function CreateOrganizationScreen() {
       setError(authErrorMessage(toAuthApiError(caught)));
     } finally { setBusy(false); }
   };
+
+  if (import.meta.env.VITE_CLERK_PUBLISHABLE_KEY) {
+    return (
+      <div className="flex justify-center">
+        <SignUp
+          routing="hash"
+          appearance={{
+            elements: {
+              rootBox: 'w-full',
+              cardBox: 'w-full shadow-none',
+              card: 'w-full bg-transparent shadow-none border-0 p-0',
+            },
+          }}
+          signInUrl="/auth/login"
+          fallbackRedirectUrl="/app"
+        />
+      </div>
+    );
+  }
 
   if (!publicFirmSignupEnabled()) {
     return <div className="space-y-5 text-center"><h1 className="text-2xl font-bold text-text-primary">Create organization</h1><p className="text-text-secondary">Public organization creation is currently unavailable. To join an existing firm, ask a firm Administrator to send an invitation.</p><Link className="font-bold text-accent underline" to="/auth/login">Sign in to accept an invitation</Link></div>;
