@@ -1,15 +1,105 @@
 import type { FormEvent } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useAuth, useUser, useClerk, SignUp } from '@clerk/react';
 import { Button } from '../../components/Button';
 import { supabase } from '../../lib/supabase';
 import type { UserRole } from '../../types';
 import { authErrorMessage, authRequest, toAuthApiError } from './authApi';
-import { redeemInvitationForSession } from './invitationRedemption';
+import { redeemInvitationForSession, redeemInvitationWithAccessToken } from './invitationRedemption';
 import { authRedirectUrl, roleHomePath } from './roleRouting';
 import { syncSupabaseSession } from './authStore';
 
+const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY?.trim();
+
 interface InvitationDetails { email: string; firmName: string; role: UserRole; expiresAt: string; }
+
+function ClerkInviteRedemption({ token, invitation }: { token: string; invitation: InvitationDetails }) {
+  const { getToken, isSignedIn } = useAuth();
+  const { user } = useUser();
+  const { signOut } = useClerk();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const currentEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase();
+  const invitedEmail = invitation.email.toLowerCase();
+  const emailMatches = Boolean(currentEmail && currentEmail === invitedEmail);
+
+  const handleRedeem = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const clerkToken = await getToken();
+      if (!clerkToken) throw new Error('Could not retrieve authentication token.');
+      await redeemInvitationWithAccessToken(clerkToken, token);
+      window.location.href = roleHomePath(invitation.role);
+    } catch (err) {
+      setError(authErrorMessage(toAuthApiError(err)));
+      setBusy(false);
+    }
+  };
+
+  if (!isSignedIn) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-text-primary">Join {invitation.firmName}</h1>
+          <p className="mt-1 text-text-secondary">
+            You are invited to join as <strong>{invitation.role}</strong> using <strong>{invitation.email}</strong>.
+          </p>
+        </div>
+        <div className="flex justify-center">
+          <SignUp
+            routing="hash"
+            initialValues={{ emailAddress: invitation.email }}
+            appearance={{
+              elements: {
+                rootBox: 'w-full',
+                cardBox: 'w-full shadow-none',
+                card: 'w-full bg-transparent shadow-none border-0 p-0',
+              },
+            }}
+            signInUrl={`/auth/login?invitation=${encodeURIComponent(token)}`}
+            fallbackRedirectUrl={`/auth/invite/${encodeURIComponent(token)}`}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 text-center">
+      <div>
+        <h1 className="text-2xl font-bold text-text-primary">Join {invitation.firmName}</h1>
+        <p className="mt-1 text-text-secondary">
+          You are invited to join as <strong>{invitation.role}</strong>.
+        </p>
+      </div>
+
+      {!emailMatches ? (
+        <div className="space-y-4 rounded border border-forge-silver-300 p-6">
+          <p className="text-text-secondary">
+            You are currently signed in as <strong>{currentEmail}</strong>, but this invitation was sent to{' '}
+            <strong>{invitation.email}</strong>.
+          </p>
+          <Button variant="outline" onClick={() => void signOut()}>
+            Sign out to use {invitation.email}
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-4 rounded border border-forge-silver-300 p-6">
+          <p className="text-text-secondary">
+            Signed in as <strong>{currentEmail}</strong>.
+          </p>
+          {error && <p className="rounded bg-risk-high/10 p-3 text-sm text-risk-high" role="alert">{error}</p>}
+          <Button className="w-full" disabled={busy} onClick={() => void handleRedeem()}>
+            {busy ? 'Joining organization…' : `Accept invitation & join ${invitation.firmName}`}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function InviteRedemptionScreen() {
   const { token = '' } = useParams<{ token: string }>();
@@ -77,6 +167,10 @@ export function InviteRedemptionScreen() {
 
   if (loading) return <p className="text-center text-text-secondary" role="status">Checking invitation…</p>;
   if (!invitation) return <div ref={statusRef} tabIndex={-1} className="space-y-4 text-center focus:outline-none" role="alert"><h1 className="text-2xl font-bold text-text-primary">Invitation unavailable</h1><p className="text-text-secondary">{error ?? 'This invitation is unavailable.'}</p><Button onClick={() => void load()}>Retry</Button></div>;
+
+  if (clerkPublishableKey) {
+    return <ClerkInviteRedemption token={token} invitation={invitation} />;
+  }
   const recoveryPath = `/auth/forgot-password?email=${encodeURIComponent(invitation.email)}&invitation=${encodeURIComponent(token)}`;
   return <div className="space-y-6"><div className="text-center"><h1 className="text-2xl font-bold text-text-primary">Join {invitation.firmName}</h1><p className="mt-1 text-text-secondary">You are invited as <strong>{invitation.role}</strong> using {invitation.email}. Expires {new Date(invitation.expiresAt).toLocaleString()}.</p><p className="mt-2 text-sm text-text-secondary">Admin manages firm members and settings. Attorney performs firm legal and research work. Viewer has read-only access.</p></div><div className="flex rounded border border-forge-silver-300 p-1"><button type="button" aria-pressed={mode === 'create'} className="flex-1 rounded px-3 py-2 text-sm font-semibold" onClick={() => setMode('create')}>Create account</button><button type="button" aria-pressed={mode === 'signin'} className="flex-1 rounded px-3 py-2 text-sm font-semibold" onClick={() => setMode('signin')}>Sign in to accept invitation</button></div><form className="space-y-4" onSubmit={(event) => void submit(event)} noValidate>{mode === 'create' && <label className="block text-sm font-semibold text-text-primary" htmlFor="invite-name">Full name<input id="invite-name" autoFocus autoComplete="name" className="mt-1 w-full rounded border border-forge-silver-300 px-3 py-2" value={fullName} onChange={(event) => setFullName(event.target.value)} /></label>}<label className="block text-sm font-semibold text-text-primary" htmlFor="invite-email">Invited email<input id="invite-email" value={invitation.email} readOnly className="mt-1 w-full rounded border border-forge-silver-300 bg-surface-base px-3 py-2" /></label><label className="block text-sm font-semibold text-text-primary" htmlFor="invite-password">{mode === 'create' ? 'Create password' : 'Password'}<input id="invite-password" type="password" autoComplete={mode === 'create' ? 'new-password' : 'current-password'} className="mt-1 w-full rounded border border-forge-silver-300 px-3 py-2" value={password} onChange={(event) => setPassword(event.target.value)} /></label>{mode === 'create' && <label className="block text-sm font-semibold text-text-primary" htmlFor="invite-confirm">Confirm password<input id="invite-confirm" type="password" autoComplete="new-password" className="mt-1 w-full rounded border border-forge-silver-300 px-3 py-2" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} /></label>}{error && <p ref={statusRef} tabIndex={-1} className="rounded bg-risk-high/10 p-3 text-sm text-risk-high focus:outline-none" role="alert">{error}</p>}<Button className="w-full" disabled={busy} type="submit">{busy ? 'Completing invitation…' : mode === 'signin' ? 'Sign in and accept invitation' : 'Create account and accept invitation'}</Button></form>{mode === 'signin' && <Link className="block text-center text-sm font-bold text-accent underline" to={recoveryPath}>Set or reset password</Link>}<Link className="block text-center text-sm font-bold text-accent underline" to="/auth/login">Return to sign in</Link></div>;
 }

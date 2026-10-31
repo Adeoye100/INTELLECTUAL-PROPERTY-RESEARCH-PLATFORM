@@ -4,10 +4,12 @@ import { parseAlertAction, parseAlertFilters, parseAlertId, parseAlertPagination
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../audit/audit-taxonomy.js';
 import { alertAuditSnapshot } from '../audit/audit-snapshots.js';
 
+const USER_ID_PATTERN = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|user_[a-zA-Z0-9_]+)$/i;
+
 const notFound = () => new AppError(404, 'ALERT_NOT_FOUND', 'Alert not found.');
 function firm(value) { if (typeof value !== 'string' || !UUID_PATTERN.test(value)) throw forbidden('A firm membership is required.'); return value; }
 function at(clock) { const value = clock(); if (!(value instanceof Date) || Number.isNaN(value.getTime())) throw new TypeError('Alert clock must return a valid Date.'); return value.toISOString(); }
-function actor(value) { if (typeof value !== 'string' || !UUID_PATTERN.test(value)) throw forbidden('A verified user identity is required.'); return value; }
+function actor(value) { if (typeof value !== 'string' || !USER_ID_PATTERN.test(value)) throw forbidden('A verified user identity is required.'); return value; }
 
 export class AlertService {
   constructor({ repository, clock = () => new Date(), auditService = null }) {

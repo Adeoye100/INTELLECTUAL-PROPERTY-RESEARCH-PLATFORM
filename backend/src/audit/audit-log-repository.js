@@ -72,7 +72,13 @@ export class AuditLogRepository {
       values.push(value);
       clauses.push(sql.replace('?', `$${values.length}`));
     };
-    if (filters.actorUserId) add('actor_user_id = ?', filters.actorUserId);
+    if (filters.actorUserId) {
+      values.push(filters.actorUserId);
+      const param = `$${values.length}`;
+      clauses.push(
+        `actor_user_id = (SELECT id FROM users WHERE firm_id = $1 AND (clerk_user_id = ${param} OR supabase_user_id::text = ${param} OR id::text = ${param}))`,
+      );
+    }
     if (filters.action) add('action = ?', filters.action);
     if (filters.entityType) add('entity_type = ?', filters.entityType);
     if (filters.entityId) add('entity_id = ?', filters.entityId);

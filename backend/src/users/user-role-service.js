@@ -1,7 +1,7 @@
 import { AppError, badRequest, conflict } from '../errors.js';
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../audit/audit-taxonomy.js';
 import { userRoleAuditSnapshot } from '../audit/audit-snapshots.js';
-import { AUDIT_UUID_PATTERN } from '../audit/audit-service.js';
+import { AUDIT_UUID_PATTERN, USER_ID_PATTERN } from '../audit/audit-service.js';
 
 export const USER_ROLES = Object.freeze(['admin', 'attorney', 'viewer']);
 const USER_ROLE_SET = new Set(USER_ROLES);
@@ -13,6 +13,13 @@ function userNotFound() {
 function uuid(value, field) {
   if (typeof value !== 'string' || !AUDIT_UUID_PATTERN.test(value)) {
     throw badRequest('VALIDATION_ERROR', `${field} must be a UUID.`, { field });
+  }
+  return value;
+}
+
+function actorId(value, field) {
+  if (typeof value !== 'string' || !USER_ID_PATTERN.test(value)) {
+    throw badRequest('VALIDATION_ERROR', `${field} must be a valid user ID.`, { field });
   }
   return value;
 }
@@ -51,14 +58,18 @@ export class UserRoleService {
 
   async deactivateMember({ firmId, actorUserId, targetUserId, requestContext = null }) {
     const scopedFirmId = uuid(firmId, 'firmId');
-    const scopedActorUserId = uuid(actorUserId, 'actorUserId');
+    const scopedActorUserId = actorId(actorUserId, 'actorUserId');
     const scopedTargetUserId = uuid(targetUserId, 'id');
     return this.userRepository.withTransaction(async (transaction) => {
       const before = await this.userRepository.findRoleTargetForUpdate({
         firmId: scopedFirmId, userId: scopedTargetUserId, transaction,
       });
       if (!before) throw userNotFound();
-      if (before.supabaseUserId === scopedActorUserId) {
+      if (
+        before.supabaseUserId === scopedActorUserId
+        || before.clerkUserId === scopedActorUserId
+        || before.id === scopedActorUserId
+      ) {
         throw conflict('SELF_REMOVAL_FORBIDDEN', 'Admins cannot remove their own firm membership.');
       }
       if (before.role === 'admin') {
@@ -87,13 +98,14 @@ export class UserRoleService {
         requestContext,
       });
       if (after.supabaseUserId) await this.roleFirmResolver.invalidate(after.supabaseUserId);
+      if (after.clerkUserId) await this.roleFirmResolver.invalidate(after.clerkUserId);
       return userRoleAuditSnapshot(after);
     });
   }
 
   async changeRole({ firmId, actorUserId, targetUserId, input, requestContext = null }) {
     const scopedFirmId = uuid(firmId, 'firmId');
-    const scopedActorUserId = uuid(actorUserId, 'actorUserId');
+    const scopedActorUserId = actorId(actorUserId, 'actorUserId');
     const scopedTargetUserId = uuid(targetUserId, 'id');
     const role = parseUserRoleChange(input);
     return this.userRepository.withTransaction(async (transaction) => {
@@ -132,6 +144,7 @@ export class UserRoleService {
       // The database role is authoritative. Cache invalidation is deliberately
       // inside the workflow so a cache failure cannot report a role change.
       if (after.supabaseUserId) await this.roleFirmResolver.invalidate(after.supabaseUserId);
+      if (after.clerkUserId) await this.roleFirmResolver.invalidate(after.clerkUserId);
       return userRoleAuditSnapshot(after);
     });
   }

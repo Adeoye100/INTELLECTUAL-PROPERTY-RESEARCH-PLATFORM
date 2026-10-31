@@ -7,6 +7,7 @@ import {
   cloneSearchSnapshot,
   parseSearchSnapshotId,
   parseSearchSnapshotRequestId,
+  parseSearchSnapshotUserId,
   validateSearchQuerySnapshot,
   validateSearchSnapshot,
 } from './search-result-validation.js';
@@ -14,6 +15,14 @@ import {
 function scope(value, message) {
   try {
     return parseSearchSnapshotId(value);
+  } catch {
+    throw forbidden(message);
+  }
+}
+
+function scopeActor(value, message) {
+  try {
+    return parseSearchSnapshotUserId(value);
   } catch {
     throw forbidden(message);
   }
@@ -168,7 +177,7 @@ export class SearchResultService {
 
   async persistSearch({ firmId, requestedByUserId, query, searchResponse, requestContext = null }) {
     const scopedFirmId = scope(firmId, 'A firm membership is required.');
-    const scopedActorUserId = scope(requestedByUserId, 'A verified user identity is required.');
+    const scopedActorUserId = scopeActor(requestedByUserId, 'A verified user identity is required.');
     const normalizedQuery = validateSearchQuerySnapshot(query);
     const requestId = parseSearchSnapshotRequestId(searchResponse?.requestId);
     try {
@@ -261,7 +270,7 @@ export class SearchResultService {
 
   async listSearchResults({ firmId, actorUserId, role, filters, pagination }) {
     const scopedFirmId = scope(firmId, 'A firm membership is required.');
-    const scopedActorUserId = scope(actorUserId, 'A verified user identity is required.');
+    const scopedActorUserId = scopeActor(actorUserId, 'A verified user identity is required.');
     if (!['admin', 'attorney', 'viewer'].includes(role)) throw forbidden();
     const records = await this.repository.listForFirm({
       firmId: scopedFirmId,
@@ -281,7 +290,7 @@ export class SearchResultService {
   }
 
   async loadSearchSnapshotForExport({ firmId, actorUserId, searchResultId }) {
-    scope(actorUserId, 'A verified user identity is required.');
+    scopeActor(actorUserId, 'A verified user identity is required.');
     return this.getSearchResult({ firmId, searchResultId });
   }
 }

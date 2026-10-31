@@ -103,7 +103,13 @@ export class ExportRepository {
     const values = [firmId];
     const clauses = ['exports.firm_id = $1'];
     const add = (sql, value) => { values.push(value); clauses.push(sql.replace('?', `$${values.length}`)); };
-    if (actorUserId) add('exports.requested_by_user_id = (SELECT id FROM users WHERE firm_id = $1 AND (clerk_user_id = ? OR supabase_user_id::text = ? OR id::text = ?))', actorUserId);
+    if (actorUserId) {
+      values.push(actorUserId);
+      const param = `$${values.length}`;
+      clauses.push(
+        `exports.requested_by_user_id = (SELECT id FROM users WHERE firm_id = $1 AND (clerk_user_id = ${param} OR supabase_user_id::text = ${param} OR id::text = ${param}))`,
+      );
+    }
     if (filters.status) add('exports.status = ?', filters.status);
     if (filters.type) add('exports.export_type = ?', filters.type);
     if (pagination.cursor) {

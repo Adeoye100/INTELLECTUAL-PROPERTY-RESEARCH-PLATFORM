@@ -5,13 +5,15 @@ import {
 import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES } from '../audit/audit-taxonomy.js';
 import { watchAuditSnapshot } from '../audit/audit-snapshots.js';
 
+const USER_ID_PATTERN = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|user_[a-zA-Z0-9_]+)$/i;
+
 function scopedFirm(firmId) {
   if (typeof firmId !== 'string' || !UUID_PATTERN.test(firmId)) throw forbidden('A firm membership is required.');
   return firmId;
 }
 
 function scopedActor(actorUserId) {
-  if (typeof actorUserId !== 'string' || !UUID_PATTERN.test(actorUserId)) {
+  if (typeof actorUserId !== 'string' || !USER_ID_PATTERN.test(actorUserId)) {
     throw forbidden('A verified user identity is required.');
   }
   return actorUserId;

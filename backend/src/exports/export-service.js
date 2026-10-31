@@ -7,8 +7,14 @@ import {
 import { deterministicPdfExportJobId } from './pdf-export-queue.js';
 import { sha256 } from './export-storage.js';
 
+const USER_ID_PATTERN = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|user_[a-zA-Z0-9_]+)$/i;
+
 function scope(value, message) {
   if (typeof value !== 'string' || !EXPORT_UUID_PATTERN.test(value)) throw forbidden(message);
+  return value;
+}
+function scopeActor(value, message) {
+  if (typeof value !== 'string' || !USER_ID_PATTERN.test(value)) throw forbidden(message);
   return value;
 }
 function now(clock) {
@@ -63,7 +69,7 @@ export class ExportService {
 
   async createExport({ firmId, actorUserId, input, requestContext = null }) {
     const scopedFirmId = scope(firmId, 'A firm membership is required.');
-    const scopedActorUserId = scope(actorUserId, 'A verified user identity is required.');
+    const scopedActorUserId = scopeActor(actorUserId, 'A verified user identity is required.');
     const parsed = parseExportCreate(input);
     const createdAt = now(this.clock);
     const requestId = parseExportRequestId(requestContext?.requestId ?? randomUUID());
@@ -118,7 +124,7 @@ export class ExportService {
   async listExports({ firmId, actorUserId, role, query }) {
     const parsed = parseExportListQuery(query ?? {});
     const scopedFirmId = scope(firmId, 'A firm membership is required.');
-    const scopedActorUserId = scope(actorUserId, 'A verified user identity is required.');
+    const scopedActorUserId = scopeActor(actorUserId, 'A verified user identity is required.');
     if (!['admin', 'attorney'].includes(role)) throw forbidden();
     const records = await this.repository.listForFirm({
       firmId: scopedFirmId, actorUserId: role === 'admin' ? null : scopedActorUserId, filters: parsed.filters, pagination: parsed.pagination,
