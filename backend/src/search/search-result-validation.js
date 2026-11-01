@@ -1,5 +1,5 @@
 import { AppError, badRequest } from '../errors.js';
-import { AUDIT_UUID_PATTERN } from '../audit/audit-service.js';
+import { AUDIT_UUID_PATTERN, USER_ID_PATTERN } from '../audit/audit-service.js';
 
 export const SEARCH_SNAPSHOT_MAX_RESULTS = 100;
 export const SEARCH_SNAPSHOT_MAX_BYTES = 256 * 1024;
@@ -111,6 +111,13 @@ function isoTimestamp(value, code, message) {
 export function parseSearchSnapshotId(value, field = 'id') {
   if (typeof value !== 'string' || !AUDIT_UUID_PATTERN.test(value)) {
     throw snapshotError('SEARCH_SNAPSHOT_INVALID', `${field} must be a UUID.`);
+  }
+  return value;
+}
+
+export function parseSearchSnapshotUserId(value, field = 'requestedByUserId') {
+  if (typeof value !== 'string' || !USER_ID_PATTERN.test(value)) {
+    throw snapshotError('SEARCH_SNAPSHOT_INVALID', `${field} must be a valid user ID.`);
   }
   return value;
 }
@@ -245,7 +252,7 @@ export function validateSearchSnapshot({
 }) {
   const snapshotId = parseSearchSnapshotId(id, 'searchId');
   const scopedFirmId = parseSearchSnapshotId(firmId, 'firmId');
-  const scopedRequestedByUserId = parseSearchSnapshotId(requestedByUserId, 'requestedByUserId');
+  const scopedRequestedByUserId = parseSearchSnapshotUserId(requestedByUserId, 'requestedByUserId');
   const normalizedRequestId = parseSearchSnapshotRequestId(requestId);
   const query = validateSearchQuerySnapshot(querySnapshot);
   if (!Array.isArray(resultsSnapshot) || resultsSnapshot.length > SEARCH_SNAPSHOT_MAX_RESULTS) {
@@ -310,6 +317,11 @@ export function validateSearchSnapshot({
   return snapshot;
 }
 
+function parseOptionalUserId(value, field) {
+  if (value === undefined) return null;
+  return parseSearchSnapshotUserId(value, field);
+}
+
 function parseOptionalUuid(value, field) {
   if (value === undefined) return null;
   return parseSearchSnapshotId(value, field);
@@ -324,7 +336,7 @@ export function parseSearchResultListQuery(query) {
   assertPlainObject(query, 'SEARCH_SNAPSHOT_INVALID', 'Search result query is invalid.');
   const allowed = new Set(['requestedByUserId', 'createdFrom', 'createdTo', 'partial', 'pageSize', 'cursor']);
   assertAllowedKeys(query, allowed, 'SEARCH_SNAPSHOT_INVALID', 'Search result query is invalid.');
-  const requestedByUserId = parseOptionalUuid(query.requestedByUserId, 'requestedByUserId');
+  const requestedByUserId = parseOptionalUserId(query.requestedByUserId, 'requestedByUserId');
   const createdFrom = parseOptionalTimestamp(query.createdFrom, 'createdFrom');
   const createdTo = parseOptionalTimestamp(query.createdTo, 'createdTo');
   if (createdFrom && createdTo && createdFrom > createdTo) {

@@ -4,6 +4,7 @@ import { isSupportedAuditAction, isSupportedAuditEntityType } from './audit-taxo
 import { sanitizeAuditObject } from './audit-sanitizer.js';
 
 export const AUDIT_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const USER_ID_PATTERN = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|user_[a-zA-Z0-9_]+)$/i;
 const EMPTY_REQUEST_CONTEXT = Object.freeze({ requestId: null, ipAddress: null, userAgent: null });
 
 function auditError(code, message) {
@@ -13,6 +14,11 @@ function auditError(code, message) {
 function uuid(value, code, message, { nullable = false } = {}) {
   if (nullable && (value === null || value === undefined)) return null;
   if (typeof value !== 'string' || !AUDIT_UUID_PATTERN.test(value)) throw auditError(code, message);
+  return value;
+}
+
+function actorId(value, code, message) {
+  if (typeof value !== 'string' || !USER_ID_PATTERN.test(value)) throw auditError(code, message);
   return value;
 }
 
@@ -85,7 +91,7 @@ export class AuditService {
       throw auditError('AUDIT_TRANSACTION_REQUIRED', 'Audit recording requires the mutation transaction.');
     }
     const scopedFirmId = uuid(firmId, 'AUDIT_FIRM_INVALID', 'Audit firm is invalid.');
-    const scopedActorUserId = uuid(actorUserId, 'AUDIT_ACTOR_INVALID', 'Audit actor is invalid.');
+    const scopedActorUserId = actorId(actorUserId, 'AUDIT_ACTOR_INVALID', 'Audit actor is invalid.');
     if (!isSupportedAuditAction(action)) throw auditError('AUDIT_ACTION_INVALID', 'Audit action is not supported.');
     if (!isSupportedAuditEntityType(entityType)) throw auditError('AUDIT_ENTITY_TYPE_INVALID', 'Audit entity type is not supported.');
     const scopedEntityId = uuid(entityId, 'AUDIT_ENTITY_ID_INVALID', 'Audit entity ID is invalid.', { nullable: true });
@@ -152,9 +158,9 @@ export function parseAuditLogListQuery(query) {
     if (typeof value !== 'string') throw auditError(code, message);
     return value.trim();
   };
-  const actorUserId = query.actorUserId === undefined ? null : uuid(
-    scalar(query.actorUserId, 'AUDIT_ACTOR_INVALID', 'actorUserId must be a UUID.'),
-    'AUDIT_ACTOR_INVALID', 'actorUserId must be a UUID.',
+  const actorUserId = query.actorUserId === undefined ? null : actorId(
+    scalar(query.actorUserId, 'AUDIT_ACTOR_INVALID', 'actorUserId is invalid.'),
+    'AUDIT_ACTOR_INVALID', 'actorUserId is invalid.',
   );
   const entityId = query.entityId === undefined ? null : uuid(
     scalar(query.entityId, 'AUDIT_ENTITY_ID_INVALID', 'entityId must be a UUID.'),

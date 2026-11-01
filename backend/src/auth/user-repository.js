@@ -293,7 +293,7 @@ export class UserRepository {
 
   async findRoleTargetForUpdate({ firmId, userId, transaction }) {
     const result = await transaction.query(
-      `SELECT id, firm_id, role, supabase_user_id, active
+      `SELECT id, firm_id, role, supabase_user_id, clerk_user_id, active
        FROM users
        WHERE firm_id = $1 AND id = $2 AND active = true
        FOR UPDATE`,
@@ -306,6 +306,7 @@ export class UserRepository {
       firmId: row.firm_id,
       role: row.role,
       supabaseUserId: row.supabase_user_id,
+      clerkUserId: row.clerk_user_id,
       active: row.active,
     };
   }
@@ -322,7 +323,7 @@ export class UserRepository {
     const result = await transaction.query(
       `UPDATE users SET role = $3
        WHERE firm_id = $1 AND id = $2 AND active = true
-       RETURNING id, firm_id, role, supabase_user_id, active`,
+       RETURNING id, firm_id, role, supabase_user_id, clerk_user_id, active`,
       [firmId, userId, role],
     );
     if (!result.rowCount) return null;
@@ -332,6 +333,7 @@ export class UserRepository {
       firmId: row.firm_id,
       role: row.role,
       supabaseUserId: row.supabase_user_id,
+      clerkUserId: row.clerk_user_id,
       active: row.active,
     };
   }
@@ -341,7 +343,7 @@ export class UserRepository {
       `UPDATE users
        SET active = false
        WHERE firm_id = $1 AND id = $2 AND active = true
-       RETURNING id, firm_id, role, supabase_user_id, active`,
+       RETURNING id, firm_id, role, supabase_user_id, clerk_user_id, active`,
       [firmId, userId],
     );
     if (!result.rowCount) return null;
@@ -351,6 +353,7 @@ export class UserRepository {
       firmId: row.firm_id,
       role: row.role,
       supabaseUserId: row.supabase_user_id,
+      clerkUserId: row.clerk_user_id,
       active: row.active,
     };
   }

@@ -143,6 +143,7 @@ describe('audit service and export hook', () => {
     await assert.rejects(() => service.record(recordInput({ transaction: {} })), { code: 'AUDIT_TRANSACTION_REQUIRED' });
     await assert.rejects(() => createAuditService({ fail: true }).record(recordInput()), { code: 'AUDIT_WRITE_FAILED' });
     assert.equal((await service.record(recordInput())).id, '88888888-8888-4888-8888-888888888888');
+    assert.equal((await service.record(recordInput({ actorUserId: 'user_3LQdbrbHFeVhRsK6sh9B1GmAXPJ' }))).id, '88888888-8888-4888-8888-888888888888');
   });
 
   it('parses bounded, deterministic audit-list pagination and filters', () => {
@@ -317,7 +318,7 @@ describe('role change and read route boundaries', () => {
     ]);
     const cacheInvalidations = []; const audit = transactionAudit();
     const service = new UserRoleService({ userRepository: repository, auditService: audit, roleFirmResolver: { async invalidate(id) { cacheInvalidations.push(id); } } });
-    assert.deepEqual(await service.changeRole({ firmId, actorUserId, targetUserId: entityId, input: { role: 'viewer' } }), { id: entityId, role: 'viewer', active: true });
+    assert.deepEqual(await service.changeRole({ firmId, actorUserId: 'user_3LQdbrbHFeVhRsK6sh9B1GmAXPJ', targetUserId: entityId, input: { role: 'viewer' } }), { id: entityId, role: 'viewer', active: true });
     assert.equal(audit.calls[0].action, AUDIT_ACTIONS.USER_ROLE_CHANGED);
     assert.equal(audit.calls[0].beforeState.role, 'attorney');
     assert.deepEqual(cacheInvalidations, [secondUserId]);
@@ -336,7 +337,7 @@ describe('role change and read route boundaries', () => {
     const service = new UserRoleService({ userRepository: repository, auditService: audit, roleFirmResolver: { async invalidate(id) { cacheInvalidations.push(id); } } });
 
     assert.deepEqual(
-      await service.deactivateMember({ firmId, actorUserId, targetUserId: entityId }),
+      await service.deactivateMember({ firmId, actorUserId: 'user_3LQdbrbHFeVhRsK6sh9B1GmAXPJ', targetUserId: entityId }),
       { id: entityId, role: 'attorney', active: false },
     );
     assert.equal(audit.calls.at(-1).action, AUDIT_ACTIONS.USER_DEACTIVATED);

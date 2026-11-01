@@ -236,21 +236,29 @@ export class InvitationRepository {
           role: existing.role ?? invitation.role,
           active: false,
         };
+        const isClerk = String(supabaseUserId).startsWith('user_');
         const linked = await transaction.query(
           `UPDATE users
-           SET supabase_user_id = $2, role = $3, active = true
+           SET supabase_user_id = CASE WHEN $4 = true THEN supabase_user_id ELSE $2::uuid END,
+               clerk_user_id = CASE WHEN $4 = true THEN $2 ELSE clerk_user_id END,
+               role = $3,
+               active = true
            WHERE id = $1 AND active = false
            RETURNING id, firm_id, email, role, last_login_at, active`,
-          [existing.id, supabaseUserId, invitation.role],
+          [existing.id, supabaseUserId, invitation.role, isClerk],
         );
         if (!linked.rowCount) throw invitationError('ACCOUNT_RECOVERY_REQUIRED');
         user = publicUser(linked.rows[0]);
         reactivated = true;
       } else {
+        const isClerk = String(supabaseUserId).startsWith('user_');
         const inserted = await transaction.query(
-          `INSERT INTO users (firm_id, email, password_hash, role, supabase_user_id)
-           VALUES ($1, $2, NULL, $3, $4) RETURNING id, firm_id, email, role, last_login_at, active`,
-          [invitation.firmId, email, invitation.role, supabaseUserId],
+          `INSERT INTO users (firm_id, email, password_hash, role, supabase_user_id, clerk_user_id)
+           VALUES ($1, $2, NULL, $3,
+             CASE WHEN $5 = true THEN NULL ELSE $4::uuid END,
+             CASE WHEN $5 = true THEN $4 ELSE NULL END)
+           RETURNING id, firm_id, email, role, last_login_at, active`,
+          [invitation.firmId, email, invitation.role, supabaseUserId, isClerk],
         );
         user = publicUser(inserted.rows[0]);
       }

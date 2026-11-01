@@ -192,6 +192,7 @@ describe('search_results snapshot schema and validation', () => {
       filters: { requestedByUserId: null, createdFrom: null, createdTo: null, partial: true },
       pagination: { pageSize: 2, cursor: null },
     });
+    assert.equal(parseSearchResultListQuery({ requestedByUserId: 'user_3LQdbrbHFeVhRsK6sh9B1GmAXPJ' }).filters.requestedByUserId, 'user_3LQdbrbHFeVhRsK6sh9B1GmAXPJ');
     for (const value of [{ pageSize: '101' }, { partial: 'sometimes' }, { cursor: 'not-a-cursor' }, { createdFrom: 'invalid' }]) {
       assert.throws(() => parseSearchResultListQuery(value));
     }
@@ -236,6 +237,11 @@ describe('SearchResultService persistence, auditing, and history', () => {
     });
     assert.equal(partialSaved.response.partial, true);
     assert.equal(repository.state.snapshots.length, 1);
+
+    const clerkResult = await service().service.persistSearch({
+      firmId, requestedByUserId: 'user_3LQdbrbHFeVhRsK6sh9B1GmAXPJ', query, searchResponse: rawSearchResponse(),
+    });
+    assert.equal(clerkResult.response.searchId, searchId);
   });
 
   it('handles equivalent retries idempotently, rejects conflicts, and rolls snapshots back on audit failure', async () => {

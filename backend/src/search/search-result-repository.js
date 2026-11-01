@@ -115,10 +115,13 @@ export class SearchResultRepository {
       values.push(value);
       clauses.push(sql.replace('?', `$${values.length}`));
     };
-    if (actorUserId) add(
-      'requested_by_user_id = (SELECT id FROM users WHERE firm_id = $1 AND (clerk_user_id = ? OR supabase_user_id::text = ? OR id::text = ?))',
-      actorUserId,
-    );
+    if (actorUserId) {
+      values.push(actorUserId);
+      const param = `$${values.length}`;
+      clauses.push(
+        `requested_by_user_id = (SELECT id FROM users WHERE firm_id = $1 AND (clerk_user_id = ${param} OR supabase_user_id::text = ${param} OR id::text = ${param}))`,
+      );
+    }
     if (filters.requestedByUserId) add('requested_by_user_id = ?', filters.requestedByUserId);
     if (filters.createdFrom) add('created_at >= ?', filters.createdFrom);
     if (filters.createdTo) add('created_at <= ?', filters.createdTo);

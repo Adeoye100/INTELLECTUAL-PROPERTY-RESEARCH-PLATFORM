@@ -7,6 +7,7 @@ vi.stubEnv('VITE_API_MODE', 'live');
 vi.stubEnv('VITE_SUPABASE_URL', 'https://test-project.supabase.co');
 vi.stubEnv('VITE_SUPABASE_PUBLISHABLE_KEY', 'sb_publishable_test');
 vi.stubEnv('VITE_PDF_EXPORT_ENABLED', 'true');
+vi.stubEnv('VITE_CLERK_PUBLISHABLE_KEY', '');
 
 afterEach(() => {
   cleanup();

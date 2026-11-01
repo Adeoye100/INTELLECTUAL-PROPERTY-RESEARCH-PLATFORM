@@ -9,6 +9,7 @@ import {
 } from './office-action-validation.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const USER_ID_PATTERN = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|user_[a-zA-Z0-9_]+)$/i;
 
 function scopedFirm(firmId) {
   if (typeof firmId !== 'string' || !UUID_PATTERN.test(firmId)) throw forbidden('A firm membership is required.');
@@ -16,7 +17,7 @@ function scopedFirm(firmId) {
 }
 
 function scopedActor(actorUserId) {
-  if (typeof actorUserId !== 'string' || !UUID_PATTERN.test(actorUserId)) {
+  if (typeof actorUserId !== 'string' || !USER_ID_PATTERN.test(actorUserId)) {
     throw forbidden('A verified user identity is required.');
   }
   return actorUserId;
