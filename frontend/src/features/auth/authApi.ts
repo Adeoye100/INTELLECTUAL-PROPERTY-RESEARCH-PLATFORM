@@ -60,6 +60,9 @@ export class AuthSynchronizationError extends AuthApiError {
 export async function authRequest<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
   const path = String(input);
   if (path === '/auth/logout') {
+    if (typeof window !== 'undefined' && (window as unknown as { Clerk?: { signOut: () => Promise<void> } }).Clerk?.signOut) {
+      await (window as unknown as { Clerk: { signOut: () => Promise<void> } }).Clerk.signOut().catch(() => undefined);
+    }
     const { error } = await supabase.auth.signOut();
     if (error) throw toAuthApiError(error);
     return undefined as T;

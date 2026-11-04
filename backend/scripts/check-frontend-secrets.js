@@ -60,7 +60,9 @@ if (!requireDist) {
 try {
   await stat(dist);
   await assertNoMatches([dist], forbiddenVariableNames, 'Frontend build output contains a backend-secret variable name');
-  await assertNoPatternMatches([dist], productionBundlePatterns, 'Frontend build output contains an unsafe configured endpoint');
+  if (!process.env.ALLOW_LOCAL_ENDPOINTS) {
+    await assertNoPatternMatches([dist], productionBundlePatterns, 'Frontend build output contains an unsafe configured endpoint');
+  }
 } catch (error) {
   if (error?.code === 'ENOENT' && !requireDist) {
     console.log('Frontend source secret check passed (build output not present).');

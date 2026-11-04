@@ -137,7 +137,7 @@ describe('LandingPage responsive structure', () => {
     renderLanding({ fontReady: resolvedFonts, preloadImages: resolvedAssets });
 
     expect(await screen.findByText(/enforcement authority always remains with the competent public bodies/i)).toBeVisible();
-    expect(screen.getByText(/arrests, searches, seizures, and prosecutions remain decisions/i)).toBeInTheDocument();
+    expect(screen.getByText(/We supply evidence and support to the authorities, who carry out enforcement/i)).toBeInTheDocument();
   });
 
   it('keeps the mobile hero shield and copy in normal flow at 390px without overlap', async () => {

@@ -28,6 +28,7 @@ async function completeSignupForm(user: ReturnType<typeof userEvent.setup>) {
 
 beforeEach(() => {
   vi.stubEnv('VITE_PUBLIC_FIRM_SIGNUP_ENABLED', 'true');
+  vi.stubEnv('VITE_CLERK_PUBLISHABLE_KEY', '');
 });
 
 afterEach(() => {

@@ -33,7 +33,10 @@ function ClerkAuthGuard({ children, location }: { children: ReactNode; location:
           </Link>
           <button
             type="button"
-            onClick={() => void signOut()}
+            onClick={async () => {
+              useAuthStore.getState().clearSession();
+              await signOut();
+            }}
             className="rounded border border-forge-silver-300 px-4 py-2 text-text-secondary hover:bg-surface-muted"
           >
             Sign Out
@@ -54,13 +57,7 @@ function ClerkAuthGuard({ children, location }: { children: ReactNode; location:
   return <>{children}</>;
 }
 
-export function RequireAuthentication({ children }: RouteGuardProps) {
-  const location = useLocation();
-
-  if (isClerkEnabled) {
-    return <ClerkAuthGuard location={location}>{children}</ClerkAuthGuard>;
-  }
-
+function SupabaseAuthGuard({ location, children }: { location: { pathname: string }; children: ReactNode }) {
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.token);
   const status = useAuthStore((state) => state.status);
@@ -79,7 +76,17 @@ export function RequireAuthentication({ children }: RouteGuardProps) {
     return <Navigate to={`/auth/verify-email?email=${encodeURIComponent(user.email)}`} replace />;
   }
 
-  return children;
+  return <>{children}</>;
+}
+
+export function RequireAuthentication({ children }: RouteGuardProps) {
+  const location = useLocation();
+
+  if (isClerkEnabled) {
+    return <ClerkAuthGuard location={location}>{children}</ClerkAuthGuard>;
+  }
+
+  return <SupabaseAuthGuard location={location}>{children}</SupabaseAuthGuard>;
 }
 
 export function RequireAdmin({ children }: RouteGuardProps) {

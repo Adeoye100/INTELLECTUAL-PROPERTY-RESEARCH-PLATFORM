@@ -10,8 +10,6 @@ import { redeemInvitationForSession, redeemInvitationWithAccessToken } from './i
 import { authRedirectUrl, roleHomePath } from './roleRouting';
 import { syncSupabaseSession } from './authStore';
 
-const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY?.trim();
-
 interface InvitationDetails { email: string; firmName: string; role: UserRole; expiresAt: string; }
 
 function ClerkInviteRedemption({ token, invitation }: { token: string; invitation: InvitationDetails }) {
@@ -168,7 +166,7 @@ export function InviteRedemptionScreen() {
   if (loading) return <p className="text-center text-text-secondary" role="status">Checking invitation…</p>;
   if (!invitation) return <div ref={statusRef} tabIndex={-1} className="space-y-4 text-center focus:outline-none" role="alert"><h1 className="text-2xl font-bold text-text-primary">Invitation unavailable</h1><p className="text-text-secondary">{error ?? 'This invitation is unavailable.'}</p><Button onClick={() => void load()}>Retry</Button></div>;
 
-  if (clerkPublishableKey) {
+  if (import.meta.env.VITE_CLERK_PUBLISHABLE_KEY?.trim()) {
     return <ClerkInviteRedemption token={token} invitation={invitation} />;
   }
   const recoveryPath = `/auth/forgot-password?email=${encodeURIComponent(invitation.email)}&invitation=${encodeURIComponent(token)}`;

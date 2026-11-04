@@ -11,6 +11,9 @@ export function SessionExpiryMonitor() {
 
   useEffect(() => {
     const handleUnauthorized = () => {
+      if (typeof window !== 'undefined' && (window as unknown as { Clerk?: { signOut: () => Promise<void> } }).Clerk?.signOut) {
+        void (window as unknown as { Clerk: { signOut: () => Promise<void> } }).Clerk.signOut().catch(() => undefined);
+      }
       appQueryClient.clear();
       clearSession();
       void supabase.auth.signOut({ scope: 'local' });

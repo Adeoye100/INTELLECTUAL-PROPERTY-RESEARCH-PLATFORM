@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InviteAcceptanceScreen } from './InviteAcceptanceScreen';
 
 const auth = vi.hoisted(() => ({ signInWithPassword: vi.fn(), signUp: vi.fn() }));
@@ -13,9 +13,14 @@ const renderInvitation = (token: string) => render(
   </MemoryRouter>,
 );
 
+beforeEach(() => {
+  vi.stubEnv('VITE_CLERK_PUBLISHABLE_KEY', '');
+});
+
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   auth.signInWithPassword.mockReset();
   auth.signUp.mockReset();
 });

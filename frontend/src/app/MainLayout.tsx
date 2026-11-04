@@ -18,6 +18,7 @@ import {
 import { cn } from '../lib/utils';
 import { Button } from '../components/Button';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { useClerk } from '@clerk/react';
 import { useAuthStore } from '../features/auth/authStore';
 import { authRequest } from '../features/auth/authApi';
 import { SessionExpiryMonitor } from '../features/auth/SessionExpiryMonitor';
@@ -44,6 +45,39 @@ function getNavIcon(path: string) {
     default:
       return <Users size={20} />;
   }
+}
+
+const isClerkEnabled = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY?.trim());
+
+function ClerkSignOutButton() {
+  const { signOut } = useClerk();
+  const clearSession = useAuthStore((state) => state.clearSession);
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      await authRequest<void>('/auth/logout', { method: 'POST' });
+    } catch {
+      // Local logout must still succeed when server revocation is unavailable.
+    } finally {
+      appQueryClient.clear();
+      clearSession();
+      navigate('/auth/login', { replace: true, state: { reason: 'signed-out' } });
+    }
+  };
+
+  return (
+    <Button
+      variant="ghost"
+      className="w-full justify-start text-white hover:bg-white/10"
+      size="sm"
+      onClick={() => void handleSignOut()}
+    >
+      <LogOut size={18} className="mr-2" aria-hidden="true" />
+      <span>Sign Out</span>
+    </Button>
+  );
 }
 
 export const MainLayout: React.FC = () => {
@@ -73,6 +107,9 @@ export const MainLayout: React.FC = () => {
 
   const signOut = async () => {
     try {
+      if (typeof window !== 'undefined' && (window as unknown as { Clerk?: { signOut: () => Promise<void> } }).Clerk?.signOut) {
+        await (window as unknown as { Clerk: { signOut: () => Promise<void> } }).Clerk.signOut();
+      }
       await authRequest<void>('/auth/logout', { method: 'POST' });
     } catch {
       // Local logout must still succeed when server revocation is unavailable.
@@ -156,15 +193,19 @@ export const MainLayout: React.FC = () => {
           </nav>
 
           <div className="border-t border-white/10 p-4">
-            <Button
-              variant="ghost"
-              className="w-full justify-start text-white hover:bg-white/10"
-              size="sm"
-              onClick={signOut}
-            >
-              <LogOut size={18} className="mr-2" aria-hidden="true" />
-              <span>Sign Out</span>
-            </Button>
+            {isClerkEnabled ? (
+              <ClerkSignOutButton />
+            ) : (
+              <Button
+                variant="ghost"
+                className="w-full justify-start text-white hover:bg-white/10"
+                size="sm"
+                onClick={signOut}
+              >
+                <LogOut size={18} className="mr-2" aria-hidden="true" />
+                <span>Sign Out</span>
+              </Button>
+            )}
           </div>
         </aside>
 
